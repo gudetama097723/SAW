@@ -33,7 +33,10 @@
                 <div class="progress-bar bg-success" style="width: <%= [[@player.hp.to_i * 100 / [@player.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
               </div>
               <p>経験値: <%= @player.exp.to_i %> / <%= @player.exp_to_next_level %></p>
-              <p>スキルスロット: <%= @player.remaining_skill_slots %> / <%= @player.skill_slots.to_i %></p>
+              <div class="progress mb-2" style="height: 6px;">
+                <div class="progress-bar bg-info" style="width: <%= [[@player.exp.to_i * 100 / [@player.exp_to_next_level, 1].max, 0].max, 100].min %>%"></div>
+              </div>
+              <p>スキルスロット: <%= @player.used_skill_slots %> / <%= @player.skill_slots.to_i %></p>
               <p>コル: <%= @player.col %></p>
               <p>現在地: <%= @player.location&.name || "不明" %></p>
               <p>時刻: <%= format("%02d:%02d", current_time / 60, current_time % 60) %></p>
@@ -55,9 +58,10 @@
           <div class="card bg-secondary text-light mb-3">
             <div class="card-header"><%= @battle.present? ? "戦闘コマンド" : "情報" %></div>
             <div class="card-body">
-              <% if @battle.present? %>
-                <% battle_command = params[:battle_command].presence %>
-                <% battle_parts = @battle_parts.presence || @battle.mob.mob_parts.to_a %>
+                <% if @battle.present? %>
+                  <% battle_command = params[:battle_command].presence %>
+                  <% battle_parts = @battle_parts.presence || @battle.mob.mob_parts.to_a %>
+                  <% part_states = @part_states || {} %>
 
                 <div class="d-grid gap-2 mb-3">
                   <%= link_to "通常攻撃", root_path(battle_command: "attack"), class: "btn btn-outline-warning w-100" %>
@@ -70,7 +74,9 @@
                   <h5>攻撃部位</h5>
                   <div class="d-grid gap-2">
                     <% battle_parts.each do |part| %>
-                      <%= button_to part.name,
+                      <% state = part_states[part.id.to_s] || {} %>
+                      <% part_label = state["broken"] ? "#{part.name}（破壊済み）" : "#{part.name}（耐久 #{state['durability'] || part.max_durability}）" %>
+                      <%= button_to part_label,
                           attack_path(mob_part_id: part.id),
                           method: :post,
                           class: part.weakness? ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
@@ -94,7 +100,9 @@
                     <h6><%= selected_skill == "vertical_arc" ? "バーチカルアーク" : "バーチカル" %> の攻撃部位</h6>
                     <div class="d-grid gap-2">
                       <% battle_parts.each do |part| %>
-                        <%= button_to part.name,
+                        <% state = part_states[part.id.to_s] || {} %>
+                        <% part_label = state["broken"] ? "#{part.name}（破壊済み）" : "#{part.name}（耐久 #{state['durability'] || part.max_durability}）" %>
+                        <%= button_to part_label,
                             sword_skill_path(mob_part_id: part.id, skill: selected_skill),
                             method: :post,
                             class: part.weakness? ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
@@ -107,9 +115,9 @@
                 <% elsif battle_command == "item" %>
                   <h5>アイテム</h5>
                   <div class="d-grid gap-2">
-                    <% herb = @player.items.find_by(name: "薬草") %>
-                    <% if herb&.quantity.to_i.positive? %>
-                      <%= button_to "薬草 × #{herb.quantity}", use_battle_item_path(item_name: "薬草"), method: :post, class: "btn btn-outline-success w-100" %>
+                    <% potion = @player.items.find_by(name: "ポーション", category: "healing") || @player.items.find_by(name: "ポーション") %>
+                    <% if potion&.quantity.to_i.positive? %>
+                      <%= button_to "ポーション × #{potion.quantity}", use_battle_item_path(item_name: "ポーション"), method: :post, class: "btn btn-outline-success w-100" %>
                     <% else %>
                       <div class="btn btn-outline-secondary disabled w-100">使用可能なアイテムなし</div>
                     <% end %>
@@ -127,8 +135,10 @@
                       <p class="mb-1">武器: <%= weapon.name %></p>
                       <p class="mb-1">種別: <%= weapon.weapon_type %></p>
                       <p class="mb-1">攻撃力: <%= weapon.attack_power %></p>
+                      <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
                       <p class="mb-1">耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
                       <p class="mb-0">補正: HP +<%= weapon.hp_bonus %> / 筋力 +<%= weapon.strength_bonus %> / 敏捷 +<%= weapon.agility_bonus %></p>
+                      <%= button_to "取り外す", unequip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
                     </div>
                   <% end %>
                   <p>武器枠: <%= equipped_weapons.count %> / <%= @player.dual_wield? ? 2 : 1 %></p>
@@ -156,6 +166,7 @@
                           <% end %>
                         </p>
                         <p class="mb-1">攻撃力: <%= weapon.attack_power %> / 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                        <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
                         <p class="mb-2">補正: HP +<%= weapon.hp_bonus %> / 筋力 +<%= weapon.strength_bonus %> / 敏捷 +<%= weapon.agility_bonus %></p>
                         <% unless weapon.equipped? %>
                           <p class="mb-2"><%= weapon.name %>を装備しますか？</p>
@@ -182,7 +193,9 @@
                         <p class="mb-1">種別: <%= armor.armor_type %> / 部位: <%= armor.slot_name %></p>
                         <p class="mb-1">防御: <%= armor.defense %> / 重量: <%= armor.weight %></p>
                         <p class="mb-2">補正: HP +<%= armor.hp_bonus %> / 筋力 +<%= armor.strength_bonus %> / 敏捷 +<%= armor.agility_bonus %></p>
-                        <% unless armor.equipped? %>
+                        <% if armor.equipped? %>
+                          <%= button_to "取り外す", unequip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-light w-100" %>
+                        <% else %>
                           <p class="mb-2"><%= armor.name %>を装備しますか？</p>
                           <%= button_to "装備する", equip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-info w-100" %>
                         <% end %>
@@ -197,7 +210,10 @@
                 <h5>所持品</h5>
                 <div class="d-grid gap-2 mb-3">
                   <%= link_to "所持武器", root_path(panel: "items", item_category: "weapons"), class: "btn btn-outline-light w-100" %>
+                  <%= link_to "所持防具", root_path(panel: "items", item_category: "armors"), class: "btn btn-outline-light w-100" %>
                   <%= link_to "回復アイテム", root_path(panel: "items", item_category: "healing"), class: "btn btn-outline-light w-100" %>
+                  <%= link_to "採取アイテム", root_path(panel: "items", item_category: "gathered"), class: "btn btn-outline-light w-100" %>
+                  <%= link_to "ドロップアイテム", root_path(panel: "items", item_category: "drop"), class: "btn btn-outline-light w-100" %>
                 </div>
 
                 <% if item_category == "weapons" %>
@@ -211,18 +227,53 @@
                   <% else %>
                     <p class="mb-0">所持武器なし</p>
                   <% end %>
+                <% elsif item_category == "armors" %>
+                  <h6>所持防具</h6>
+                  <% if @player.armors.any? %>
+                    <ul class="mb-0">
+                      <% @player.armors.each do |armor| %>
+                        <li><%= armor.name %> / <%= armor.slot_name %> <%= armor.equipped? ? "（装備中）" : "" %></li>
+                      <% end %>
+                    </ul>
+                  <% else %>
+                    <p class="mb-0">所持防具なし</p>
+                  <% end %>
                 <% elsif item_category == "healing" %>
                   <h6>回復アイテム</h6>
-                  <% healing_items = @player.items.select { |item| item.name == "薬草" && item.quantity.to_i.positive? } %>
+                  <% healing_items = @player.items.select { |item| item.category == "healing" && item.quantity.to_i.positive? } %>
                   <% if healing_items.any? %>
                     <ul class="mb-3">
                       <% healing_items.each do |item| %>
                         <li><%= item.name %> × <%= item.quantity %></li>
                       <% end %>
                     </ul>
-                    <%= button_to "薬草を使う", use_item_path(item_name: "薬草"), method: :post, class: "btn btn-outline-success w-100" %>
+                    <%= button_to "ポーションを使う", use_item_path(item_name: "ポーション"), method: :post, class: "btn btn-outline-success w-100" %>
                   <% else %>
                     <p class="mb-0">回復アイテムなし</p>
+                  <% end %>
+                <% elsif item_category == "gathered" %>
+                  <h6>採取アイテム</h6>
+                  <% gathered_items = @player.items.select { |item| item.category == "gathered" && item.quantity.to_i.positive? } %>
+                  <% if gathered_items.any? %>
+                    <ul class="mb-0">
+                      <% gathered_items.each do |item| %>
+                        <li><%= item.name %> × <%= item.quantity %></li>
+                      <% end %>
+                    </ul>
+                  <% else %>
+                    <p class="mb-0">採取アイテムなし</p>
+                  <% end %>
+                <% elsif item_category == "drop" %>
+                  <h6>ドロップアイテム</h6>
+                  <% drop_items = @player.items.select { |item| item.category == "drop" && item.quantity.to_i.positive? } %>
+                  <% if drop_items.any? %>
+                    <ul class="mb-0">
+                      <% drop_items.each do |item| %>
+                        <li><%= item.name %> × <%= item.quantity %></li>
+                      <% end %>
+                    </ul>
+                  <% else %>
+                    <p class="mb-0">ドロップアイテムなし</p>
                   <% end %>
                 <% else %>
                   <p class="mb-0">種類を選択してください。</p>
@@ -230,7 +281,7 @@
               <% when "skills" %>
                 <% selected_skill_set = params[:skill_set].presence %>
                 <h5>スキル</h5>
-                <p>スキルスロット: <%= @player.remaining_skill_slots %> / <%= @player.skill_slots.to_i %></p>
+                <p>スキルスロット: <%= @player.used_skill_slots %> / <%= @player.skill_slots.to_i %>（空き <%= @player.remaining_skill_slots %>）</p>
                 <% @player.skills.each do |skill| %>
                   <%= link_to "#{skill.name}: #{skill.proficiency.to_i}/1000", root_path(panel: "skills", skill_set: skill.name), class: "btn btn-outline-light w-100 mb-2" %>
                   <div class="progress mb-3">
@@ -259,8 +310,16 @@
                 <% end %>
               <% when "growth" %>
                 <h5>成長</h5>
-                <p>筋力: <%= @player.effective_strength %>（基礎 <%= @player.strength.to_i %>）</p>
-                <p>敏捷: <%= @player.effective_agility %>（基礎 <%= @player.agility.to_i %>）</p>
+                <h6>装備込みステータス</h6>
+                <p>レベル: <%= @player.level.to_i %></p>
+                <p>HP: <%= @player.hp.to_i %> / <%= @player.effective_max_hp %>（基礎最大 <%= @player.max_hp.to_i %> / 武器 +<%= @player.weapon_hp_bonus %> / 防具 +<%= @player.armor_hp_bonus %>）</p>
+                <p>筋力: <%= @player.effective_strength %>（基礎 <%= @player.strength.to_i %> / 武器 +<%= @player.weapon_strength_bonus %> / 防具 +<%= @player.armor_strength_bonus %>）</p>
+                <p>敏捷: <%= @player.effective_agility %>（基礎 <%= @player.agility.to_i %> / 武器 +<%= @player.weapon_agility_bonus %> / 防具 +<%= @player.armor_agility_bonus %> / 重量 -<%= @player.equipment_weight_penalty %>）</p>
+                <p>防御: <%= @player.damage_cut %></p>
+                <p>装備重量: <%= @player.equipment_weight %></p>
+                <p>経験値: <%= @player.exp.to_i %> / <%= @player.exp_to_next_level %></p>
+                <p>スキルスロット: <%= @player.used_skill_slots %> / <%= @player.skill_slots.to_i %>（空き <%= @player.remaining_skill_slots %>）</p>
+                <h6 class="mt-3">ポイント振り分け</h6>
                 <p>振り分け: <%= @player.stat_points.to_i %> pt</p>
                 <% if @player.stat_points.to_i > 0 %>
                   <div class="d-grid gap-2">
@@ -268,12 +327,50 @@
                     <%= button_to "敏捷 +1", allocate_agility_path, method: :post, class: "btn btn-outline-info w-100" %>
                   </div>
                 <% end %>
+              <% when "item_shop" %>
+                <% shop_menu = params[:shop_menu].presence %>
+                <h5>道具屋</h5>
+                <div class="d-grid gap-2 mb-3">
+                  <%= link_to "道具を購入", root_path(panel: "item_shop", shop_menu: "buy"), class: "btn btn-outline-warning w-100" %>
+                  <%= link_to "道具を生産", root_path(panel: "item_shop", shop_menu: "produce"), class: "btn btn-outline-warning w-100" %>
+                  <%= link_to "アイテムを売却", root_path(panel: "item_shop", shop_menu: "sell"), class: "btn btn-outline-warning w-100" %>
+                </div>
+
+                <% if shop_menu == "buy" %>
+                  <h6>ポーション</h6>
+                  <p>価格: 50コル</p>
+                  <p>効果: HPを100回復</p>
+                  <%= button_to "購入する", item_shop_path, method: :post, class: "btn btn-outline-warning w-100" %>
+                <% elsif shop_menu == "produce" %>
+                  <% herb = @player.items.find_by(name: "薬草", category: "gathered") || @player.items.find_by(name: "薬草") %>
+                  <h6>ポーション</h6>
+                  <p>必要素材: 薬草 10個</p>
+                  <p>費用: 20コル</p>
+                  <p>所持薬草: <%= (herb&.quantity || 0).to_i %></p>
+                  <%= button_to "ポーションを生産する", produce_item_path, method: :post, class: "btn btn-outline-warning w-100" %>
+                <% elsif shop_menu == "sell" %>
+                  <% sellable_items = @player.items.select { |item| item.quantity.to_i.positive? } %>
+                  <% if sellable_items.any? %>
+                    <div class="d-grid gap-2">
+                      <% sellable_items.each do |item| %>
+                        <div class="border rounded p-2">
+                          <p class="mb-1"><%= item.name %> × <%= item.quantity %></p>
+                          <p class="mb-2">売却価格: <%= item.sell_price %>コル</p>
+                          <%= button_to "1つ売却する", sell_item_path(item_name: item.name), method: :post, class: "btn btn-outline-warning w-100" %>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% else %>
+                    <p class="mb-0">売却できるアイテムがありません。</p>
+                  <% end %>
+                <% end %>
               <% when "blacksmith" %>
                 <% blacksmith_menu = params[:blacksmith_menu].presence %>
                 <h5>鍛冶屋</h5>
                 <div class="d-grid gap-2 mb-3">
                   <%= link_to "武器を購入する", root_path(panel: "blacksmith", blacksmith_menu: "buy"), class: "btn btn-outline-warning w-100" %>
                   <%= link_to "武器を整備する", root_path(panel: "blacksmith", blacksmith_menu: "repair"), class: "btn btn-outline-warning w-100" %>
+                  <%= link_to "武器を売却する", root_path(panel: "blacksmith", blacksmith_menu: "sell"), class: "btn btn-outline-warning w-100" %>
                 </div>
 
                 <% if blacksmith_menu == "buy" %>
@@ -281,6 +378,7 @@
                   <p>価格: 100コル</p>
                   <p>種別: 片手直剣</p>
                   <p>攻撃力: 9</p>
+                  <p>クリティカル率: 7%</p>
                   <p>耐久力: 40 / 40</p>
                   <p>補正: HP +0 / 筋力 +2 / 敏捷 +0</p>
                   <p>ブロンズソードを購入しますか？</p>
@@ -296,6 +394,23 @@
                     <%= button_to "整備する", blacksmith_path, method: :post, class: "btn btn-outline-warning w-100" %>
                   <% else %>
                     <p class="mb-0">整備できる装備中の武器がありません。</p>
+                  <% end %>
+                <% elsif blacksmith_menu == "sell" %>
+                  <% sellable_weapons = @player.weapons.reject(&:starter_weapon?) %>
+                  <% if sellable_weapons.any? %>
+                    <div class="d-grid gap-2">
+                      <% sellable_weapons.each do |weapon| %>
+                        <div class="border rounded p-2">
+                          <p class="mb-1"><%= weapon.name %> <%= weapon.equipped? ? "（装備中）" : "" %></p>
+                          <p class="mb-1">攻撃力: <%= weapon.attack_power %> / 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                          <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
+                          <p class="mb-2">売却価格: <%= weapon.sell_price %>コル</p>
+                          <%= button_to "売却する", sell_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-warning w-100" %>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% else %>
+                    <p class="mb-0">売却できる武器がありません。</p>
                   <% end %>
                 <% end %>
               <% else %>
@@ -329,7 +444,7 @@
                   <%= button_to "昼寝する", use_rest_skill_path, method: :post, class: "btn btn-success w-100 mb-2" %>
                 <% end %>
 
-                <%= button_to "薬草を使う", use_rest_item_path, method: :post, class: "btn btn-outline-success w-100 mb-2" %>
+                <%= button_to "ポーションを使う", use_rest_item_path, method: :post, class: "btn btn-outline-success w-100 mb-2" %>
                 <%= button_to "休憩を終える", end_rest_path, method: :post, class: "btn btn-outline-dark w-100" %>
               </div>
             </div>
@@ -348,7 +463,7 @@
                 <% end %>
 
                 <% if @player.found_item_shop? %>
-                  <%= button_to "道具屋で薬草を買う（10コル）", item_shop_path, method: :post, class: "btn btn-outline-warning w-100" %>
+                  <%= link_to "道具屋に入る", root_path(panel: "item_shop"), class: "btn btn-outline-warning w-100" %>
                 <% else %>
                   <div class="btn btn-outline-secondary disabled w-100">道具屋（未発見）</div>
                 <% end %>
@@ -360,6 +475,7 @@
                 <% end %>
               <% else %>
                 <%= button_to "探索する", explore_path, method: :post, class: "btn btn-primary btn-lg" %>
+                <%= button_to "採取する", gather_path, method: :post, class: "btn btn-outline-success btn-lg" %>
                 <%= button_to "休憩", start_rest_path, method: :post, class: "btn btn-outline-light" %>
               <% end %>
 

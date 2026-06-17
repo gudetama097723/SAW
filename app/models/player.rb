@@ -28,16 +28,40 @@ class Player < ApplicationRecord
   end
 
   def effective_max_hp
-    max_hp.to_i + equipped_weapons.sum(:hp_bonus).to_i + equipped_armors.sum(:hp_bonus).to_i
+    max_hp.to_i + weapon_hp_bonus + armor_hp_bonus
   end
 
   def effective_strength
-    strength.to_i + equipped_weapons.sum(:strength_bonus).to_i + equipped_armors.sum(:strength_bonus).to_i
+    strength.to_i + weapon_strength_bonus + armor_strength_bonus
   end
 
   def effective_agility
-    base_agility = agility.to_i + equipped_weapons.sum(:agility_bonus).to_i + equipped_armors.sum(:agility_bonus).to_i
+    base_agility = agility.to_i + weapon_agility_bonus + armor_agility_bonus
     [base_agility - equipment_weight_penalty, 1].max
+  end
+
+  def weapon_hp_bonus
+    equipped_weapons.sum(:hp_bonus).to_i
+  end
+
+  def weapon_strength_bonus
+    equipped_weapons.sum(:strength_bonus).to_i
+  end
+
+  def weapon_agility_bonus
+    equipped_weapons.sum(:agility_bonus).to_i
+  end
+
+  def armor_hp_bonus
+    equipped_armors.sum(:hp_bonus).to_i
+  end
+
+  def armor_strength_bonus
+    equipped_armors.sum(:strength_bonus).to_i
+  end
+
+  def armor_agility_bonus
+    equipped_armors.sum(:agility_bonus).to_i
   end
 
   def equipment_weight
@@ -53,7 +77,7 @@ class Player < ApplicationRecord
   end
 
   def used_skill_slots
-    skills.exists?(name: "片手剣") ? 1 : 0
+    skills.select(:name).distinct.count
   end
 
   def remaining_skill_slots

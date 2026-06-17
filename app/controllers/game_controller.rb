@@ -3,8 +3,11 @@ class GameController < ApplicationController
     @player = Player.first
     @battle = Battle.last
     @rest = Rest.last
-    @routes = available_routes_for(@player.location)
-    @battle_parts = ensure_mob_parts!(@battle.mob) if @battle
+    @routes = FieldService.available_routes_for(@player.location)
+    if @battle
+      @battle_parts = BattleService.ensure_mob_parts!(@battle.mob)
+      @part_states = BattleService.ensure_part_states!(@battle, @battle_parts)
+    end
   end
 
   def stroll
@@ -34,69 +37,29 @@ class GameController < ApplicationController
   end
 
   def explore
-    player = Player.first
-    location = player.location
+    result = FieldService.explore!(Player.first)
+    redirect_with_result(result)
+  end
 
-    if location&.safe_area?
-      redirect_to root_path, alert: "ここは安全地帯です。敵は出現しません。"
-      return
-    end
-
-    mapping_before = location.mapping_progress.to_i
-    mapping_gain = rand(12..22)
-    location.mapping_progress = [mapping_before + mapping_gain, 100].min
-    location.save!
-
-    event = rand(100)
-
-    if event < 40
-      mob = Mob.order("RANDOM()").first
-
-      Battle.destroy_all
-      Battle.create!(
-        player: player,
-        mob: mob,
-        enemy_hp: mob.hp
-      )
-
-      message = "#{mob.name}と遭遇した！"
-
-    elsif event < 70
-      herb = player.items.find_or_create_by(name: "薬草") do |item|
-        item.quantity = 0
-      end
-
-      herb.quantity ||= 0
-      herb.quantity += 1
-      herb.save
-
-      message = "薬草を見つけた！"
-
-    elsif event < 90
-      message = "何も見つからなかった。"
-
-    else
-      message = "遠くに奇妙な塔が見える……。"
-    end
-
-    message += " マッピング進行度 +#{location.mapping_progress - mapping_before}%（#{location.mapping_progress}%）"
-    if mapping_before < 100 && location.mapping_progress >= 100
-      message += " #{location.name}の地形を把握した。次の町への道が開けた！"
-    end
-
-    player.save
-
-    redirect_to root_path, notice: message
+  def gather
+    result = FieldService.gather!(Player.first)
+    redirect_with_result(result)
   end
 
   def attack
-    resolve_player_attack!(
+    result = BattleService.resolve_player_attack!(
+      battle: Battle.last,
+      player: Player.first,
+      mob_part_id: params[:mob_part_id],
       label: "通常攻撃",
       damage_multiplier: 100,
       durability_cost: 1,
-      skill_gain: 1,
-      stiffness: false
+      skill_gain: 0,
+      stiffness: false,
+      hits: 1,
+      sword_skill: false
     )
+    redirect_with_result(result)
   end
 
   def sword_skill
@@ -109,23 +72,35 @@ class GameController < ApplicationController
         return
       end
 
-      resolve_player_attack!(
+      result = BattleService.resolve_player_attack!(
+        battle: Battle.last,
+        player: player,
+        mob_part_id: params[:mob_part_id],
         label: "バーチカルアーク",
         damage_multiplier: 240,
         durability_cost: 4,
         skill_gain: 5,
-        stiffness: true
+        stiffness: true,
+        hits: 2,
+        sword_skill: true
       )
+      redirect_with_result(result)
       return
     end
 
-    resolve_player_attack!(
+    result = BattleService.resolve_player_attack!(
+      battle: Battle.last,
+      player: Player.first,
+      mob_part_id: params[:mob_part_id],
       label: "バーチカル",
       damage_multiplier: 150,
       durability_cost: 2,
       skill_gain: 3,
-      stiffness: true
+      stiffness: true,
+      hits: 1,
+      sword_skill: true
     )
+    redirect_with_result(result)
   end
 
   def use_battle_item
@@ -137,20 +112,20 @@ class GameController < ApplicationController
       return
     end
 
-    unless params[:item_name] == "薬草"
+    unless params[:item_name] == "ポーション"
       redirect_to root_path, alert: "そのアイテムはまだ使用できません。"
       return
     end
 
-    unless consume_healing_herb!(player)
-      redirect_to root_path, alert: "薬草を持っていません。"
+    item_result = ItemService.consume_healing_potion!(player)
+    unless item_result.status == :ok
+      redirect_to root_path, alert: item_result.message
       return
     end
 
-    enemy_message = apply_enemy_attack!(player, battle, battle.mob.name)
-    return if performed?
+    enemy_result = BattleService.apply_enemy_attack!(player, battle)
 
-    redirect_to root_path, notice: "薬草を使った。HPが10回復した。#{enemy_message}"
+    redirect_to root_path, notice: "#{item_result.message}#{enemy_result.message}"
   end
 
   def use_item
@@ -161,13 +136,14 @@ class GameController < ApplicationController
       return
     end
 
-    unless params[:item_name] == "薬草"
+    unless params[:item_name] == "ポーション"
       redirect_to root_path(panel: "items", item_category: "healing"), alert: "そのアイテムはまだ使用できません。"
       return
     end
 
-    unless consume_healing_herb!(player)
-      redirect_to root_path(panel: "items", item_category: "healing"), alert: "薬草を持っていません。"
+    item_result = ItemService.consume_healing_potion!(player)
+    unless item_result.status == :ok
+      redirect_to root_path(panel: "items", item_category: "healing"), alert: item_result.message
       return
     end
 
@@ -177,7 +153,7 @@ class GameController < ApplicationController
     surprise_message = check_item_use_surprise_encounter!(player)
     return if performed?
 
-    redirect_to root_path(panel: "items", item_category: "healing"), notice: "薬草を使った。HPが10回復した。#{surprise_message}"
+    redirect_to root_path(panel: "items", item_category: "healing"), notice: "#{item_result.message}#{surprise_message}"
   end
 
   def escape
@@ -195,10 +171,9 @@ class GameController < ApplicationController
       battle.destroy
       redirect_to root_path, notice: "逃走に成功した。"
     else
-      enemy_message = apply_enemy_attack!(player, battle, battle.mob.name)
-      return if performed?
+      enemy_result = BattleService.apply_enemy_attack!(player, battle)
 
-      redirect_to root_path, alert: "逃走に失敗した。#{enemy_message}"
+      redirect_to root_path, alert: "逃走に失敗した。#{enemy_result.message}"
     end
   end
 
@@ -259,8 +234,9 @@ class GameController < ApplicationController
       return
     end
 
-    unless consume_healing_herb!(player)
-      redirect_to root_path, alert: "薬草を持っていません。"
+    item_result = ItemService.consume_healing_potion!(player)
+    unless item_result.status == :ok
+      redirect_to root_path, alert: item_result.message
       return
     end
 
@@ -270,7 +246,7 @@ class GameController < ApplicationController
     check_rest_encounter!(player)
     return if performed?
 
-    redirect_to root_path, notice: "薬草を使った。HPが10回復した。"
+    redirect_to root_path, notice: item_result.message
   end
 
   def end_rest
@@ -307,27 +283,33 @@ class GameController < ApplicationController
       return
     end
 
-    price = 10
-    if player.col.to_i < price
-      redirect_to root_path, alert: "コルが足りません。薬草は#{price}コルです。"
+    result = ItemService.buy_potion!(player)
+    redirect_to root_path(panel: "item_shop", shop_menu: "buy"), result.status == :ok ? { notice: result.message } : { alert: result.message }
+  end
+
+  def produce_item
+    player = Player.first
+
+    unless player.location&.safe_area? && player.found_item_shop?
+      redirect_to root_path, alert: "道具屋はまだ利用できません。"
       return
     end
 
-    herb = player.items.find_or_create_by!(name: "薬草") do |item|
-      item.quantity = 0
+    result = ItemService.produce_potion!(player)
+    redirect_to root_path(panel: "item_shop", shop_menu: "produce"), result.status == :ok ? { notice: result.message } : { alert: result.message }
+  end
+
+  def sell_item
+    player = Player.first
+
+    unless player.location&.safe_area? && player.found_item_shop?
+      redirect_to root_path, alert: "道具屋はまだ利用できません。"
+      return
     end
 
-    player.col = player.col.to_i - price
-    player.current_time = (player.current_time.to_i + 5) % 1440
-    herb.quantity ||= 0
-    herb.quantity += 1
-
-    ActiveRecord::Base.transaction do
-      player.save!
-      herb.save!
-    end
-
-    redirect_to root_path, notice: "道具屋で薬草を1つ購入した。#{price}コル支払った。"
+    item = player.items.find_by(name: params[:item_name])
+    result = ItemService.sell_item!(player, item)
+    redirect_to root_path(panel: "item_shop", shop_menu: "sell"), result.status == :ok ? { notice: result.message } : { alert: result.message }
   end
 
   def blacksmith
@@ -392,11 +374,43 @@ class GameController < ApplicationController
       hp_bonus: 0,
       strength_bonus: 2,
       agility_bonus: 0,
+      critical_rate: 7,
       equipped: false
     )
     player.save!
 
     redirect_to root_path(panel: "equipment"), notice: "ブロンズソードを購入した。"
+  end
+
+  def sell_weapon
+    player = Player.first
+
+    unless player.location&.safe_area? && player.found_blacksmith?
+      redirect_to root_path, alert: "鍛冶屋はまだ利用できません。"
+      return
+    end
+
+    weapon = player.weapons.find_by(id: params[:weapon_id])
+    unless weapon
+      redirect_to root_path(panel: "blacksmith", blacksmith_menu: "sell"), alert: "その武器は所持していません。"
+      return
+    end
+
+    if weapon.starter_weapon?
+      redirect_to root_path(panel: "blacksmith", blacksmith_menu: "sell"), alert: "スモールソードは売却できません。"
+      return
+    end
+
+    price = weapon.sell_price
+    player.col = player.col.to_i + price
+    player.current_time = (player.current_time.to_i + 10) % 1440
+
+    ActiveRecord::Base.transaction do
+      weapon.destroy!
+      player.save!
+    end
+
+    redirect_to root_path(panel: "blacksmith", blacksmith_menu: "sell"), notice: "#{weapon.name}を#{price}コルで売却した。"
   end
 
   def equip_weapon
@@ -422,6 +436,19 @@ class GameController < ApplicationController
     redirect_to root_path(panel: "equipment"), notice: "#{weapon.name}を装備した。"
   end
 
+  def unequip_weapon
+    player = Player.first
+    weapon = player.weapons.find_by(id: params[:weapon_id])
+
+    unless weapon&.equipped?
+      redirect_to root_path(panel: "equipment"), alert: "その武器は装備していません。"
+      return
+    end
+
+    weapon.update!(equipped: false)
+    redirect_to root_path(panel: "equipment"), notice: "#{weapon.name}を外した。"
+  end
+
   def equip_armor
     player = Player.first
     armor = player.armors.find_by(id: params[:armor_id])
@@ -437,6 +464,19 @@ class GameController < ApplicationController
     end
 
     redirect_to root_path(panel: "equipment"), notice: "#{armor.name}を装備した。"
+  end
+
+  def unequip_armor
+    player = Player.first
+    armor = player.armors.find_by(id: params[:armor_id])
+
+    unless armor&.equipped?
+      redirect_to root_path(panel: "equipment"), alert: "その防具は装備していません。"
+      return
+    end
+
+    armor.update!(equipped: false)
+    redirect_to root_path(panel: "equipment"), notice: "#{armor.name}を外した。"
   end
 
   def allocate_strength
@@ -493,6 +533,13 @@ class GameController < ApplicationController
     [(base_damage * part.damage_multiplier.to_i / 100.0).ceil, 1].max
   end
 
+  def player_attack_hit?(player, battle, part)
+    agility_gap = player.effective_agility - mob_effective_agility(battle)
+    part_modifier = part.weakness? ? -20 : 0
+    chance = [[80 + (agility_gap * 5) + part_modifier, 20].max, 98].min
+    rand(100) < chance
+  end
+
   def ensure_mob_parts!(mob)
     return [] unless mob
     return mob.mob_parts.to_a if mob.mob_parts.exists?
@@ -523,7 +570,7 @@ class GameController < ApplicationController
     [(mob.exp_reward.to_i * multiplier).round, 1].max
   end
 
-  def resolve_player_attack!(label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:)
+  def resolve_player_attack!(label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:)
     battle = Battle.last
     player = Player.first
 
@@ -539,22 +586,47 @@ class GameController < ApplicationController
     end
 
     parts = ensure_mob_parts!(battle.mob)
+    ensure_part_states!(battle, parts)
     part = parts.find { |mob_part| mob_part.id == params[:mob_part_id].to_i } || parts.first
     unless part
       redirect_to root_path, alert: "攻撃可能な部位がありません。"
       return
     end
 
-    damage = (calculate_player_damage(player, weapon, battle.mob, part) * damage_multiplier / 100.0).ceil
+    hit_messages = []
+    damage = 0
+    damage_per_hit_multiplier = damage_multiplier / hits.to_f
+
+    hits.times do |index|
+      guard_result = resolve_guarded_part(player, battle, parts, part)
+
+      if guard_result[:blocked]
+        hit_messages << hit_message(index, hits, guard_result[:message])
+      elsif player_attack_hit?(player, battle, guard_result[:part])
+        actual_part = guard_result[:part]
+        base_hit_damage = (calculate_player_damage(player, weapon, battle.mob, actual_part) * damage_per_hit_multiplier / 100.0).ceil
+        varied_damage = apply_player_damage_variance(base_hit_damage)
+        critical = critical_hit?(weapon, battle, actual_part, varied_damage)
+        hit_damage = critical ? varied_damage * 2 : varied_damage
+        damage += hit_damage
+        break_message = apply_part_damage!(player, battle, actual_part, hit_damage)
+        critical_message = critical ? "クリティカル！" : ""
+        result_message = "#{guard_result[:message]}#{critical_message}#{actual_part.name}へ#{hit_damage}ダメージ#{break_message}"
+        hit_messages << hit_message(index, hits, result_message)
+      else
+        hit_messages << hit_message(index, hits, "#{guard_result[:message]}ミス")
+      end
+    end
+
     weapon.apply_durability_loss!(durability_cost)
     battle.enemy_hp -= damage
 
     if battle.enemy_hp <= 0
-      finish_battle_victory!(player, battle, weapon, part, label, damage, skill_gain)
+      finish_battle_victory!(player, battle, weapon, part, label, hit_messages.join(" / "), skill_gain, sword_skill)
       return
     end
 
-    skill_message = gain_sword_skill!(player, skill_gain)
+    skill_message = sword_skill ? gain_sword_skill!(player, skill_gain) : ""
 
     player.save!
     battle.save!
@@ -569,15 +641,15 @@ class GameController < ApplicationController
       stiffness_message = ""
     end
 
-    redirect_to root_path, notice: "#{battle.mob.name}の#{part.name}へ#{label}！#{damage}ダメージ！#{enemy_message}#{stiffness_message}#{broken_message}#{skill_message}"
+    redirect_to root_path, notice: "#{battle.mob.name}の#{part.name}へ#{label}！#{hit_messages.join(' / ')}！#{enemy_message}#{stiffness_message}#{broken_message}#{skill_message}"
   end
 
-  def finish_battle_victory!(player, battle, weapon, part, label, damage, skill_gain)
+  def finish_battle_victory!(player, battle, weapon, part, label, damage_message, skill_gain, sword_skill)
     mob = battle.mob
     mob_name = mob.name
     player.col = player.col.to_i + 10
 
-    skill_message = gain_sword_skill!(player, skill_gain)
+    skill_message = sword_skill ? gain_sword_skill!(player, skill_gain) : ""
 
     player.save!
     dropped_weapon_message = try_drop_weapon!(player, mob)
@@ -585,16 +657,141 @@ class GameController < ApplicationController
     battle.destroy!
 
     broken_message = destroy_weapon_if_broken!(weapon)
-    redirect_to root_path, notice: "#{mob_name}の#{part.name}へ#{label}！#{damage}ダメージ！10コル獲得！片手剣 +#{skill_gain} #{exp_message}#{dropped_weapon_message}#{broken_message}#{skill_message}"
+    redirect_to root_path, notice: "#{mob_name}の#{part.name}へ#{label}！#{damage_message}！10コル獲得！#{exp_message}#{dropped_weapon_message}#{broken_message}#{skill_message}"
+  end
+
+  def hit_message(index, hits, message)
+    hits > 1 ? "#{index + 1}撃目 #{message}" : message
+  end
+
+  def apply_player_damage_variance(damage)
+    [(damage.to_i * rand(75..100) / 100.0).ceil, 1].max
+  end
+
+  def critical_hit?(weapon, battle, part, damage)
+    return true if part.weakness? && part_would_break?(battle, part, damage)
+
+    rand(100) < weapon.effective_critical_rate
+  end
+
+  def part_would_break?(battle, part, damage)
+    state = battle_part_states(battle)[part.id.to_s] || default_part_state(part)
+    return false if state["broken"]
+
+    state["durability"].to_i <= damage.to_i
+  end
+
+  def resolve_guarded_part(player, battle, parts, target_part)
+    return { part: target_part, message: "", blocked: false } if part_broken?(battle, target_part)
+    return { part: target_part, message: "", blocked: false } unless enemy_guard_success?(player, battle, target_part)
+
+    if battle.mob.equipped_weapon && target_part.weakness?
+      return { part: target_part, message: "#{battle.mob.equipped_weapon.name}で弾かれた！", blocked: true }
+    end
+
+    guard_part = guard_part_for(battle, parts, target_part)
+    if guard_part
+      { part: guard_part, message: "#{guard_part.name}で防がれた！", blocked: false }
+    else
+      { part: target_part, message: "", blocked: false }
+    end
+  end
+
+  def enemy_guard_success?(player, battle, target_part)
+    base_chance = target_part.weakness? ? 65 : 20
+    base_chance += 15 if battle.mob.equipped_weapon && target_part.weakness?
+    agility_gap = player.effective_agility - mob_effective_agility(battle)
+    chance = [[base_chance - (agility_gap * 6), 5].max, 90].min
+    rand(100) < chance
+  end
+
+  def guard_part_for(battle, parts, target_part)
+    candidates = parts.reject { |part| part.id == target_part.id || part_broken?(battle, part) }
+    candidates.find { |part| part.name.match?(/手|腕/) } ||
+      candidates.find { |part| part.name.match?(/外膜|胴|体/) } ||
+      candidates.first
+  end
+
+  def apply_part_damage!(player, battle, part, damage)
+    states = battle_part_states(battle)
+    state = states[part.id.to_s] || default_part_state(part)
+    return "" if state["broken"]
+
+    state["durability"] = state["durability"].to_i - damage.to_i
+    message = ""
+    if state["durability"] <= 0
+      state["broken"] = true
+      message = " #{part.break_message}"
+      message += apply_part_drop!(player, part)
+    end
+
+    states[part.id.to_s] = state
+    battle.part_states = states.to_json
+    message
+  end
+
+  def apply_part_drop!(player, part)
+    return "" if part.drop_item_name.blank?
+    return "" unless rand(100) < part.drop_rate.to_i
+
+    item = add_item!(player, part.drop_item_name, "drop")
+    item.save!
+    " #{part.drop_item_name}を入手した！"
+  end
+
+  def ensure_part_states!(battle, parts)
+    states = battle_part_states(battle)
+    changed = false
+    parts.each do |part|
+      next if states.key?(part.id.to_s)
+
+      states[part.id.to_s] = default_part_state(part)
+      changed = true
+    end
+    return states unless changed
+
+    battle.part_states = states.to_json
+    battle.save!
+    states
+  end
+
+  def default_part_state(part)
+    { "durability" => part.max_durability.to_i, "broken" => false }
+  end
+
+  def battle_part_states(battle)
+    JSON.parse(battle.part_states.presence || "{}")
+  rescue JSON::ParserError
+    {}
+  end
+
+  def part_broken?(battle, part)
+    battle_part_states(battle).dig(part.id.to_s, "broken") == true
+  end
+
+  def mob_effective_atk(battle)
+    penalty = broken_parts_with_effect(battle, "strength_down").count * 0.35
+    [(battle.mob.atk.to_i * (1.0 - penalty)).ceil, 1].max
+  end
+
+  def mob_effective_agility(battle)
+    penalty = broken_parts_with_effect(battle, "agility_down").count * 0.35
+    [(battle.mob.effective_agility * (1.0 - penalty)).ceil, 1].max
+  end
+
+  def broken_parts_with_effect(battle, effect)
+    battle.mob.mob_parts.select do |part|
+      part.break_effect == effect && part_broken?(battle, part)
+    end
   end
 
   def apply_enemy_attack!(player, battle, mob_name, prefix: "")
-    if evaded_enemy_attack?(player, battle.mob)
+    if evaded_enemy_attack?(player, battle)
       player.save!
       return "#{prefix}#{mob_name}の攻撃を回避した！"
     end
 
-    raw_damage = rand(1..battle.mob.atk)
+    raw_damage = rand(1..mob_effective_atk(battle))
     enemy_damage = [raw_damage - player.damage_cut, 1].max
     player.hp = player.hp.to_i - enemy_damage
 
@@ -615,25 +812,33 @@ class GameController < ApplicationController
     "#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！"
   end
 
-  def evaded_enemy_attack?(player, mob)
-    agility_gap = player.effective_agility - mob.effective_agility
+  def evaded_enemy_attack?(player, battle)
+    agility_gap = player.effective_agility - mob_effective_agility(battle)
     chance = [[10 + (agility_gap * 5), 5].max, 75].min
     rand(100) < chance
   end
 
-  def consume_healing_herb!(player)
-    herb = player.items.find_by(name: "薬草")
-    return false unless herb && herb.quantity.to_i.positive?
+  def consume_healing_potion!(player)
+    potion = player.items.find_by(name: "ポーション", category: "healing") || player.items.find_by(name: "ポーション")
+    return false unless potion && potion.quantity.to_i.positive?
 
-    herb.quantity -= 1
-    player.hp = [player.hp.to_i + 10, player.effective_max_hp].min
+    potion.quantity -= 1
+    player.hp = [player.hp.to_i + 100, player.effective_max_hp].min
 
     ActiveRecord::Base.transaction do
-      herb.save!
+      potion.quantity.to_i <= 0 ? potion.destroy! : potion.save!
       player.save!
     end
 
     true
+  end
+
+  def add_item!(player, name, category, quantity = 1)
+    item = player.items.find_or_create_by!(name: name, category: category) do |new_item|
+      new_item.quantity = 0
+    end
+    item.quantity = item.quantity.to_i + quantity.to_i
+    item
   end
 
   def gain_sword_skill!(player, amount)
@@ -641,14 +846,20 @@ class GameController < ApplicationController
       skill.proficiency = 0
     end
     before = sword_skill.proficiency.to_i
-    sword_skill.proficiency = before + amount.to_i
+    actual_gain = proficiency_gain(amount, before)
+    sword_skill.proficiency = [before + actual_gain, 1000].min
     sword_skill.save!
 
     if before < 100 && sword_skill.proficiency >= 100
-      " バーチカルアークを習得した！"
+      " 片手剣 +#{actual_gain} バーチカルアークを習得した！"
     else
-      ""
+      " 片手剣 +#{actual_gain}"
     end
+  end
+
+  def proficiency_gain(base_amount, current_proficiency)
+    reduction = current_proficiency.to_i / 100
+    [base_amount.to_i - reduction, 1].max
   end
 
   def check_rest_encounter!(player)
@@ -680,6 +891,7 @@ class GameController < ApplicationController
       hp_bonus: weapon.hp_bonus,
       strength_bonus: weapon.strength_bonus,
       agility_bonus: weapon.agility_bonus,
+      critical_rate: weapon.critical_rate,
       equipped: false
     )
 
@@ -727,5 +939,20 @@ class GameController < ApplicationController
     return "" if performed?
 
     "#{mob.name}に見つかった！"
+  end
+
+  def gather_encounter_chance(location)
+    [[(location&.danger_level || 0).to_i / 2, 10].max, 45].min
+  end
+
+  def gatherable_items_for(location)
+    case location&.name
+    when "はじまりの草原"
+      ["薬草"]
+    when "静寂の森"
+      ["薬草", "しなる枝"]
+    else
+      ["薬草"]
+    end
   end
 end

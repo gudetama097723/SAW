@@ -22,6 +22,18 @@ class Weapon < ApplicationRecord
     missing * rarity_cost_multiplier
   end
 
+  def sell_price
+    return 0 if starter_weapon?
+
+    base = attack_power.to_i * 4
+    durability_rate = max_durability.to_i.positive? ? durability.to_i.to_f / max_durability.to_i : 0.5
+    [(base * durability_rate * rarity_cost_multiplier / 2.0).floor, 1].max
+  end
+
+  def effective_critical_rate
+    [[critical_rate.to_i, 0].max, 100].min
+  end
+
   def rarity_cost_multiplier
     {
       "common" => 2,
