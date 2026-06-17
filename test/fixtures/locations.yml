@@ -1,0 +1,13 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  name: MyString
+  floor: 1
+  danger_level: 1
+  safe_area: false
+
+two:
+  name: MyString
+  floor: 1
+  danger_level: 1
+  safe_area: false

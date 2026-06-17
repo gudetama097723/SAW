@@ -1,0 +1,11 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  player: one
+  mob: one
+  enemy_hp: 1
+
+two:
+  player: two
+  mob: two
+  enemy_hp: 1
