@@ -81,8 +81,10 @@ Weapon.find_or_create_by!(player: player, name: "スモールソード") do |wea
   weapon.hp_bonus = 0
   weapon.strength_bonus = 1
   weapon.agility_bonus = 0
+  weapon.critical_rate = 5
   weapon.equipped = true
 end
+player.weapons.find_by(name: "スモールソード")&.update!(critical_rate: 5)
 
 Armor.find_or_create_by!(player: player, name: "レザーチュニック") do |armor|
   armor.armor_type = "体防具"
@@ -194,5 +196,28 @@ Weapon.find_or_create_by!(mob: kobold, name: "錆びたショートソード") d
   weapon.hp_bonus = 0
   weapon.strength_bonus = 0
   weapon.agility_bonus = 0
+  weapon.critical_rate = 3
   weapon.drop_rate = 20
+end
+kobold.weapons.find_by(name: "錆びたショートソード")&.update!(critical_rate: 3)
+
+[
+  [slime, "核", 8, nil, "スライムの核", 35],
+  [slime, "外膜", 12, nil, nil, 0],
+  [rabbit, "角", 6, nil, "ホーンラビットの角", 50],
+  [rabbit, "胴体", 12, nil, nil, 0],
+  [rabbit, "脚", 8, "agility_down", nil, 0],
+  [mutant_slime, "赤い核", 12, nil, "変異スライムの核", 40],
+  [mutant_slime, "硬質外膜", 18, nil, nil, 0],
+  [kobold, "首", 10, nil, nil, 0],
+  [kobold, "手", 9, "strength_down", nil, 0],
+  [kobold, "足", 9, "agility_down", nil, 0]
+].each do |mob, part_name, durability, break_effect, drop_item_name, drop_rate|
+  part = MobPart.find_by!(mob: mob, name: part_name)
+  part.update!(
+    max_durability: durability,
+    break_effect: break_effect,
+    drop_item_name: drop_item_name,
+    drop_rate: drop_rate
+  )
 end

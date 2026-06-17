@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_17_092000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_17_095000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -32,6 +32,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_092000) do
     t.datetime "created_at", null: false
     t.integer "enemy_hp"
     t.integer "mob_id", null: false
+    t.text "part_states", default: "{}", null: false
     t.integer "player_id", null: false
     t.datetime "updated_at", null: false
     t.index ["mob_id"], name: "index_battles_on_mob_id"
@@ -39,6 +40,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_092000) do
   end
 
   create_table "items", force: :cascade do |t|
+    t.string "category", default: "misc", null: false
     t.datetime "created_at", null: false
     t.string "name"
     t.integer "player_id", null: false
@@ -58,8 +60,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_092000) do
   end
 
   create_table "mob_parts", force: :cascade do |t|
+    t.string "break_effect"
     t.datetime "created_at", null: false
     t.integer "damage_multiplier", default: 80, null: false
+    t.string "drop_item_name"
+    t.integer "drop_rate", default: 0, null: false
+    t.integer "max_durability", default: 10, null: false
     t.integer "mob_id", null: false
     t.string "name", null: false
     t.datetime "updated_at", null: false
@@ -133,6 +139,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_092000) do
     t.integer "agility_bonus", default: 0, null: false
     t.integer "attack_power", default: 1, null: false
     t.datetime "created_at", null: false
+    t.integer "critical_rate", default: 5, null: false
     t.integer "drop_rate", default: 0, null: false
     t.integer "durability", default: 10, null: false
     t.boolean "equipped", default: false, null: false
