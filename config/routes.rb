@@ -1,5 +1,11 @@
 Rails.application.routes.draw do
-  root "game#index"
+  root "home#index"
+  get "game", to: "game#index", as: :game
+  get "signup", to: "registrations#new"
+  post "signup", to: "registrations#create"
+  get "login", to: "sessions#new"
+  post "login", to: "sessions#create"
+  delete "logout", to: "sessions#destroy"
   post "explore", to: "game#explore"
   post "gather", to: "game#gather"
   post "attack", to: "game#attack"

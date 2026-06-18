@@ -9,50 +9,42 @@ class BattleService
     mob.mob_parts.to_a
   end
 
-  def self.resolve_player_attack!(battle:, player:, mob_part_id:, label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:)
+  def self.resolve_player_attack!(battle:, player:, mob_part_id:, target_enemy_id: nil, group_start: nil, label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:, area: false)
     return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
 
     weapon = player.equipped_weapon
-    return Result.new(status: :error, message: "装備中の武器がありません。") unless weapon
+    return Result.new(status: :error, message: "武器を装備していないため、ソードスキルは使用できません。") if sword_skill && !weapon
 
-    parts = ensure_mob_parts!(battle.mob)
-    ensure_part_states!(battle, parts)
-    part = parts.find { |mob_part| mob_part.id == mob_part_id.to_i } || parts.first
-    return Result.new(status: :error, message: "攻撃可能な部位がありません。") unless part
+    ensure_battle_enemies!(battle)
+    target_enemies = target_enemies_for(battle, target_enemy_id, group_start, area)
+    return Result.new(status: :error, message: "攻撃対象がいません。") if target_enemies.empty?
 
     hit_messages = []
-    total_damage = 0
-    damage_per_hit_multiplier = damage_multiplier / hits.to_f
 
     hits.times do |index|
-      guard_result = resolve_guarded_part(player, battle, parts, part)
+      alive_targets = target_enemies.select(&:alive?)
+      break if alive_targets.empty?
 
-      if guard_result[:blocked]
-        hit_messages << hit_message(index, hits, guard_result[:message])
-      elsif player_attack_hit?(player, battle, guard_result[:part])
-        actual_part = guard_result[:part]
-        base_hit_damage = (calculate_player_damage(player, weapon, battle.mob, actual_part) * damage_per_hit_multiplier / 100.0).ceil
-        varied_damage = apply_player_damage_variance(base_hit_damage)
-        critical = critical_hit?(weapon, battle, actual_part, varied_damage)
-        hit_damage = critical ? varied_damage * 2 : varied_damage
-        total_damage += hit_damage
-        break_message = apply_part_damage!(player, battle, actual_part, hit_damage)
-        critical_message = critical ? "クリティカル！" : ""
-        result_message = "#{guard_result[:message]}#{critical_message}#{actual_part.name}へ#{hit_damage}ダメージ#{break_message}"
-        hit_messages << hit_message(index, hits, result_message)
-      else
-        hit_messages << hit_message(index, hits, "#{guard_result[:message]}ミス")
+      per_target_multiplier = area_damage_multiplier(damage_multiplier, alive_targets.size)
+      alive_targets.each do |battle_enemy|
+        result = resolve_hit!(
+          player: player,
+          weapon: weapon,
+          battle_enemy: battle_enemy,
+          mob_part_id: (alive_targets.one? ? mob_part_id : nil),
+          damage_multiplier: per_target_multiplier
+        )
+        hit_messages << hit_message(index, hits, result)
       end
     end
 
-    weapon.apply_durability_loss!(durability_cost)
-    battle.enemy_hp -= total_damage
+    weapon&.apply_durability_loss!(durability_cost)
 
-    if battle.enemy_hp <= 0
-      return finish_battle_victory!(player, battle, weapon, part, label, hit_messages.join(" / "), skill_gain, sword_skill)
+    if battle.alive_enemies.reload.empty?
+      return finish_battle_victory!(player, battle, weapon, label, hit_messages.join(" / "), skill_gain, sword_skill)
     end
 
-    skill_message = sword_skill ? gain_sword_skill!(player, skill_gain) : ""
+    skill_message = sword_skill ? gain_weapon_skill!(player, weapon, skill_gain) : ""
 
     player.save!
     battle.save!
@@ -62,7 +54,7 @@ class BattleService
 
     stiffness_message = ""
     if stiffness
-      stiffness_result = apply_enemy_attack!(player, battle, prefix: "ソードスキル後の硬直中、")
+      stiffness_result = apply_enemy_attack!(player, battle, prefix: "ソードスキル後の硬直中、", allow_evasion: false)
       return stiffness_result if stiffness_result.status == :defeated
 
       stiffness_message = stiffness_result.message
@@ -70,35 +62,42 @@ class BattleService
 
     Result.new(
       status: :ok,
-      message: "#{battle.mob.name}の#{part.name}へ#{label}！#{hit_messages.join(' / ')}！#{enemy_result.message}#{stiffness_message}#{broken_message}#{skill_message}"
+      message: "#{label}！#{hit_messages.join(' / ')}！#{enemy_result.message}#{stiffness_message}#{broken_message}#{skill_message}"
     )
   end
 
-  def self.apply_enemy_attack!(player, battle, prefix: "")
-    mob_name = battle.mob.name
-    if evaded_enemy_attack?(player, battle)
-      player.save!
-      return Result.new(status: :ok, message: "#{prefix}#{mob_name}の攻撃を回避した！")
-    end
+  def self.apply_enemy_attack!(player, battle, prefix: "", allow_evasion: true)
+    ensure_battle_enemies!(battle)
+    messages = []
 
-    raw_damage = rand(1..mob_effective_atk(battle))
-    enemy_damage = [raw_damage - player.damage_cut, 1].max
-    player.hp = player.hp.to_i - enemy_damage
+    battle.alive_enemies.each do |battle_enemy|
+      mob_name = battle_enemy.mob.name
+      if allow_evasion && evaded_enemy_attack?(player, battle_enemy)
+        messages << "#{prefix}#{mob_name}の攻撃を回避した！"
+        next
+      end
 
-    if player.hp <= 0
-      town = Location.find_by(name: "はじまりの街")
-      player.hp = player.effective_max_hp
-      player.floor = 1
-      player.col = 0
-      player.location = town if town
-      battle.destroy!
-      player.save!
+      raw_damage = rand(1..mob_effective_atk(battle_enemy))
+      enemy_damage = [raw_damage - player.damage_cut, 1].max
+      player.hp = player.hp.to_i - enemy_damage
 
-      return Result.new(status: :defeated, message: "#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！あなたは倒れた……。はじまりの街へ戻された。")
+      if player.hp <= 0
+        town = Location.find_by(name: "はじまりの街")
+        player.hp = player.effective_max_hp
+        player.floor = 1
+        player.col = 0
+        player.location = town if town
+        battle.destroy!
+        player.save!
+
+        return Result.new(status: :defeated, message: "#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！あなたは倒れた……。はじまりの街へ戻された。")
+      end
+
+      messages << "#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！"
     end
 
     player.save!
-    Result.new(status: :ok, message: "#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")
+    Result.new(status: :ok, message: messages.join)
   end
 
   def self.ensure_part_states!(battle, parts)
@@ -123,30 +122,98 @@ class BattleService
     {}
   end
 
+  def self.ensure_battle_enemies!(battle)
+    return battle.alive_enemies.to_a if battle.battle_enemies.exists?
+
+    battle.battle_enemies.create!(mob: battle.mob, enemy_hp: battle.enemy_hp || battle.mob.hp, position: 1)
+    battle.alive_enemies.to_a
+  end
+
+  def self.target_enemies_for(battle, target_enemy_id, group_start, area)
+    alive = battle.alive_enemies.to_a
+    if area
+      start = group_start.to_i
+      start = alive.first&.position.to_i if start <= 0
+      alive.select { |enemy| enemy.position >= start && enemy.position < start + 4 }.first(4)
+    elsif target_enemy_id.present?
+      alive.select { |enemy| enemy.id == target_enemy_id.to_i }
+    else
+      alive.first ? [alive.first] : []
+    end
+  end
+
+  def self.resolve_hit!(player:, weapon:, battle_enemy:, mob_part_id:, damage_multiplier:)
+    parts = ensure_mob_parts!(battle_enemy.mob)
+    ensure_part_states!(battle_enemy, parts)
+    target_part = if mob_part_id.present?
+                    parts.find { |mob_part| mob_part.id == mob_part_id.to_i } || parts.first
+                  else
+                    weighted_random_part(parts, battle_enemy)
+                  end
+    return "#{battle_enemy.mob.name}に攻撃可能部位がない" unless target_part
+
+    guard_result = resolve_guarded_part(player, battle_enemy, parts, target_part)
+    return "#{battle_enemy.mob.name}: #{guard_result[:message]}" if guard_result[:blocked]
+
+    actual_part = guard_result[:part]
+    unless player_attack_hit?(player, battle_enemy, actual_part)
+      return "#{battle_enemy.mob.name}: #{guard_result[:message]}ミス"
+    end
+
+    base_hit_damage = (calculate_player_damage(player, weapon, battle_enemy.mob, actual_part) * damage_multiplier / 100.0).ceil
+    varied_damage = apply_player_damage_variance(base_hit_damage)
+    critical = critical_hit?(player, weapon, battle_enemy, actual_part, varied_damage)
+    hit_damage = critical ? varied_damage * 2 : varied_damage
+    battle_enemy.enemy_hp = [battle_enemy.enemy_hp.to_i - hit_damage, 0].max
+    break_message = apply_part_damage!(player, battle_enemy, actual_part, hit_damage)
+    battle_enemy.save!
+
+    critical_message = critical ? "クリティカル！" : ""
+    defeated_message = battle_enemy.enemy_hp <= 0 ? " #{battle_enemy.mob.name}を倒した！" : ""
+    "#{battle_enemy.mob.name}: #{guard_result[:message]}#{critical_message}#{actual_part.name}へ#{hit_damage}ダメージ#{break_message}#{defeated_message}"
+  end
+
+  def self.weighted_random_part(parts, battle_enemy)
+    candidates = parts.reject { |part| part_broken?(battle_enemy, part) }
+    candidates = parts if candidates.empty?
+    weighted = candidates.flat_map do |part|
+      weight = part.weakness? ? 1 : [part.damage_multiplier.to_i / 20, 1].max
+      [part] * weight
+    end
+    weighted.sample || candidates.first
+  end
+
+  def self.area_damage_multiplier(damage_multiplier, target_count)
+    reduction = { 1 => 1.0, 2 => 0.75, 3 => 0.62, 4 => 0.52, 5 => 0.45 }.fetch(target_count, 0.5)
+    (damage_multiplier * reduction).ceil
+  end
+
   def self.calculate_player_damage(player, weapon, mob, part)
-    base_damage = [player.effective_strength + weapon.attack_power.to_i - mob.durability.to_i, 1].max
+    weapon_power = weapon&.attack_power.to_i
+    attack_power = (player.effective_strength * 0.7) + (weapon_power * 1.3)
+    defense_rate = 100.0 / (100 + [mob.durability.to_i, 0].max)
+    base_damage = attack_power * defense_rate
     [(base_damage * part.damage_multiplier.to_i / 100.0).ceil, 1].max
   end
 
-  def self.player_attack_hit?(player, battle, part)
-    agility_gap = player.effective_agility - mob_effective_agility(battle)
+  def self.player_attack_hit?(player, battle_enemy, part)
+    agility_gap = player.effective_agility - mob_effective_agility(battle_enemy)
     part_modifier = part.weakness? ? -20 : 0
     chance = [[80 + (agility_gap * 5) + part_modifier, 20].max, 98].min
     rand(100) < chance
   end
 
-  def self.finish_battle_victory!(player, battle, weapon, part, label, damage_message, skill_gain, sword_skill)
-    mob = battle.mob
+  def self.finish_battle_victory!(player, battle, weapon, label, damage_message, skill_gain, sword_skill)
     player.col = player.col.to_i + 10
-    skill_message = sword_skill ? gain_sword_skill!(player, skill_gain) : ""
-
     player.save!
-    dropped_weapon_message = try_drop_weapon!(player, mob)
-    exp_message = gain_exp_message(player, mob)
+    defeated_mobs = battle.battle_enemies.includes(:mob).to_a.map(&:mob)
+    dropped_weapon_message = defeated_mobs.map { |mob| try_drop_weapon!(player, mob) }.join
+    exp_message = defeated_mobs.map { |mob| gain_exp_message(player, mob) }.join(" ")
+    skill_message = gain_weapon_skill_for_victory!(player, weapon, defeated_mobs.count, skill_gain, sword_skill)
     battle.destroy!
 
     broken_message = destroy_weapon_if_broken!(weapon)
-    Result.new(status: :ok, message: "#{mob.name}の#{part.name}へ#{label}！#{damage_message}！10コル獲得！#{exp_message}#{dropped_weapon_message}#{broken_message}#{skill_message}")
+    Result.new(status: :ok, message: "#{label}！#{damage_message}！敵を全て倒した！10コル獲得！#{exp_message}#{dropped_weapon_message}#{broken_message}#{skill_message}")
   end
 
   def self.hit_message(index, hits, message)
@@ -157,48 +224,51 @@ class BattleService
     [(damage.to_i * rand(75..100) / 100.0).ceil, 1].max
   end
 
-  def self.critical_hit?(weapon, battle, part, damage)
-    return true if part.weakness? && part_would_break?(battle, part, damage)
+  def self.critical_hit?(player, weapon, battle_enemy, part, damage)
+    return false unless weapon
+    return true if part.weakness? && part_would_break?(battle_enemy, part, damage)
 
-    rand(100) < weapon.effective_critical_rate
+    agility_bonus = (player.effective_agility - mob_effective_agility(battle_enemy)) / 5
+    chance = [[weapon.effective_critical_rate + agility_bonus, 1].max, 30].min
+    rand(100) < chance
   end
 
-  def self.part_would_break?(battle, part, damage)
-    state = battle_part_states(battle)[part.id.to_s] || default_part_state(part)
+  def self.part_would_break?(battle_enemy, part, damage)
+    state = battle_part_states(battle_enemy)[part.id.to_s] || default_part_state(part)
     return false if state["broken"]
 
     state["durability"].to_i <= damage.to_i
   end
 
-  def self.resolve_guarded_part(player, battle, parts, target_part)
-    return { part: target_part, message: "", blocked: false } if part_broken?(battle, target_part)
-    return { part: target_part, message: "", blocked: false } unless enemy_guard_success?(player, battle, target_part)
+  def self.resolve_guarded_part(player, battle_enemy, parts, target_part)
+    return { part: target_part, message: "", blocked: false } if part_broken?(battle_enemy, target_part)
+    return { part: target_part, message: "", blocked: false } unless enemy_guard_success?(player, battle_enemy, target_part)
 
-    if battle.mob.equipped_weapon && target_part.weakness?
-      return { part: target_part, message: "#{battle.mob.equipped_weapon.name}で弾かれた！", blocked: true }
+    if battle_enemy.mob.equipped_weapon && target_part.weakness?
+      return { part: target_part, message: "#{battle_enemy.mob.equipped_weapon.name}で弾かれた！", blocked: true }
     end
 
-    guard_part = guard_part_for(battle, parts, target_part)
+    guard_part = guard_part_for(battle_enemy, parts, target_part)
     guard_part ? { part: guard_part, message: "#{guard_part.name}で防がれた！", blocked: false } : { part: target_part, message: "", blocked: false }
   end
 
-  def self.enemy_guard_success?(player, battle, target_part)
+  def self.enemy_guard_success?(player, battle_enemy, target_part)
     base_chance = target_part.weakness? ? 65 : 20
-    base_chance += 15 if battle.mob.equipped_weapon && target_part.weakness?
-    agility_gap = player.effective_agility - mob_effective_agility(battle)
+    base_chance += 15 if battle_enemy.mob.equipped_weapon && target_part.weakness?
+    agility_gap = player.effective_agility - mob_effective_agility(battle_enemy)
     chance = [[base_chance - (agility_gap * 6), 5].max, 90].min
     rand(100) < chance
   end
 
-  def self.guard_part_for(battle, parts, target_part)
-    candidates = parts.reject { |part| part.id == target_part.id || part_broken?(battle, part) }
+  def self.guard_part_for(battle_enemy, parts, target_part)
+    candidates = parts.reject { |part| part.id == target_part.id || part_broken?(battle_enemy, part) }
     candidates.find { |part| part.name.match?(/手|腕/) } ||
       candidates.find { |part| part.name.match?(/外膜|胴|体/) } ||
       candidates.first
   end
 
-  def self.apply_part_damage!(player, battle, part, damage)
-    states = battle_part_states(battle)
+  def self.apply_part_damage!(player, battle_enemy, part, damage)
+    states = battle_part_states(battle_enemy)
     state = states[part.id.to_s] || default_part_state(part)
     return "" if state["broken"]
 
@@ -211,7 +281,7 @@ class BattleService
     end
 
     states[part.id.to_s] = state
-    battle.part_states = states.to_json
+    battle_enemy.part_states = states.to_json
     message
   end
 
@@ -232,22 +302,22 @@ class BattleService
     battle_part_states(battle).dig(part.id.to_s, "broken") == true
   end
 
-  def self.mob_effective_atk(battle)
-    penalty = broken_parts_with_effect(battle, "strength_down").count * 0.35
-    [(battle.mob.atk.to_i * (1.0 - penalty)).ceil, 1].max
+  def self.mob_effective_atk(battle_enemy)
+    penalty = broken_parts_with_effect(battle_enemy, "strength_down").count * 0.35
+    [(battle_enemy.mob.atk.to_i * (1.0 - penalty)).ceil, 1].max
   end
 
-  def self.mob_effective_agility(battle)
-    penalty = broken_parts_with_effect(battle, "agility_down").count * 0.35
-    [(battle.mob.effective_agility * (1.0 - penalty)).ceil, 1].max
+  def self.mob_effective_agility(battle_enemy)
+    penalty = broken_parts_with_effect(battle_enemy, "agility_down").count * 0.35
+    [(battle_enemy.mob.effective_agility * (1.0 - penalty)).ceil, 1].max
   end
 
-  def self.broken_parts_with_effect(battle, effect)
-    battle.mob.mob_parts.select { |part| part.break_effect == effect && part_broken?(battle, part) }
+  def self.broken_parts_with_effect(battle_enemy, effect)
+    battle_enemy.mob.mob_parts.select { |part| part.break_effect == effect && part_broken?(battle_enemy, part) }
   end
 
-  def self.evaded_enemy_attack?(player, battle)
-    agility_gap = player.effective_agility - mob_effective_agility(battle)
+  def self.evaded_enemy_attack?(player, battle_enemy)
+    agility_gap = player.effective_agility - mob_effective_agility(battle_enemy)
     chance = [[10 + (agility_gap * 5), 5].max, 75].min
     rand(100) < chance
   end
@@ -270,19 +340,47 @@ class BattleService
     [(mob.exp_reward.to_i * multiplier).round, 1].max
   end
 
-  def self.gain_sword_skill!(player, amount)
-    sword_skill = player.skills.find_or_create_by!(name: "片手剣") { |skill| skill.proficiency = 0 }
-    before = sword_skill.proficiency.to_i
-    actual_gain = proficiency_gain(amount, before)
-    sword_skill.proficiency = [before + actual_gain, 1000].min
-    sword_skill.save!
+  def self.gain_weapon_skill_for_victory!(player, weapon, defeated_count, use_exp, sword_skill)
+    return "" unless weapon
 
-    before < 100 && sword_skill.proficiency >= 100 ? " 片手剣 +#{actual_gain} バーチカルアークを習得した！" : " 片手剣 +#{actual_gain}"
+    growth = SkillGrowthCatalog.find(weapon_skill_name(weapon))
+    amount = growth.kill_exp.to_i * defeated_count.to_i
+    amount += use_exp.to_i if sword_skill
+    amount += growth.sword_skill_kill_bonus.to_i * defeated_count.to_i if sword_skill
+    gain_weapon_skill!(player, weapon, amount)
   end
 
-  def self.proficiency_gain(base_amount, current_proficiency)
-    reduction = current_proficiency.to_i / 100
-    [base_amount.to_i - reduction, 1].max
+  def self.gain_weapon_skill!(player, weapon, amount)
+    return "" unless weapon
+    return "" if amount.to_i <= 0
+
+    skill_name = weapon_skill_name(weapon)
+    growth = SkillGrowthCatalog.find(skill_name)
+    skill = player.skills.find_or_create_by!(name: skill_name) do |new_skill|
+      new_skill.proficiency = 0
+      new_skill.skill_exp = 0 if new_skill.has_attribute?(:skill_exp)
+    end
+    before = skill.proficiency.to_i
+    awarded_capstone_slot = skill.gain_skill_exp!(amount, growth_scale: growth.growth_scale)
+    actual_gain = skill.proficiency.to_i - before
+
+    learned = SkillCatalog.sword_skills.select do |skill_definition|
+      skill_definition.required_proficiency.positive? &&
+        before < skill_definition.required_proficiency &&
+        skill.proficiency >= skill_definition.required_proficiency
+    end.map(&:name)
+    learned_message = learned.any? ? " #{learned.join('、')}を習得した！" : ""
+    capstone_message = awarded_capstone_slot ? " #{skill_name}熟練度がカンストした！スキルスロット +1" : ""
+    actual_gain.positive? ? " #{skill_name} +#{actual_gain}#{learned_message}#{capstone_message}" : "#{learned_message}#{capstone_message}"
+  end
+
+  def self.weapon_skill_name(weapon)
+    case weapon.weapon_type
+    when "片手直剣"
+      "片手剣"
+    else
+      weapon.weapon_type.presence || "武器"
+    end
   end
 
   def self.try_drop_weapon!(player, mob)
