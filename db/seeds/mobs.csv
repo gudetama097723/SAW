@@ -1,0 +1,5 @@
+﻿name,hp,atk,rarity,level,agility,durability,exp_reward
+スライム,10,3,normal,1,1,1,8
+ホーンラビット,15,5,normal,2,4,2,12
+変異スライム,30,10,rare,4,2,4,25
+コボルド歩哨,24,8,normal,3,3,3,18

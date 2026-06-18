@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_17_095000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_18_134500) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -26,6 +26,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_095000) do
     t.datetime "updated_at", null: false
     t.integer "weight", default: 0, null: false
     t.index ["player_id"], name: "index_armors_on_player_id"
+  end
+
+  create_table "battle_enemies", force: :cascade do |t|
+    t.integer "battle_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "enemy_hp", null: false
+    t.integer "mob_id", null: false
+    t.text "part_states", default: "{}", null: false
+    t.integer "position", default: 1, null: false
+    t.datetime "updated_at", null: false
+    t.index ["battle_id"], name: "index_battle_enemies_on_battle_id"
+    t.index ["mob_id"], name: "index_battle_enemies_on_mob_id"
   end
 
   create_table "battles", force: :cascade do |t|
@@ -101,11 +113,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_095000) do
     t.integer "location_id"
     t.integer "max_hp", default: 100, null: false
     t.string "name"
+    t.integer "skill_slot_bonus", default: 0, null: false
     t.integer "skill_slots", default: 3, null: false
     t.integer "stat_points", default: 0, null: false
     t.integer "strength", default: 1, null: false
     t.datetime "updated_at", null: false
+    t.integer "user_id"
     t.index ["location_id"], name: "index_players_on_location_id"
+    t.index ["user_id"], name: "index_players_on_user_id"
   end
 
   create_table "rests", force: :cascade do |t|
@@ -127,12 +142,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_095000) do
   end
 
   create_table "skills", force: :cascade do |t|
+    t.boolean "capstone_slot_awarded", default: false, null: false
     t.datetime "created_at", null: false
     t.string "name"
     t.integer "player_id", null: false
     t.integer "proficiency"
+    t.integer "skill_exp", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["player_id"], name: "index_skills_on_player_id"
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "password_digest", null: false
+    t.datetime "updated_at", null: false
+    t.string "username", null: false
+    t.index ["username"], name: "index_users_on_username", unique: true
   end
 
   create_table "weapons", force: :cascade do |t|
@@ -157,11 +182,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_095000) do
   end
 
   add_foreign_key "armors", "players"
+  add_foreign_key "battle_enemies", "battles"
+  add_foreign_key "battle_enemies", "mobs"
   add_foreign_key "battles", "mobs"
   add_foreign_key "battles", "players"
   add_foreign_key "items", "players"
   add_foreign_key "mob_parts", "mobs"
   add_foreign_key "players", "locations"
+  add_foreign_key "players", "users"
   add_foreign_key "rests", "players"
   add_foreign_key "routes", "locations", column: "from_location_id"
   add_foreign_key "routes", "locations", column: "to_location_id"

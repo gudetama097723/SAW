@@ -1,0 +1,3 @@
+﻿name,armor_type,slot,rarity,defense,weight,hp_bonus,strength_bonus,agility_bonus,equipped
+レザーチュニック,体防具,body,common,2,2,5,0,0,TRUE
+レザーブーツ,ブーツ,feet,common,0,1,0,0,1,TRUE

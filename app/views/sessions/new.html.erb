@@ -1,0 +1,23 @@
+<div class="container py-5">
+  <div class="card bg-dark text-light border-secondary col-md-5 mx-auto">
+    <div class="card-header">ログイン</div>
+    <div class="card-body">
+      <% if alert.present? %>
+        <div class="alert alert-warning"><%= alert %></div>
+      <% end %>
+
+      <%= form_with url: login_path, class: "d-grid gap-3" do |form| %>
+        <div>
+          <%= form.label :username, "ユーザー名", class: "form-label" %>
+          <%= form.text_field :username, class: "form-control", autocomplete: "username" %>
+        </div>
+        <div>
+          <%= form.label :password, "パスワード", class: "form-label" %>
+          <%= form.password_field :password, class: "form-control", autocomplete: "current-password" %>
+        </div>
+        <%= form.submit "ログイン", class: "btn btn-primary" %>
+        <%= link_to "新規登録へ", signup_path, class: "btn btn-outline-light" %>
+      <% end %>
+    </div>
+  </div>
+</div>

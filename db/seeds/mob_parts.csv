@@ -1,0 +1,11 @@
+﻿mob,name,damage_multiplier,weakness,max_durability,break_effect,drop_item_name,drop_rate
+スライム,核,100,TRUE,8,,スライムの核,35
+スライム,外膜,70,FALSE,12,,,0
+ホーンラビット,角,100,TRUE,6,,ホーンラビットの角,50
+ホーンラビット,胴体,80,FALSE,12,,,0
+ホーンラビット,脚,70,FALSE,8,agility_down,,0
+変異スライム,赤い核,100,TRUE,12,,変異スライムの核,40
+変異スライム,硬質外膜,65,FALSE,18,,,0
+コボルド歩哨,首,100,TRUE,10,,,0
+コボルド歩哨,手,80,FALSE,9,strength_down,,0
+コボルド歩哨,足,75,FALSE,9,agility_down,,0

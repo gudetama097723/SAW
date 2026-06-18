@@ -27,9 +27,8 @@ class FieldService
     event = rand(100)
     message =
       if event < 40
-        mob = Mob.order("RANDOM()").first
-        battle = create_battle!(player, mob)
-        "#{mob.name}と遭遇した！"
+        battle = create_battle!(player, encounter_mobs_for(location))
+        "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}と遭遇した！"
       elsif event < 80
         "何も見つからなかった。"
       else
@@ -53,9 +52,8 @@ class FieldService
     event = rand(100)
 
     if event < gather_encounter_chance(location)
-      mob = Mob.order("RANDOM()").first
-      battle = create_battle!(player, mob)
-      message = "採取中に#{mob.name}と遭遇した！"
+      battle = create_battle!(player, encounter_mobs_for(location))
+      message = "採取中に#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}と遭遇した！"
     elsif event < 75
       item_name = gatherable_items_for(location).sample
       item = ItemService.add_item!(player, item_name, "gathered")
@@ -74,28 +72,59 @@ class FieldService
     return Result.new(status: :none) if danger <= 0
     return Result.new(status: :none) unless rand(100) < (danger / 3)
 
-    mob = Mob.order("RANDOM()").first
-    return Result.new(status: :none) unless mob
+    mobs = encounter_mobs_for(player.location)
+    return Result.new(status: :none) if mobs.empty?
 
-    Rest.destroy_all
-    battle = create_battle!(player, mob)
-    Result.new(status: :encounter, message: "休憩中に#{mob.name}に見つかった！", battle: battle)
+    player.rests.destroy_all
+    battle = create_battle!(player, mobs)
+    Result.new(status: :encounter, message: "休憩中に#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に見つかった！", battle: battle)
   end
 
   def self.item_use_surprise_encounter!(player)
     return Result.new(status: :none) if player.location&.safe_area?
     return Result.new(status: :none) unless rand(100) < 40
 
-    mob = Mob.order("RANDOM()").first
-    return Result.new(status: :none) unless mob
+    mobs = encounter_mobs_for(player.location)
+    return Result.new(status: :none) if mobs.empty?
 
-    battle = create_battle!(player, mob)
-    Result.new(status: :encounter, message: "#{mob.name}に見つかった！", battle: battle)
+    battle = create_battle!(player, mobs)
+    Result.new(status: :encounter, message: "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に見つかった！", battle: battle)
   end
 
-  def self.create_battle!(player, mob)
-    Battle.destroy_all
-    Battle.create!(player: player, mob: mob, enemy_hp: mob.hp)
+  def self.create_battle!(player, mobs)
+    mobs = Array(mobs).compact
+    first_mob = mobs.first
+    return unless first_mob
+
+    player.battles.destroy_all
+    battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp)
+    mobs.first(5).each.with_index(1) do |mob, position|
+      battle.battle_enemies.create!(mob: mob, enemy_hp: mob.hp, position: position)
+    end
+    battle
+  end
+
+  def self.encounter_mobs_for(location)
+    count = encounter_count_for(location)
+    Array.new(count) { Mob.order("RANDOM()").first }.compact
+  end
+
+  def self.encounter_count_for(location)
+    roll = rand(100)
+    if location&.name == "はじまりの草原"
+      return 5 if roll < 1
+      return 4 if roll < 3
+      return 3 if roll < 10
+      return 2 if roll < 30
+      1
+    else
+      danger = (location&.danger_level || 30).to_i
+      return 5 if roll < danger - 35
+      return 4 if roll < danger - 20
+      return 3 if roll < danger
+      return 2 if roll < danger + 25
+      1
+    end
   end
 
   def self.gather_encounter_chance(location)
