@@ -5,7 +5,7 @@ class GameController < ApplicationController
     @player = current_player
     @battle = current_battle
     @rest = current_rest
-    @routes = FieldService.available_routes_for(@player.location)
+    @routes = FieldService.available_routes_for(@player)
     if @battle
       BattleService.ensure_battle_enemies!(@battle)
       @battle_enemies = @battle.alive_enemies.includes(mob: :mob_parts).to_a
@@ -14,6 +14,7 @@ class GameController < ApplicationController
         [battle_enemy.id, BattleService.ensure_part_states!(battle_enemy, parts)]
       end
     end
+    @active_route_progress = @player.player_route_progresses.includes(route: [:from_location, :to_location]).first
   end
 
   def stroll
@@ -190,7 +191,12 @@ class GameController < ApplicationController
       return
     end
 
-    danger = player.location&.danger_level || 30
+    unless player.field_route.present?
+      redirect_to game_path, notice: "街中では休憩コマンドを使用できません。"
+      return
+    end
+
+    danger = FieldService.field_danger_level(player)
 
     if rand(100) < danger
       redirect_to game_path, notice: "周囲に敵の気配があり、休憩できなかった。"
@@ -263,21 +269,91 @@ class GameController < ApplicationController
     player = current_player
     route = Route.find(params[:route_id])
 
-    if current_player.battles.exists?
+    if player.battles.exists?
       redirect_to game_path, notice: "戦闘中は移動できない！"
       return
     end
 
-    if current_player.rests.exists?
+    if player.rests.exists?
       redirect_to game_path, notice: "休憩中は移動できない！"
       return
     end
 
-    player.location = route.to_location
-    player.current_time = (player.current_time.to_i + route.travel_time.to_i) % 1440
-    player.save
+    unless FieldService.available_routes_for(player).include?(route)
+      redirect_to game_path, notice: "このルートには入れない。"
+      return
+    end
 
-    redirect_to game_path, notice: "#{route.to_location.name}へ移動した。#{route.travel_time}分経過した。"
+    # まだフィールド上にいない場合：町/村からフィールドに出る
+    if player.field_route.blank?
+      player.field_route = route
+
+      if player.location == route.from_location
+        player.field_position = 0
+      elsif player.location == route.to_location
+        player.field_position = route.distance
+      else
+        redirect_to game_path, notice: "このルートには入れない。"
+        return
+      end
+
+      player.current_time = (player.current_time.to_i + 5) % 1440
+      player.save!
+
+      redirect_to game_path, notice: "#{route.name}に出た。"
+      return
+    end
+
+    # すでにフィールド上にいる場合：フィールド内を進む
+    unless player.field_route == route
+      redirect_to game_path, notice: "現在進行中のフィールド以外には移動できない。"
+      return
+    end
+
+    advance = rand(15..25)
+    direction = params[:direction]
+
+    if direction == "backward"
+      player.field_position -= advance
+      direction_text = route.from_location.name
+    else
+      player.field_position += advance
+      direction_text = route.to_location.name
+    end
+
+    elapsed_time = rand(10..20)
+    player.current_time = (player.current_time.to_i + elapsed_time) % 1440
+
+    if player.field_position <= 0
+      player.location = route.from_location
+      player.field_route = nil
+      player.field_position = 0
+      player.save!
+
+      redirect_to game_path, notice: "#{route.from_location.name}へ到着した。#{elapsed_time}分経過した。"
+      return
+    end
+
+    if player.field_position >= route.distance
+      unless FieldService.route_mapped?(player, route)
+        player.field_position = route.distance
+        player.save!
+        redirect_to game_path, notice: "#{route.name}はまだ地形を把握できていない。探索でマッピングを100%にする必要がある。"
+        return
+      end
+
+      player.location = route.to_location
+      player.field_route = nil
+      player.field_position = 0
+      player.save!
+
+      redirect_to game_path, notice: "#{route.to_location.name}へ到着した。#{elapsed_time}分経過した。"
+      return
+    end
+
+    player.save!
+
+    redirect_to game_path, notice: "#{route.name}を#{direction_text}方面へ進んだ。現在位置 #{player.field_position} / #{route.distance}。#{elapsed_time}分経過した。"
   end
 
   def item_shop
@@ -315,6 +391,22 @@ class GameController < ApplicationController
     item = player.items.find_by(name: params[:item_name])
     result = ItemService.sell_item!(player, item)
     redirect_to game_path(panel: "item_shop", shop_menu: "sell"), flash_for(result)
+  end
+
+  def toggle_route_direction
+    player = current_player
+    progress = player.player_route_progresses.find(params[:progress_id])
+
+    progress.update!(returning: !progress.returning?)
+
+    message =
+      if progress.returning?
+        "引き返すことにした。"
+      else
+        "再び目的地へ向かうことにした。"
+      end
+
+    redirect_to game_path, notice: message
   end
 
   def blacksmith

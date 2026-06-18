@@ -2,7 +2,7 @@
   <div class="card bg-dark text-light border-secondary shadow-lg">
     <div class="card-header text-center">
       <h1 class="mb-0">Sword Art World</h1>
-      <small>第1層 はじまりの草原</small>
+      <small>第1層</small>
     </div>
 
     <div class="card-body">
@@ -38,7 +38,7 @@
               </div>
               <p>スキルスロット: <%= @player.used_skill_slots %> / <%= @player.skill_slots.to_i %></p>
               <p>コル: <%= @player.col %></p>
-              <p>現在地: <%= @player.location&.name || "不明" %></p>
+              <p>現在地: <%= @player.field_route ? "#{@player.field_route.name}（移動中）" : (@player.location&.name || "不明") %></p>
               <p>時刻: <%= format("%02d:%02d", current_time / 60, current_time % 60) %></p>
             </div>
           </div>
@@ -576,7 +576,15 @@
 
           <% else %>
             <div class="d-grid gap-2">
-              <% if @player.location&.safe_area? %>
+              <% if @player.field_route.present? %>
+                <div class="d-flex gap-2">
+                  <%= button_to "探索", explore_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-primary btn-lg w-100" %>
+                  <%= button_to "狩り", hunt_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-danger btn-lg w-100" %>
+                  <%= button_to "採取", gather_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-outline-success btn-lg w-100" %>
+                  <%= button_to "休憩", start_rest_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-outline-light btn-lg w-100" %>
+                </div>
+
+              <% elsif @player.location&.safe_area? %>
                 <%= button_to "街を散策する", stroll_path, method: :post, class: "btn btn-primary btn-lg" %>
 
                 <h5 class="mt-3">施設</h5>
@@ -599,19 +607,49 @@
                   <div class="btn btn-outline-secondary disabled w-100">鍛冶屋（未発見）</div>
                 <% end %>
               <% else %>
-                <%= button_to "探索", explore_path, method: :post, class: "btn btn-primary btn-lg" %>
-                <%= button_to "狩り", hunt_path,method: :post, class: "btn btn-danger btn-lg" %>
-                <%= button_to "採取", gather_path, method: :post, class: "btn btn-outline-success btn-lg" %>
-                <%= button_to "休憩", start_rest_path, method: :post, class: "btn btn-outline-light" %>
+                <div class="d-flex gap-2">
+                  <%= button_to "探索", explore_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-primary btn-lg w-100" %>
+                  <%= button_to "狩り", hunt_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-danger btn-lg w-100" %>
+                  <%= button_to "採取", gather_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-outline-success btn-lg w-100" %>
+                  <%= button_to "休憩", start_rest_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-outline-light btn-lg w-100" %>
+                </div>
               <% end %>
 
-              <h5 class="mt-3">移動先</h5>
+              <h5 class="mt-3">移動</h5>
 
-              <% @routes.each do |route| %>
-                <%= button_to "#{route.to_location.name}へ移動（#{route.travel_time}分）",
-                    move_path(route_id: route.id),
-                    method: :post,
-                    class: "btn btn-outline-info w-100 mb-2" %>
+              <% if @player.field_route.present? %>
+                <% route = @player.field_route %>
+                <% route_progress = @player.player_route_progresses.find_by(route: route) %>
+
+                <div class="mb-2">
+                  <div class="small text-light mb-1">
+                    <%= route.name %>を移動中：
+                    現在位置 <%= @player.field_position %> / <%= route.distance %>
+                  </div>
+                  <div class="small text-light mb-2">
+                    マッピング進行度 <%= route_progress&.progress.to_i %>%
+                  </div>
+
+                  <%= button_to "#{route.from_location.name}方面へ進む",
+                      move_path(route_id: route.id, direction: "backward"),
+                      method: :post,
+                      class: "btn btn-outline-warning w-100 mb-1" %>
+
+                  <%= button_to "#{route.to_location.name}方面へ進む",
+                      move_path(route_id: route.id, direction: "forward"),
+                      method: :post,
+                      class: "btn btn-outline-info w-100 mb-2" %>
+                </div>
+
+              <% else %>
+                <% @routes.each do |route| %>
+                  <% route_progress = @player.player_route_progresses.find_by(route: route) %>
+                  <%= button_to "#{route.name}へ出る（#{route.from_location.name} ⇄ #{route.to_location.name}）",
+                      move_path(route_id: route.id),
+                      method: :post,
+                      class: "btn btn-outline-info w-100 mb-2" %>
+                  <div class="small text-secondary mb-2">マッピング進行度 <%= route_progress&.progress.to_i %>%</div>
+                <% end %>
               <% end %>
             </div>
           <% end %>

@@ -1,33 +1,31 @@
 class FieldService
   Result = Struct.new(:status, :message, :battle, keyword_init: true)
 
-  def self.available_routes_for(location)
+  def self.available_routes_for(player)
+    location = player&.location
     return [] unless location
+    return [player.field_route].compact if player.field_route.present?
 
-    routes = location.outgoing_routes.includes(:to_location)
-    return routes if location.safe_area?
-
-    routes.select do |route|
-      destination = route.to_location
-      next false unless destination.safe_area?
-
-      destination.name == "はじまりの街" || location.mapping_progress.to_i >= 100
+    Route.includes(:from_location, :to_location).select do |route|
+      route.from_location == location || route.to_location == location
     end
   end
 
   def self.explore!(player)
-    location = player.location
-    return Result.new(status: :error, message: "ここは安全地帯です。敵は出現しません。") if location&.safe_area?
+    route = player.field_route
+    return Result.new(status: :error, message: "街中では探索できません。フィールドへ出てください。") unless route
 
-    mapping_before = location.mapping_progress.to_i
+    progress = route_progress_for(player, route)
+    mapping_before = progress.progress.to_i
     mapping_gain = rand(12..22)
-    location.mapping_progress = [mapping_before + mapping_gain, 100].min
-    location.save!
+    progress.progress = [mapping_before + mapping_gain, 100].min
+    progress.save!
+    player.current_time = (player.current_time.to_i + 10) % 1440
 
     event = rand(100)
     message =
       if event < 40
-        battle = create_battle!(player, encounter_mobs_for(location))
+        battle = create_battle!(player, encounter_mobs_for(player))
         "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}と遭遇した！"
       elsif event < 80
         "何も見つからなかった。"
@@ -35,9 +33,9 @@ class FieldService
         "遠くに奇妙な塔が見える……。"
       end
 
-    message += " マッピング進行度 +#{location.mapping_progress - mapping_before}%（#{location.mapping_progress}%）"
-    if mapping_before < 100 && location.mapping_progress >= 100
-      message += " #{location.name}の地形を把握した。次の町への道が開けた！"
+    message += " マッピング進行度 +#{progress.progress - mapping_before}%（#{progress.progress}%）"
+    if mapping_before < 100 && progress.progress >= 100
+      message += " #{route.name}の地形を把握した。次の町への道が開けた！"
     end
 
     player.save!
@@ -45,17 +43,17 @@ class FieldService
   end
 
   def self.gather!(player)
-    location = player.location
-    return Result.new(status: :error, message: "街中では採取できません。") if location&.safe_area?
+    route = player.field_route
+    return Result.new(status: :error, message: "街中では採取できません。フィールドへ出てください。") unless route
 
     player.current_time = (player.current_time.to_i + 10) % 1440
     event = rand(100)
 
-    if event < gather_encounter_chance(location)
-      battle = create_battle!(player, encounter_mobs_for(location))
+    if event < gather_encounter_chance(player)
+      battle = create_battle!(player, encounter_mobs_for(player))
       message = "採取中に#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}と遭遇した！"
     elsif event < 75
-      item_name = gatherable_items_for(location).sample
+      item_name = gatherable_items_for(player).sample
       item = ItemService.add_item!(player, item_name, "gathered")
       item.save!
       message = "#{item_name}を採取した！"
@@ -68,13 +66,13 @@ class FieldService
   end
 
   def self.hunt!(player)
-    location = player.location
-    return Result.new(status: :error, message: "ここは安全地帯です。狩りはできません。") if location&.safe_area?
+    route = player.field_route
+    return Result.new(status: :error, message: "街中では狩りはできません。フィールドへ出てください。") unless route
 
     player.current_time = (player.current_time.to_i + 15) % 1440
 
     if rand(100) < 85
-      battle = create_battle!(player, encounter_mobs_for(location), ambush: true)
+      battle = create_battle!(player, encounter_mobs_for(player), ambush: true)
       message = "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}を発見した！先制攻撃のチャンス！"
     else
       message = "周辺を探したが、獲物は見つからなかった。"
@@ -85,11 +83,11 @@ class FieldService
   end
   
   def self.rest_encounter!(player)
-    danger = (player.location&.danger_level || 0).to_i
+    danger = field_danger_level(player)
     return Result.new(status: :none) if danger <= 0
     return Result.new(status: :none) unless rand(100) < (danger / 3)
 
-    mobs = encounter_mobs_for(player.location)
+    mobs = encounter_mobs_for(player)
     return Result.new(status: :none) if mobs.empty?
 
     player.rests.destroy_all
@@ -98,10 +96,10 @@ class FieldService
   end
 
   def self.item_use_surprise_encounter!(player)
-    return Result.new(status: :none) if player.location&.safe_area?
+    return Result.new(status: :none) unless player.field_route.present?
     return Result.new(status: :none) unless rand(100) < 40
 
-    mobs = encounter_mobs_for(player.location)
+    mobs = encounter_mobs_for(player)
     return Result.new(status: :none) if mobs.empty?
 
     battle = create_battle!(player, mobs)
@@ -121,13 +119,14 @@ class FieldService
     battle
   end
 
-  def self.encounter_mobs_for(location)
-    count = encounter_count_for(location)
-    Array.new(count) { weighted_encounter_mob_for(location) }.compact
+  def self.encounter_mobs_for(player_or_route)
+    context = field_context(player_or_route)
+    count = encounter_count_for(context)
+    Array.new(count) { weighted_encounter_mob_for(context) }.compact
   end
 
-  def self.weighted_encounter_mob_for(location)
-    entries = encounter_entries_for(location)
+  def self.weighted_encounter_mob_for(context)
+    entries = encounter_entries_for(context)
     return Mob.order("RANDOM()").first if entries.empty?
 
     total_weight = entries.sum { |entry| entry[:weight] }
@@ -139,9 +138,9 @@ class FieldService
     entries.last[:mob]
   end
 
-  def self.encounter_entries_for(location)
-    location_name = location&.name.to_s
-    rows = mob_spawn_rows.select { |row| row["location"] == location_name }
+  def self.encounter_entries_for(context)
+    field_name = field_name_for(context)
+    rows = mob_spawn_rows.select { |row| row["location"] == field_name }
     rows.filter_map do |row|
       mob = Mob.find_by(name: row["mob"])
       weight = row["weight"].to_i
@@ -160,16 +159,16 @@ class FieldService
     end
   end
 
-  def self.encounter_count_for(location)
+  def self.encounter_count_for(context)
     roll = rand(100)
-    if location&.name == "はじまりの草原"
+    if field_name_for(context) == "はじまりの草原"
       return 5 if roll < 1
       return 4 if roll < 3
       return 3 if roll < 10
       return 2 if roll < 30
       1
     else
-      danger = (location&.danger_level || 30).to_i
+      danger = field_danger_level(context)
       return 5 if roll < danger - 35
       return 4 if roll < danger - 20
       return 3 if roll < danger
@@ -178,12 +177,12 @@ class FieldService
     end
   end
 
-  def self.gather_encounter_chance(location)
-    [[(location&.danger_level || 0).to_i / 2, 10].max, 45].min
+  def self.gather_encounter_chance(context)
+    [[field_danger_level(context) / 2, 10].max, 45].min
   end
 
-  def self.gatherable_items_for(location)
-    case location&.name
+  def self.gatherable_items_for(context)
+    case field_name_for(context)
     when "はじまりの草原"
       ["薬草"]
     when "静寂の森"
@@ -191,5 +190,25 @@ class FieldService
     else
       ["薬草"]
     end
+  end
+
+  def self.field_context(player_or_route)
+    player_or_route.respond_to?(:field_route) ? player_or_route.field_route : player_or_route
+  end
+
+  def self.field_name_for(context)
+    field_context(context)&.name.to_s
+  end
+
+  def self.field_danger_level(context)
+    field_context(context)&.danger_level.to_i
+  end
+
+  def self.route_progress_for(player, route)
+    player.player_route_progresses.find_or_create_by!(route: route)
+  end
+
+  def self.route_mapped?(player, route)
+    route_progress_for(player, route).progress.to_i >= 100
   end
 end
