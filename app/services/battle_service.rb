@@ -38,6 +38,8 @@ class BattleService
       end
     end
 
+    battle.update!(ambush: false) if battle.ambush?
+
     weapon&.apply_durability_loss!(durability_cost)
 
     if battle.alive_enemies.reload.empty?
@@ -199,8 +201,12 @@ class BattleService
 
   def self.player_attack_hit?(player, battle_enemy, part)
     agility_gap = player.effective_agility - mob_effective_agility(battle_enemy)
-    part_modifier = part.weakness? ? -20 : 0
-    chance = [[80 + (agility_gap * 5) + part_modifier, 20].max, 98].min
+    part_modifier = part.weakness? ? -10 : 0
+    ambush_bonus = battle_enemy.battle.ambush? ? 15 : 0
+
+    chance = 85 + (agility_gap * 3) + part_modifier + ambush_bonus
+    chance = chance.clamp(55, 98)
+
     rand(100) < chance
   end
 

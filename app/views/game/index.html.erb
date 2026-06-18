@@ -59,6 +59,11 @@
             <div class="card-header"><%= @battle.present? ? "戦闘コマンド" : "情報" %></div>
             <div class="card-body">
                 <% if @battle.present? %>
+                  <% if @battle.ambush? %>
+                    <div class="alert alert-success py-2">
+                      先制攻撃のチャンス！
+                    </div>
+                  <% end %>
                   <% battle_command = params[:battle_command].presence %>
                   <% battle_enemies = @battle_enemies.presence || @battle.alive_enemies.to_a %>
                   <% selected_enemy = battle_enemies.find { |enemy| enemy.id == params[:target_enemy_id].to_i } || battle_enemies.first %>
@@ -594,8 +599,9 @@
                   <div class="btn btn-outline-secondary disabled w-100">鍛冶屋（未発見）</div>
                 <% end %>
               <% else %>
-                <%= button_to "探索する", explore_path, method: :post, class: "btn btn-primary btn-lg" %>
-                <%= button_to "採取する", gather_path, method: :post, class: "btn btn-outline-success btn-lg" %>
+                <%= button_to "探索", explore_path, method: :post, class: "btn btn-primary btn-lg" %>
+                <%= button_to "狩り", hunt_path,method: :post, class: "btn btn-danger btn-lg" %>
+                <%= button_to "採取", gather_path, method: :post, class: "btn btn-outline-success btn-lg" %>
                 <%= button_to "休憩", start_rest_path, method: :post, class: "btn btn-outline-light" %>
               <% end %>
 

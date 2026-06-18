@@ -8,6 +8,7 @@ Rails.application.routes.draw do
   delete "logout", to: "sessions#destroy"
   post "explore", to: "game#explore"
   post "gather", to: "game#gather"
+  post "hunt", to: "game#hunt"
   post "attack", to: "game#attack"
   post "sword_skill", to: "game#sword_skill"
   post "use_battle_item", to: "game#use_battle_item"

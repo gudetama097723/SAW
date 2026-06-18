@@ -52,6 +52,11 @@ class GameController < ApplicationController
     redirect_with_result(result)
   end
 
+  def hunt
+    result = FieldService.hunt!(current_player)
+    redirect_to game_path, notice: result.message
+  end
+
   def attack
     result = BattleService.resolve_player_attack!(
       battle: current_battle,
