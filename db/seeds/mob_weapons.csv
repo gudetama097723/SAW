@@ -1,2 +1,2 @@
-﻿mob,name,weapon_type,rarity,attack_power,durability,max_durability,hp_bonus,strength_bonus,agility_bonus,critical_rate,drop_rate
-コボルド歩哨,錆びたショートソード,片手直剣,common,4,12,18,0,0,0,3,20
+mob,name,weapon_type,rarity,attack_power,durability,max_durability,hp_bonus,strength_bonus,agility_bonus,critical_rate,part_break_power,drop_rate
+コボルド歩哨,錆びたショートソード,片手直剣,common,4,600,600,0,0,0,3,100,20

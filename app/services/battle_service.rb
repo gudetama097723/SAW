@@ -162,10 +162,11 @@ class BattleService
 
     base_hit_damage = (calculate_player_damage(player, weapon, battle_enemy.mob, actual_part) * damage_multiplier / 100.0).ceil
     varied_damage = apply_player_damage_variance(base_hit_damage)
-    critical = critical_hit?(player, weapon, battle_enemy, actual_part, varied_damage)
+    part_damage = calculate_part_damage(varied_damage, weapon, actual_part)
+    critical = critical_hit?(player, weapon, battle_enemy, actual_part, part_damage)
     hit_damage = critical ? varied_damage * 2 : varied_damage
     battle_enemy.enemy_hp = [battle_enemy.enemy_hp.to_i - hit_damage, 0].max
-    break_message = apply_part_damage!(player, battle_enemy, actual_part, hit_damage)
+    break_message = apply_part_damage!(player, battle_enemy, actual_part, part_damage)
     battle_enemy.save!
 
     critical_message = critical ? "クリティカル！" : ""
@@ -213,7 +214,8 @@ class BattleService
     battle.destroy!
 
     broken_message = destroy_weapon_if_broken!(weapon)
-    Result.new(status: :ok, message: "#{label}！#{damage_message}！敵を全て倒した！10コル獲得！#{exp_message}#{dropped_weapon_message}#{broken_message}#{skill_message}")
+    victory_message = defeated_mobs.many? ? "敵を全て倒した！" : ""
+    Result.new(status: :ok, message: "#{label}！#{damage_message}！#{victory_message}10コル獲得！#{exp_message}#{dropped_weapon_message}#{broken_message}#{skill_message}")
   end
 
   def self.hit_message(index, hits, message)
@@ -222,6 +224,12 @@ class BattleService
 
   def self.apply_player_damage_variance(damage)
     [(damage.to_i * rand(75..100) / 100.0).ceil, 1].max
+  end
+
+  def self.calculate_part_damage(hp_damage, weapon, part)
+    weapon_break_power = weapon&.effective_part_break_power || 100
+    part_modifier = part.weakness? ? 0.8 : 1.0
+    [(hp_damage.to_i * 0.35 * weapon_break_power / 100.0 * part_modifier).ceil, 1].max
   end
 
   def self.critical_hit?(player, weapon, battle_enemy, part, damage)
@@ -261,7 +269,7 @@ class BattleService
   end
 
   def self.guard_part_for(battle_enemy, parts, target_part)
-    candidates = parts.reject { |part| part.id == target_part.id || part_broken?(battle_enemy, part) }
+    candidates = parts.reject { |part| part.id == target_part.id || part_broken?(battle_enemy, part) || part.weakness? }
     candidates.find { |part| part.name.match?(/手|腕/) } ||
       candidates.find { |part| part.name.match?(/外膜|胴|体/) } ||
       candidates.first
@@ -399,6 +407,7 @@ class BattleService
       strength_bonus: weapon.strength_bonus,
       agility_bonus: weapon.agility_bonus,
       critical_rate: weapon.critical_rate,
+      part_break_power: weapon.part_break_power,
       equipped: false
     )
 

@@ -37,6 +37,7 @@ class PlayerInitializer
         strength_bonus: to_int(row["strength_bonus"]),
         agility_bonus: to_int(row["agility_bonus"]),
         critical_rate: to_int(row["critical_rate"]),
+        part_break_power: to_int(row["part_break_power"]) || 100,
         equipped: to_bool(row["equipped"])
       )
     end

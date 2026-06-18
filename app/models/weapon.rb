@@ -34,6 +34,10 @@ class Weapon < ApplicationRecord
     [[critical_rate.to_i, 0].max, 100].min
   end
 
+  def effective_part_break_power
+    [[part_break_power.to_i, 0].max, 300].min
+  end
+
   def rarity_cost_multiplier
     {
       "common" => 2,

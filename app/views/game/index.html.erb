@@ -107,22 +107,21 @@
                   <% unless equipped_weapon %>
                     <p class="mb-0">武器を装備していないため、ソードスキルは使用できません。</p>
                   <% else %>
-                  <% selected_skill = params[:selected_skill].presence %>
                   <% sword_skill = @player.skills.find_by(name: "片手剣") %>
                   <% sword_skill_level = (sword_skill&.proficiency || 0).to_i %>
-                  <% sword_skill_definitions = SkillCatalog.sword_skills %>
-                  <% selected_skill_definition = SkillCatalog.find(selected_skill || "vertical") %>
+                  <% sword_skill_definitions = SkillCatalog.sword_skills.select { |skill_definition| skill_definition.unlocked?(sword_skill_level) } %>
+                  <% selected_skill = params[:selected_skill].presence %>
+                  <% selected_skill = nil unless sword_skill_definitions.any? { |skill_definition| skill_definition.key == selected_skill } %>
+                  <% selected_skill_definition = SkillCatalog.find(selected_skill || sword_skill_definitions.first&.key || "vertical") %>
+                  <% selected_skill_definition = sword_skill_definitions.first unless sword_skill_definitions.include?(selected_skill_definition) %>
+                  <% selected_skill ||= selected_skill_definition&.key %>
                   <% selected_skill_is_area = selected_skill_definition&.area? %>
                   <h5>ソードスキル</h5>
                   <div class="d-grid gap-2 mb-3">
                     <% sword_skill_definitions.each do |skill_definition| %>
-                      <% if skill_definition.unlocked?(sword_skill_level) %>
-                        <%= link_to skill_definition.name,
-                            game_path(battle_command: "sword_skill", selected_skill: skill_definition.key),
-                            class: "btn btn-outline-danger w-100" %>
-                      <% else %>
-                        <div class="btn btn-outline-secondary disabled w-100"><%= skill_definition.name %>（片手剣熟練度<%= skill_definition.required_proficiency %>で習得）</div>
-                      <% end %>
+                      <%= link_to skill_definition.name,
+                          game_path(battle_command: "sword_skill", selected_skill: skill_definition.key),
+                          class: "btn btn-outline-danger w-100" %>
                     <% end %>
                   </div>
 
@@ -205,6 +204,9 @@
                         <div class="border rounded p-2">
                           <p class="mb-1"><%= weapon.name %></p>
                           <p class="mb-1">攻撃力: <%= weapon.attack_power %> / 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                          <% if weapon.effective_part_break_power > 100 %>
+                            <p class="mb-1">特性: 部位破壊率が高い</p>
+                          <% end %>
                           <p class="mb-2">補正: HP +<%= weapon.hp_bonus %> / 筋力 +<%= weapon.strength_bonus %> / 敏捷 +<%= weapon.agility_bonus %></p>
                           <%= button_to "装備する", equip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-info w-100" %>
                         </div>
@@ -238,6 +240,9 @@
                       <p class="mb-1">攻撃力: <%= weapon.attack_power %></p>
                       <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
                       <p class="mb-1">耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                      <% if weapon.effective_part_break_power > 100 %>
+                        <p class="mb-1">特性: 部位破壊率が高い</p>
+                      <% end %>
                       <p class="mb-0">補正: HP +<%= weapon.hp_bonus %> / 筋力 +<%= weapon.strength_bonus %> / 敏捷 +<%= weapon.agility_bonus %></p>
                       <%= button_to "取り外す", unequip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
                     </div>
@@ -267,6 +272,9 @@
                           <% end %>
                         </p>
                         <p class="mb-1">攻撃力: <%= weapon.attack_power %> / 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                        <% if weapon.effective_part_break_power > 100 %>
+                          <p class="mb-1">特性: 部位破壊率が高い</p>
+                        <% end %>
                         <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
                         <p class="mb-2">補正: HP +<%= weapon.hp_bonus %> / 筋力 +<%= weapon.strength_bonus %> / 敏捷 +<%= weapon.agility_bonus %></p>
                         <% unless weapon.equipped? %>
@@ -293,7 +301,7 @@
                         </p>
                         <p class="mb-1">種別: <%= armor.armor_type %> / 部位: <%= armor.slot_name %></p>
                         <p class="mb-1">防御: <%= armor.defense %> / 重量: <%= armor.weight %></p>
-                        <p class="mb-2">補正: HP +<%= armor.hp_bonus %> / 筋力 +<%= armor.strength_bonus %> / 敏捷 +<%= armor.agility_bonus %></p>
+                        <p class="mb-2">補正: HP +<%= armor.hp_bonus %>% / 筋力 +<%= armor.strength_bonus %> / 敏捷 +<%= armor.agility_bonus %></p>
                         <% if armor.equipped? %>
                           <%= button_to "取り外す", unequip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-light w-100" %>
                         <% else %>
@@ -394,29 +402,30 @@
                   <% sword_skill = @player.skills.find_by(name: "片手剣") %>
                   <% sword_skill_level = (sword_skill&.proficiency || 0).to_i %>
                   <h5 class="mt-3">片手直剣ソードスキル</h5>
-                  <% SkillCatalog.sword_skills.each do |skill_definition| %>
-                    <% unlocked = skill_definition.unlocked?(sword_skill_level) %>
+                  <% SkillCatalog.sword_skills.select { |skill_definition| skill_definition.unlocked?(sword_skill_level) }.each do |skill_definition| %>
                     <%= link_to "#{skill_definition.name} / 倍率#{skill_definition.damage_multiplier}%#{skill_definition.hits > 1 ? "×#{skill_definition.hits}" : ""} / #{skill_definition.target_label}",
                         game_path(panel: "skills", skill_set: "片手剣", sword_skill: skill_definition.key),
-                        class: unlocked ? "btn btn-outline-light w-100 mb-2" : "btn btn-outline-secondary w-100 mb-2" %>
+                        class: "btn btn-outline-light w-100 mb-2" %>
                   <% end %>
 
                   <% if selected_sword_skill.present? %>
                     <% detail_skill = SkillCatalog.find(selected_sword_skill) %>
-                    <div class="border rounded p-2 mt-3">
-                      <p class="mb-1"><%= detail_skill.name %></p>
-                      <p class="mb-1">必要熟練度: <%= detail_skill.required_proficiency %></p>
-                      <p class="mb-1">攻撃倍率: <%= detail_skill.damage_multiplier %>%<%= detail_skill.hits > 1 ? " × #{detail_skill.hits}撃" : "" %></p>
-                      <p class="mb-1">種別: <%= detail_skill.target_label %></p>
-                      <p class="mb-0"><%= detail_skill.description %></p>
-                    </div>
+                    <% if detail_skill&.unlocked?(sword_skill_level) %>
+                      <div class="border rounded p-2 mt-3">
+                        <p class="mb-1"><%= detail_skill.name %></p>
+                        <p class="mb-1">必要熟練度: <%= detail_skill.required_proficiency %></p>
+                        <p class="mb-1">攻撃倍率: <%= detail_skill.damage_multiplier %>%<%= detail_skill.hits > 1 ? " × #{detail_skill.hits}撃" : "" %></p>
+                        <p class="mb-1">種別: <%= detail_skill.target_label %></p>
+                        <p class="mb-0"><%= detail_skill.description %></p>
+                      </div>
+                    <% end %>
                   <% end %>
                 <% end %>
               <% elsif selected_panel == "growth" %>
                 <h5>成長</h5>
                 <h6>装備込みステータス</h6>
                 <p>レベル: <%= @player.level.to_i %></p>
-                <p>HP: <%= @player.hp.to_i %> / <%= @player.effective_max_hp %>（基礎最大 <%= @player.max_hp.to_i %> / 武器 +<%= @player.weapon_hp_bonus %> / 防具 +<%= @player.armor_hp_bonus %>）</p>
+                <p>HP: <%= @player.hp.to_i %> / <%= @player.effective_max_hp %>（基礎最大 <%= @player.max_hp.to_i %> / 筋力 +<%= @player.strength_hp_bonus %> / 武器 +<%= @player.weapon_hp_bonus %> / 防具 +<%= @player.armor_hp_bonus %>（<%= @player.armor_hp_bonus_percent %>%））</p>
                 <p>筋力: <%= @player.effective_strength %>（基礎 <%= @player.strength.to_i %> / 武器 +<%= @player.weapon_strength_bonus %> / 防具 +<%= @player.armor_strength_bonus %>）</p>
                 <p>敏捷: <%= @player.effective_agility %>（基礎 <%= @player.agility.to_i %> / 武器 +<%= @player.weapon_agility_bonus %> / 防具 +<%= @player.armor_agility_bonus %> / 重量 -<%= @player.equipment_weight_penalty %>）</p>
                 <p>防御: <%= @player.damage_cut %></p>
@@ -483,7 +492,7 @@
                   <p>種別: 片手直剣</p>
                   <p>攻撃力: 9</p>
                   <p>クリティカル率: 7%</p>
-                  <p>耐久力: 40 / 40</p>
+                  <p>耐久力: 1200 / 1200</p>
                   <p>補正: HP +0 / 筋力 +2 / 敏捷 +0</p>
                   <p>ブロンズソードを購入しますか？</p>
                   <div class="d-grid gap-2">

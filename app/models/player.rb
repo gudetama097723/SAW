@@ -51,7 +51,7 @@ class Player < ApplicationRecord
   end
 
   def effective_max_hp
-    max_hp.to_i + weapon_hp_bonus + armor_hp_bonus
+    max_hp_before_armor_hp_bonus + armor_hp_bonus
   end
 
   def effective_strength
@@ -75,8 +75,26 @@ class Player < ApplicationRecord
     equipped_weapons.sum(:agility_bonus).to_i
   end
 
-  def armor_hp_bonus
+  def max_hp_before_armor_hp_bonus
+    max_hp.to_i + weapon_hp_bonus + strength_hp_bonus
+  end
+
+  def strength_hp_bonus
+    base_hp = max_hp.to_i
+    cap = (base_hp / 3.0).round
+    [(base_hp * hp_bonus_strength / 300.0).round, cap].min
+  end
+
+  def hp_bonus_strength
+    strength.to_i
+  end
+
+  def armor_hp_bonus_percent
     equipped_armors.sum(:hp_bonus).to_i
+  end
+
+  def armor_hp_bonus
+    (max_hp_before_armor_hp_bonus * armor_hp_bonus_percent / 100.0).round
   end
 
   def armor_strength_bonus
