@@ -80,7 +80,7 @@ class GameController < ApplicationController
       hits: 1,
       sword_skill: false
     )
-    redirect_with_result(result)
+    redirect_with_result(result, battle_command: "attack", target_enemy_id: params[:target_enemy_id])
   end
 
   def sword_skill
