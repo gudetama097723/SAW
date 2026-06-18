@@ -19,6 +19,7 @@ Rails.application.routes.draw do
   post "use_rest_item", to: "game#use_rest_item"
   post "end_rest", to: "game#end_rest"
   post "move", to: "game#move"
+  post "toggle_route_direction", to: "game#toggle_route_direction"
   post "stroll", to: "game#stroll"
   post "item_shop", to: "game#item_shop"
   post "produce_item", to: "game#produce_item"

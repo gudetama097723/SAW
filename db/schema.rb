@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_18_151001) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_18_151007) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -99,12 +99,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_151001) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "player_route_progresses", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "player_id", null: false
+    t.integer "progress", default: 0, null: false
+    t.boolean "returning", default: false, null: false
+    t.integer "route_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["player_id", "route_id"], name: "index_player_route_progresses_on_player_id_and_route_id", unique: true
+    t.index ["player_id"], name: "index_player_route_progresses_on_player_id"
+    t.index ["route_id"], name: "index_player_route_progresses_on_route_id"
+  end
+
   create_table "players", force: :cascade do |t|
     t.integer "agility", default: 1, null: false
     t.integer "col"
     t.datetime "created_at", null: false
     t.integer "current_time", default: 480
     t.integer "exp", default: 0, null: false
+    t.integer "field_position", default: 0, null: false
+    t.integer "field_route_id"
     t.integer "floor"
     t.boolean "found_blacksmith", default: false, null: false
     t.boolean "found_inn", default: false, null: false
@@ -134,7 +148,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_151001) do
   create_table "routes", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "danger_level"
+    t.integer "distance", default: 100, null: false
     t.integer "from_location_id", null: false
+    t.string "name", default: "名もなき道", null: false
     t.integer "to_location_id", null: false
     t.integer "travel_time"
     t.datetime "updated_at", null: false
@@ -190,6 +206,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_151001) do
   add_foreign_key "battles", "players"
   add_foreign_key "items", "players"
   add_foreign_key "mob_parts", "mobs"
+  add_foreign_key "player_route_progresses", "players"
+  add_foreign_key "player_route_progresses", "routes"
   add_foreign_key "players", "locations"
   add_foreign_key "players", "users"
   add_foreign_key "rests", "players"

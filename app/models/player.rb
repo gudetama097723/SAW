@@ -27,9 +27,11 @@ class Player < ApplicationRecord
   has_many :rests, dependent: :destroy
   has_many :weapons, dependent: :destroy
   has_many :armors, dependent: :destroy
+  has_many :player_route_progresses, dependent: :destroy
   belongs_to :user, optional: true
   belongs_to :location, optional: true
-
+  belongs_to :field_route, class_name: "Route", optional: true
+  
   def equipped_weapons
     weapons.where(equipped: true)
   end

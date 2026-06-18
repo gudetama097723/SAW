@@ -30,8 +30,10 @@ seed_rows("routes.csv") do |row|
   to_location = locations.fetch(row["to"])
   route = Route.find_or_create_by!(from_location: from_location, to_location: to_location)
   route.update!(
+    name: row["name"],
     travel_time: to_int(row["travel_time"]),
-    danger_level: to_int(row["danger_level"])
+    danger_level: to_int(row["danger_level"]),
+    distance: to_int(row["distance"]) || 100
   )
 end
 
