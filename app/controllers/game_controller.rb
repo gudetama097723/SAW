@@ -6,6 +6,7 @@ class GameController < ApplicationController
     @battle = current_battle
     @rest = current_rest
     @routes = FieldService.available_routes_for(@player)
+    @current_field_area = FieldService.current_area_for(@player)
     @town_discovery = @player.town_discovery_for if @player.location&.safe_area?
     if @battle
       BattleService.ensure_battle_enemies!(@battle)

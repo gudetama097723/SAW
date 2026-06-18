@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_18_155000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_19_090000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -52,6 +52,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_155000) do
     t.datetime "updated_at", null: false
     t.index ["mob_id"], name: "index_battles_on_mob_id"
     t.index ["player_id"], name: "index_battles_on_player_id"
+  end
+
+  create_table "field_areas", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.integer "encounter_rate", default: 30, null: false
+    t.integer "end_distance", null: false
+    t.string "name", null: false
+    t.integer "rest_safety", default: 70, null: false
+    t.integer "route_id", null: false
+    t.integer "start_distance", null: false
+    t.datetime "updated_at", null: false
+    t.index ["route_id", "start_distance", "end_distance"], name: "index_field_areas_on_route_and_distance"
+    t.index ["route_id"], name: "index_field_areas_on_route_id"
   end
 
   create_table "items", force: :cascade do |t|
@@ -223,6 +237,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_155000) do
   add_foreign_key "battle_enemies", "mobs"
   add_foreign_key "battles", "mobs"
   add_foreign_key "battles", "players"
+  add_foreign_key "field_areas", "routes"
   add_foreign_key "items", "players"
   add_foreign_key "mob_parts", "mobs"
   add_foreign_key "player_route_progresses", "players"

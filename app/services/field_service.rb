@@ -27,8 +27,9 @@ class FieldService
     player.field_position = [player.field_position.to_i + advance, route.distance].min
 
     event = rand(100)
+    encounter_rate = current_area_for(player)&.encounter_rate || field_danger_level(player)
     message =
-      if event < 40
+      if event < encounter_rate
         battle = create_battle!(player, encounter_mobs_for(player))
         "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}と遭遇した！"
       elsif event < 80
@@ -38,7 +39,8 @@ class FieldService
       end
 
     message += " #{route.name}を探索した。"
-    message += " マッピング進行度 +#{progress.progress - mapping_before}%（#{progress.progress}%）"
+    mapping_added = progress.progress - mapping_before
+    message += " マッピング進行度 +#{mapping_added}%（#{progress.progress}%）" if mapping_before < 100 && mapping_added.positive?
     if mapping_before < 100 && progress.progress >= 100
       message += " #{route.name}を完全に踏破した！"
     elsif !destination_discovered_before && destination_discovered?(player, route)
@@ -90,9 +92,9 @@ class FieldService
   end
   
   def self.rest_encounter!(player)
-    danger = field_danger_level(player)
-    return Result.new(status: :none) if danger <= 0
-    return Result.new(status: :none) unless rand(100) < (danger / 3)
+    chance = rest_encounter_chance(player)
+    return Result.new(status: :none) if chance <= 0
+    return Result.new(status: :none) unless rand(100) < chance
 
     mobs = encounter_mobs_for(player)
     return Result.new(status: :none) if mobs.empty?
@@ -262,6 +264,21 @@ class FieldService
 
   def self.field_danger_level(context)
     field_context(context)&.danger_level.to_i
+  end
+
+  def self.current_area_for(player)
+    route = player&.field_route
+    return unless route
+
+    distance = player.field_position.to_i
+    route.field_areas.ordered.find { |area| area.include_distance?(distance) }
+  end
+
+  def self.rest_encounter_chance(player)
+    area = current_area_for(player)
+    return [[field_danger_level(player) / 3, 0].max, 100].min unless area
+
+    (100 - area.rest_safety.to_i).clamp(0, 100)
   end
 
   def self.route_progress_for(player, route)

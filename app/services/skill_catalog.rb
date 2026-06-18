@@ -58,7 +58,7 @@ class SkillCatalog
         durability_cost: row["durability_cost"].to_i,
         skill_gain: row["skill_gain"].to_i,
         hits: row["hits"].to_i,
-        area: row["area"].to_s == "true",
+        area: row["area"].to_s.casecmp?("true"),
         target_type: row["target_type"],
         summary: row["summary"],
         description: row["description"]
