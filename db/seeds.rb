@@ -38,6 +38,19 @@ seed_rows("routes.csv") do |row|
   )
 end
 
+routes = Route.all.index_by(&:name)
+seed_rows("field_areas.csv") do |row|
+  route = routes.fetch(row["route"])
+  area = FieldArea.find_or_initialize_by(route: route, name: row["name"])
+  area.update!(
+    start_distance: to_int(row["start_distance"]),
+    end_distance: to_int(row["end_distance"]),
+    encounter_rate: to_int(row["encounter_rate"]) || 30,
+    rest_safety: to_int(row["rest_safety"]) || 70,
+    description: row["description"].presence
+  )
+end
+
 town = locations.fetch("はじまりの街")
 demo_user = User.find_or_initialize_by(username: "kirito")
 demo_user.password = "password" if demo_user.new_record?
@@ -67,7 +80,7 @@ player.update!(
 )
 
 seed_rows("player_weapons.csv") do |row|
-  weapon = Weapon.find_or_create_by!(player: player, name: row["name"])
+  weapon = Weapon.find_or_initialize_by(player: player, name: row["name"])
   weapon.update!(
     weapon_type: row["weapon_type"],
     rarity: row["rarity"],
@@ -84,7 +97,7 @@ seed_rows("player_weapons.csv") do |row|
 end
 
 seed_rows("player_armors.csv") do |row|
-  armor = Armor.find_or_create_by!(player: player, name: row["name"])
+  armor = Armor.find_or_initialize_by(player: player, name: row["name"])
   armor.update!(
     armor_type: row["armor_type"],
     slot: row["slot"],
@@ -140,7 +153,7 @@ end
 
 seed_rows("mob_weapons.csv") do |row|
   mob = mobs.fetch(row["mob"])
-  weapon = Weapon.find_or_create_by!(mob: mob, name: row["name"])
+  weapon = Weapon.find_or_initialize_by(mob: mob, name: row["name"])
   weapon.update!(
     weapon_type: row["weapon_type"],
     rarity: row["rarity"],

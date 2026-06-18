@@ -75,7 +75,7 @@ class BattleService
     battle.alive_enemies.each do |battle_enemy|
       mob_name = battle_enemy.mob.name
       if allow_evasion && evaded_enemy_attack?(player, battle_enemy)
-        messages << "#{prefix}#{mob_name}の攻撃を回避した！"
+        messages << enemy_message("#{prefix}#{mob_name}の攻撃を回避した！")
         next
       end
 
@@ -92,10 +92,10 @@ class BattleService
         battle.destroy!
         player.save!
 
-        return Result.new(status: :defeated, message: "#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！あなたは倒れた……。はじまりの街へ戻された。")
+        return Result.new(status: :defeated, message: "#{enemy_message("#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。はじまりの街へ戻された。")
       end
 
-      messages << "#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！"
+      messages << enemy_message("#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")
     end
 
     player.save!
@@ -228,7 +228,7 @@ class BattleService
     dropped_weapon_message = defeated_enemies.map { |enemy| try_drop_weapon!(player, enemy.mob) }.join
     dropped_item_message = defeat_drop_message!(player, defeated_enemies)
     broken_part_drop_message = broken_part_drop_message!(player, defeated_enemies)
-    exp_message = defeated_enemies.map { |enemy| gain_exp_message(player, enemy) }.join(" ")
+    exp_message = gain_exp_message(player, defeated_enemies)
     skill_message = gain_weapon_skill_for_victory!(player, weapon, defeated_enemies.count, skill_gain, sword_skill)
     battle.destroy!
 
@@ -370,13 +370,19 @@ class BattleService
     rand(100) < chance
   end
 
-  def self.gain_exp_message(player, battle_enemy)
+  def self.gain_exp_message(player, defeated_enemies)
     before_level = player.level.to_i
     before_slots = player.skill_slots.to_i
-    amount = adjusted_exp_reward(player, battle_enemy)
-    player.gain_exp!(amount)
-    message = "#{amount}経験値獲得！"
-    message += " レベル#{player.level}に上昇！振り分けポイント +3" if player.level.to_i > before_level
+
+    total = Array(defeated_enemies).sum do |battle_enemy|
+      amount = adjusted_exp_reward(player, battle_enemy)
+      player.gain_exp!(amount)
+      amount
+    end
+
+    message = "経験値を #{total} 獲得した！"
+    level_gain = player.level.to_i - before_level
+    message += " レベル#{player.level}に上昇！振り分けポイント +#{level_gain * 3}" if level_gain.positive?
     message += " スキルスロット +#{player.skill_slots.to_i - before_slots}" if player.skill_slots.to_i > before_slots
     message
   end
@@ -410,16 +416,22 @@ class BattleService
     end
     before = skill.proficiency.to_i
     awarded_capstone_slot = skill.gain_skill_exp!(amount, growth_scale: growth.growth_scale)
-    actual_gain = skill.proficiency.to_i - before
 
     learned = SkillCatalog.sword_skills.select do |skill_definition|
       skill_definition.required_proficiency.positive? &&
         before < skill_definition.required_proficiency &&
         skill.proficiency >= skill_definition.required_proficiency
     end.map(&:name)
-    learned_message = learned.any? ? " #{learned.join('、')}を習得した！" : ""
+    learned_message = learned.map do |name|
+      learned_skill = SkillCatalog.sword_skills.find { |skill_definition| skill_definition.name == name }
+      " #{skill_name}の熟練度が #{learned_skill.required_proficiency} に到達した。新しいソードスキル「#{name}」を習得した！"
+    end.join
     capstone_message = awarded_capstone_slot ? " #{skill_name}熟練度がカンストした！スキルスロット +1" : ""
-    actual_gain.positive? ? " #{skill_name} +#{actual_gain}#{learned_message}#{capstone_message}" : "#{learned_message}#{capstone_message}"
+    "#{learned_message}#{capstone_message}"
+  end
+
+  def self.enemy_message(message)
+    "[enemy]#{message}[/enemy]"
   end
 
   def self.weapon_skill_name(weapon)

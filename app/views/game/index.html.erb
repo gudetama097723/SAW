@@ -2,18 +2,27 @@
   <div class="card bg-dark text-light border-secondary shadow-lg">
     <div class="card-header text-center">
       <h1 class="mb-0">Sword Art World</h1>
-      <small>第1層</small>
+      <div class="d-flex gap-3">
+        <p>第1層</p>
+        <p class="mb-0">フィールド名:<%= @player.field_route ? "#{@player.field_route.name}（移動中）" : (@player.location&.name || "不明") %></p>
+        <% if @player.field_route.present? %>
+          <p class="mb-0">現在地:<%= @current_field_area&.name || "不明" %></p>
+        <% end %>
+        <p class="mb-0 ms-auto">ゲーム内時刻: <%= format("%02d:%02d", @player.current_time / 60, @player.current_time % 60) %></p>
+      </div>
     </div>
 
     <div class="card-body">
-      <div class="message-window mb-3">
-        <% if alert.present? %>
-          <div class="message-line text-warning"><%= alert %></div>
-        <% elsif notice.present? %>
-          <div class="message-line text-success"><%= notice %></div>
-        <% else %>
-          <div class="message-line text-secondary">メッセージはありません。</div>
-        <% end %>
+      <div class="message-window mb-3 p-0 text-start overflow-auto" style="min-height: 6rem; max-height: 10rem;">
+        <% message_text = alert.presence || notice.presence %>
+        <% message_class = alert.present? ? "text-warning" : "text-success" %>
+        <div class="message-line <%= message_text.present? ? "" : "text-secondary" %>" style="line-height: 1.35;">
+          <% if message_text.present? %>
+            <% message_text.to_s.split(/(\[enemy\].*?\[\/enemy\])/m).each do |segment| %><% if segment.start_with?("[enemy]") %><span class="text-danger"><%= segment.delete_prefix("[enemy]").delete_suffix("[/enemy]") %></span><% else %><span class="<%= message_class %>"><%= segment %></span><% end %><% end %>
+          <% else %>
+            メッセージはありません。
+          <% end %>
+        </div>
       </div>
 
       <% selected_panel = params[:panel].presence %>
@@ -43,8 +52,6 @@
               <% end %>
               <p>スキルスロット: <%= @player.used_skill_slots %> / <%= @player.skill_slots.to_i %></p>
               <p>コル: <%= @player.col %></p>
-              <p>現在地: <%= @player.field_route ? "#{@player.field_route.name}（移動中）" : (@player.location&.name || "不明") %></p>
-              <p>時刻: <%= format("%02d:%02d", current_time / 60, current_time % 60) %></p>
             </div>
           </div>
 
@@ -104,7 +111,7 @@
                         <%= button_to part_label,
                             attack_path(target_enemy_id: selected_enemy.id, mob_part_id: part.id),
                             method: :post,
-                            class: part.weakness? ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
+                            class: "btn btn-outline-warning w-100" %>
                       <% end %>
                     </div>
                   <% end %>
@@ -126,7 +133,7 @@
                     <% sword_skill_definitions.each do |skill_definition| %>
                       <%= link_to skill_definition.name,
                           game_path(battle_command: "sword_skill", selected_skill: skill_definition.key),
-                          class: "btn btn-outline-danger w-100" %>
+                          class: skill_definition.key == selected_skill ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
                     <% end %>
                   </div>
 
@@ -160,7 +167,7 @@
                           <%= button_to part_label,
                               sword_skill_path(skill: selected_skill, group_start: group_start, target_enemy_id: area_enemy.id, mob_part_id: part.id),
                               method: :post,
-                              class: part.weakness? ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
+                              class: "btn btn-outline-danger w-100" %>
                         <% end %>
                       </div>
                     <% elsif selected_group.any? %>
@@ -190,7 +197,7 @@
                           <%= button_to part_label,
                               sword_skill_path(target_enemy_id: selected_enemy.id, mob_part_id: part.id, skill: selected_skill),
                               method: :post,
-                              class: part.weakness? ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
+                              class: "btn btn-outline-danger w-100" %>
                         <% end %>
                       </div>
                     <% end %>
