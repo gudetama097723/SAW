@@ -25,16 +25,6 @@
   </head>
 
   <body>
-    <% if notice.present? || alert.present? %>
-      <div class="container pt-3">
-        <% if notice.present? %>
-          <div class="alert alert-success"><%= notice %></div>
-        <% end %>
-        <% if alert.present? %>
-          <div class="alert alert-warning"><%= alert %></div>
-        <% end %>
-      </div>
-    <% end %>
     <%= yield %>
   </body>
 </html>

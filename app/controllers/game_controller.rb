@@ -369,12 +369,13 @@ class GameController < ApplicationController
       weapon_type: "片手直剣",
       rarity: "common",
       attack_power: 9,
-      durability: 40,
-      max_durability: 40,
+      durability: 1200,
+      max_durability: 1200,
       hp_bonus: 0,
       strength_bonus: 2,
       agility_bonus: 0,
       critical_rate: 7,
+      part_break_power: 100,
       equipped: false
     )
     player.save!

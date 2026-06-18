@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_18_134500) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_18_151000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -172,6 +172,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_134500) do
     t.integer "max_durability", default: 10, null: false
     t.integer "mob_id"
     t.string "name", null: false
+    t.integer "part_break_power", default: 100, null: false
     t.integer "player_id"
     t.string "rarity", default: "common", null: false
     t.integer "strength_bonus", default: 0, null: false

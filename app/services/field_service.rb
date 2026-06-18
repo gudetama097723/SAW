@@ -106,7 +106,41 @@ class FieldService
 
   def self.encounter_mobs_for(location)
     count = encounter_count_for(location)
-    Array.new(count) { Mob.order("RANDOM()").first }.compact
+    Array.new(count) { weighted_encounter_mob_for(location) }.compact
+  end
+
+  def self.weighted_encounter_mob_for(location)
+    entries = encounter_entries_for(location)
+    return Mob.order("RANDOM()").first if entries.empty?
+
+    total_weight = entries.sum { |entry| entry[:weight] }
+    roll = rand(total_weight)
+    entries.each do |entry|
+      roll -= entry[:weight]
+      return entry[:mob] if roll < 0
+    end
+    entries.last[:mob]
+  end
+
+  def self.encounter_entries_for(location)
+    location_name = location&.name.to_s
+    rows = mob_spawn_rows.select { |row| row["location"] == location_name }
+    rows.filter_map do |row|
+      mob = Mob.find_by(name: row["mob"])
+      weight = row["weight"].to_i
+      next unless mob && weight.positive?
+
+      { mob: mob, weight: weight }
+    end
+  end
+
+  def self.mob_spawn_rows
+    @mob_spawn_rows ||= begin
+      path = Rails.root.join("db", "seeds", "mob_spawns.csv")
+      rows = []
+      SimpleCsv.foreach(path) { |row| rows << row } if File.exist?(path)
+      rows
+    end
   end
 
   def self.encounter_count_for(location)
