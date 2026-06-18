@@ -1,5 +1,6 @@
 class FieldService
   Result = Struct.new(:status, :message, :battle, keyword_init: true)
+  REQUIRED_MAPPING_TO_REACH_DESTINATION = 30
 
   def self.available_routes_for(player)
     location = player&.location
@@ -17,10 +18,13 @@ class FieldService
 
     progress = route_progress_for(player, route)
     mapping_before = progress.progress.to_i
-    mapping_gain = rand(12..22)
+    destination_discovered_before = destination_discovered?(player, route)
+    mapping_gain = mapping_gain_for(mapping_before, player, route)
     progress.progress = [mapping_before + mapping_gain, 100].min
     progress.save!
     player.current_time = (player.current_time.to_i + 10) % 1440
+    advance = destination_discovered?(player, route) ? 0 : explore_advance_for(route)
+    player.field_position = [player.field_position.to_i + advance, route.distance].min
 
     event = rand(100)
     message =
@@ -33,9 +37,12 @@ class FieldService
         "遠くに奇妙な塔が見える……。"
       end
 
+    message += " #{route.name}を探索した。"
     message += " マッピング進行度 +#{progress.progress - mapping_before}%（#{progress.progress}%）"
     if mapping_before < 100 && progress.progress >= 100
-      message += " #{route.name}の地形を把握した。次の町への道が開けた！"
+      message += " #{route.name}を完全に踏破した！"
+    elsif !destination_discovered_before && destination_discovered?(player, route)
+      message += " #{route.to_location.name}を発見した！"
     end
 
     player.save!
@@ -106,6 +113,19 @@ class FieldService
     Result.new(status: :encounter, message: "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に見つかった！", battle: battle)
   end
 
+  def self.movement_encounter!(player)
+    return Result.new(status: :none) unless player.field_route.present?
+
+    chance = [[field_danger_level(player) / 2, 8].max, 40].min
+    return Result.new(status: :none) unless rand(100) < chance
+
+    mobs = encounter_mobs_for(player)
+    return Result.new(status: :none) if mobs.empty?
+
+    battle = create_battle!(player, mobs)
+    Result.new(status: :encounter, message: "移動中に#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}と遭遇した！", battle: battle)
+  end
+
   def self.create_battle!(player, mobs, ambush: false)
     mobs = Array(mobs).compact
     first_mob = mobs.first
@@ -114,9 +134,49 @@ class FieldService
     player.battles.destroy_all
     battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp, ambush: ambush)
     mobs.first(5).each.with_index(1) do |mob, position|
-      battle.battle_enemies.create!(mob: mob, enemy_hp: mob.hp, position: position)
+      enemy_level = enemy_level_for(player.field_route, mob)
+      enemy_max_hp = scaled_mob_value(mob.hp, enemy_level)
+      battle.battle_enemies.create!(
+        battle_enemy_attributes(
+          mob: mob,
+          enemy_hp: enemy_max_hp,
+          enemy_max_hp: enemy_max_hp,
+          enemy_level: enemy_level,
+          position: position
+        )
+      )
     end
     battle
+  end
+
+  def self.enemy_level_for(route, mob)
+    if route&.name == "はじまりの草原"
+      roll = rand(100)
+      return 1 if roll < 60
+      return 2 if roll < 95
+      return 3
+    end
+
+    [mob.level.to_i, 1].max
+  end
+
+  def self.scaled_mob_value(base, enemy_level)
+    base_value = [base.to_i, 1].max
+    multiplier = 1.0 + (([enemy_level.to_i, 1].max - 1) * 0.25)
+    (base_value * multiplier).round
+  end
+
+  def self.battle_enemy_attributes(mob:, enemy_hp:, enemy_max_hp:, enemy_level:, position:)
+    attrs = {
+      mob: mob,
+      enemy_hp: enemy_hp,
+      position: position
+    }
+
+    probe = BattleEnemy.new
+    attrs[:enemy_max_hp] = enemy_max_hp if probe.has_attribute?(:enemy_max_hp)
+    attrs[:enemy_level] = enemy_level if probe.has_attribute?(:enemy_level)
+    attrs
   end
 
   def self.encounter_mobs_for(player_or_route)
@@ -209,6 +269,40 @@ class FieldService
   end
 
   def self.route_mapped?(player, route)
-    route_progress_for(player, route).progress.to_i >= 100
+    route_progress_for(player, route).progress.to_i >= REQUIRED_MAPPING_TO_REACH_DESTINATION
+  end
+
+  def self.destination_discovered?(player, route)
+    route_mapped?(player, route)
+  end
+
+  def self.destination_reached?(player, route)
+    route_progress_for(player, route).reached_destination?
+  end
+
+  def self.explore_advance_for(route)
+    distance = [route.distance.to_i, 1].max
+    [[rand(8..16), (distance / 6.0).ceil].min, 1].max
+  end
+
+  def self.mapping_gain_for(mapping_progress, player, route)
+    gain =
+      case mapping_progress.to_i
+      when 0...30
+        rand(2..4)
+      when 30...60
+        rand(2..3)
+      when 60...80
+        rand(1..2)
+      when 80...90
+        rand(0..1)
+      else
+        rand(0..1)
+      end
+
+    gain += 1 if player.skills.exists?(name: "探索")
+    difficulty = route.mapping_difficulty.to_f
+    difficulty = 1.0 if difficulty <= 0
+    (gain / difficulty).ceil
   end
 end

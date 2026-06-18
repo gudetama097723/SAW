@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_18_151007) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_18_155000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -32,6 +32,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_151007) do
     t.integer "battle_id", null: false
     t.datetime "created_at", null: false
     t.integer "enemy_hp", null: false
+    t.integer "enemy_level", default: 1, null: false
+    t.integer "enemy_max_hp"
     t.integer "mob_id", null: false
     t.text "part_states", default: "{}", null: false
     t.integer "position", default: 1, null: false
@@ -89,6 +91,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_151007) do
   create_table "mobs", force: :cascade do |t|
     t.integer "agility", default: 1, null: false
     t.integer "atk"
+    t.integer "col_max", default: 3, null: false
+    t.integer "col_min", default: 1, null: false
     t.datetime "created_at", null: false
     t.integer "durability", default: 0, null: false
     t.integer "exp_reward", default: 10, null: false
@@ -103,12 +107,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_151007) do
     t.datetime "created_at", null: false
     t.integer "player_id", null: false
     t.integer "progress", default: 0, null: false
+    t.boolean "reached_destination", default: false, null: false
     t.boolean "returning", default: false, null: false
     t.integer "route_id", null: false
     t.datetime "updated_at", null: false
     t.index ["player_id", "route_id"], name: "index_player_route_progresses_on_player_id_and_route_id", unique: true
     t.index ["player_id"], name: "index_player_route_progresses_on_player_id"
     t.index ["route_id"], name: "index_player_route_progresses_on_route_id"
+  end
+
+  create_table "player_town_discoveries", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "found_blacksmith", default: false, null: false
+    t.boolean "found_inn", default: false, null: false
+    t.boolean "found_item_shop", default: false, null: false
+    t.integer "location_id", null: false
+    t.integer "player_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["location_id"], name: "index_player_town_discoveries_on_location_id"
+    t.index ["player_id", "location_id"], name: "index_player_town_discoveries_on_player_id_and_location_id", unique: true
+    t.index ["player_id"], name: "index_player_town_discoveries_on_player_id"
   end
 
   create_table "players", force: :cascade do |t|
@@ -150,6 +168,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_151007) do
     t.integer "danger_level"
     t.integer "distance", default: 100, null: false
     t.integer "from_location_id", null: false
+    t.decimal "mapping_difficulty", precision: 4, scale: 2, default: "1.0", null: false
     t.string "name", default: "名もなき道", null: false
     t.integer "to_location_id", null: false
     t.integer "travel_time"
@@ -208,6 +227,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_151007) do
   add_foreign_key "mob_parts", "mobs"
   add_foreign_key "player_route_progresses", "players"
   add_foreign_key "player_route_progresses", "routes"
+  add_foreign_key "player_town_discoveries", "locations"
+  add_foreign_key "player_town_discoveries", "players"
   add_foreign_key "players", "locations"
   add_foreign_key "players", "users"
   add_foreign_key "rests", "players"

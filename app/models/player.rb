@@ -28,6 +28,7 @@ class Player < ApplicationRecord
   has_many :weapons, dependent: :destroy
   has_many :armors, dependent: :destroy
   has_many :player_route_progresses, dependent: :destroy
+  has_many :player_town_discoveries, dependent: :destroy
   belongs_to :user, optional: true
   belongs_to :location, optional: true
   belongs_to :field_route, class_name: "Route", optional: true
@@ -50,6 +51,12 @@ class Player < ApplicationRecord
 
   def armor_for(slot)
     equipped_armors.find_by(slot: slot)
+  end
+
+  def town_discovery_for(target_location = location)
+    return unless target_location
+
+    player_town_discoveries.find_or_create_by!(location: target_location)
   end
 
   def effective_max_hp

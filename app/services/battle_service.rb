@@ -127,7 +127,17 @@ class BattleService
   def self.ensure_battle_enemies!(battle)
     return battle.alive_enemies.to_a if battle.battle_enemies.exists?
 
-    battle.battle_enemies.create!(mob: battle.mob, enemy_hp: battle.enemy_hp || battle.mob.hp, position: 1)
+    enemy_level = [battle.mob.level.to_i, 1].max
+    enemy_max_hp = FieldService.scaled_mob_value(battle.mob.hp, enemy_level)
+    battle.battle_enemies.create!(
+      FieldService.battle_enemy_attributes(
+        mob: battle.mob,
+        enemy_hp: battle.enemy_hp || enemy_max_hp,
+        enemy_max_hp: enemy_max_hp,
+        enemy_level: enemy_level,
+        position: 1
+      )
+    )
     battle.alive_enemies.to_a
   end
 
@@ -162,7 +172,7 @@ class BattleService
       return "#{battle_enemy.mob.name}: #{guard_result[:message]}ミス"
     end
 
-    base_hit_damage = (calculate_player_damage(player, weapon, battle_enemy.mob, actual_part) * damage_multiplier / 100.0).ceil
+    base_hit_damage = (calculate_player_damage(player, weapon, battle_enemy, actual_part) * damage_multiplier / 100.0).ceil
     varied_damage = apply_player_damage_variance(base_hit_damage)
     part_damage = calculate_part_damage(varied_damage, weapon, actual_part)
     critical = critical_hit?(player, weapon, battle_enemy, actual_part, part_damage)
@@ -191,10 +201,10 @@ class BattleService
     (damage_multiplier * reduction).ceil
   end
 
-  def self.calculate_player_damage(player, weapon, mob, part)
+  def self.calculate_player_damage(player, weapon, battle_enemy, part)
     weapon_power = weapon&.attack_power.to_i
     attack_power = (player.effective_strength * 0.7) + (weapon_power * 1.3)
-    defense_rate = 100.0 / (100 + [mob.durability.to_i, 0].max)
+    defense_rate = 100.0 / (100 + [battle_enemy.effective_durability, 0].max)
     base_damage = attack_power * defense_rate
     [(base_damage * part.damage_multiplier.to_i / 100.0).ceil, 1].max
   end
@@ -211,17 +221,20 @@ class BattleService
   end
 
   def self.finish_battle_victory!(player, battle, weapon, label, damage_message, skill_gain, sword_skill)
-    player.col = player.col.to_i + 10
+    defeated_enemies = battle.battle_enemies.includes(:mob).to_a
+    col_reward = defeated_enemies.sum(&:col_reward)
+    player.col = player.col.to_i + col_reward
     player.save!
-    defeated_mobs = battle.battle_enemies.includes(:mob).to_a.map(&:mob)
-    dropped_weapon_message = defeated_mobs.map { |mob| try_drop_weapon!(player, mob) }.join
-    exp_message = defeated_mobs.map { |mob| gain_exp_message(player, mob) }.join(" ")
-    skill_message = gain_weapon_skill_for_victory!(player, weapon, defeated_mobs.count, skill_gain, sword_skill)
+    dropped_weapon_message = defeated_enemies.map { |enemy| try_drop_weapon!(player, enemy.mob) }.join
+    dropped_item_message = defeat_drop_message!(player, defeated_enemies)
+    broken_part_drop_message = broken_part_drop_message!(player, defeated_enemies)
+    exp_message = defeated_enemies.map { |enemy| gain_exp_message(player, enemy) }.join(" ")
+    skill_message = gain_weapon_skill_for_victory!(player, weapon, defeated_enemies.count, skill_gain, sword_skill)
     battle.destroy!
 
     broken_message = destroy_weapon_if_broken!(weapon)
-    victory_message = defeated_mobs.many? ? "敵を全て倒した！" : ""
-    Result.new(status: :ok, message: "#{label}！#{damage_message}！#{victory_message}10コル獲得！#{exp_message}#{dropped_weapon_message}#{broken_message}#{skill_message}")
+    victory_message = defeated_enemies.many? ? "敵を全て倒した！" : ""
+    Result.new(status: :ok, message: "#{label}！#{damage_message}！#{victory_message}#{col_reward}コル獲得！#{exp_message}#{dropped_item_message}#{broken_part_drop_message}#{dropped_weapon_message}#{broken_message}#{skill_message}")
   end
 
   def self.hit_message(index, hits, message)
@@ -291,7 +304,6 @@ class BattleService
     if state["durability"] <= 0
       state["broken"] = true
       message = " #{part.break_message}"
-      message += apply_part_drop!(player, part)
     end
 
     states[part.id.to_s] = state
@@ -299,13 +311,35 @@ class BattleService
     message
   end
 
-  def self.apply_part_drop!(player, part)
-    return "" if part.drop_item_name.blank?
-    return "" unless rand(100) < part.drop_rate.to_i
+  def self.defeat_drop_message!(player, defeated_enemies)
+    messages = defeated_enemies.filter_map do |battle_enemy|
+      drop = MobDropCatalog.roll_defeat_drop(battle_enemy.mob)
+      next unless drop
 
-    item = ItemService.add_item!(player, part.drop_item_name, "drop")
-    item.save!
-    " #{part.drop_item_name}を入手した！"
+      item = ItemService.add_item!(player, drop.item_name, drop.category)
+      item.save!
+      "#{drop.item_name}を入手した！"
+    end
+
+    messages.any? ? " #{messages.join}" : ""
+  end
+
+  def self.broken_part_drop_message!(player, defeated_enemies)
+    messages = defeated_enemies.flat_map do |battle_enemy|
+      states = battle_part_states(battle_enemy)
+      battle_enemy.mob.mob_parts.filter_map do |part|
+        next unless states.dig(part.id.to_s, "broken")
+
+        item_name = MobDropCatalog.roll_part_drop(part)
+        next unless item_name
+
+        item = ItemService.add_item!(player, item_name, "drop")
+        item.save!
+        "#{part.name}から#{item_name}を入手した！"
+      end
+    end
+
+    messages.any? ? " #{messages.join}" : ""
   end
 
   def self.default_part_state(part)
@@ -318,12 +352,12 @@ class BattleService
 
   def self.mob_effective_atk(battle_enemy)
     penalty = broken_parts_with_effect(battle_enemy, "strength_down").count * 0.35
-    [(battle_enemy.mob.atk.to_i * (1.0 - penalty)).ceil, 1].max
+    [(battle_enemy.effective_atk * (1.0 - penalty)).ceil, 1].max
   end
 
   def self.mob_effective_agility(battle_enemy)
     penalty = broken_parts_with_effect(battle_enemy, "agility_down").count * 0.35
-    [(battle_enemy.mob.effective_agility * (1.0 - penalty)).ceil, 1].max
+    [(battle_enemy.effective_agility * (1.0 - penalty)).ceil, 1].max
   end
 
   def self.broken_parts_with_effect(battle_enemy, effect)
@@ -336,10 +370,10 @@ class BattleService
     rand(100) < chance
   end
 
-  def self.gain_exp_message(player, mob)
+  def self.gain_exp_message(player, battle_enemy)
     before_level = player.level.to_i
     before_slots = player.skill_slots.to_i
-    amount = adjusted_exp_reward(player, mob)
+    amount = adjusted_exp_reward(player, battle_enemy)
     player.gain_exp!(amount)
     message = "#{amount}経験値獲得！"
     message += " レベル#{player.level}に上昇！振り分けポイント +3" if player.level.to_i > before_level
@@ -347,11 +381,11 @@ class BattleService
     message
   end
 
-  def self.adjusted_exp_reward(player, mob)
-    level_gap = mob.effective_level - player.effective_level
+  def self.adjusted_exp_reward(player, battle_enemy)
+    level_gap = battle_enemy.effective_level - player.effective_level
     multiplier = 1.0 + (level_gap * 0.15)
     multiplier = [[multiplier, 0.1].max, 2.5].min
-    [(mob.exp_reward.to_i * multiplier).round, 1].max
+    [(battle_enemy.effective_exp_reward * multiplier).round, 1].max
   end
 
   def self.gain_weapon_skill_for_victory!(player, weapon, defeated_count, use_exp, sword_skill)
