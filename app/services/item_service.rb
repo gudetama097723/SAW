@@ -14,19 +14,25 @@ class ItemService
     item
   end
 
-  def self.buy_potion!(player)
-    return Result.new(status: :error, message: "コルが足りません。ポーションは#{POTION_PRICE}コルです。") if player.col.to_i < POTION_PRICE
+  def self.buy_shop_item!(player, item_name)
+    shop_item = ShopCatalog.item_shop_item(player.location, item_name)
+    return Result.new(status: :error, message: "この町では#{item_name}を購入できません。") unless shop_item
+    return Result.new(status: :error, message: "コルが足りません。#{item_name}は#{shop_item.price}コルです。") if player.col.to_i < shop_item.price
 
-    player.col = player.col.to_i - POTION_PRICE
+    player.col = player.col.to_i - shop_item.price
     player.current_time = (player.current_time.to_i + 5) % 1440
-    potion = add_item!(player, "ポーション", "healing")
+    item = add_item!(player, shop_item.item_name, shop_item.category)
 
     ActiveRecord::Base.transaction do
       player.save!
-      potion.save!
+      item.save!
     end
 
-    Result.new(status: :ok, message: "道具屋でポーションを1本購入した。#{POTION_PRICE}コル支払った。", item: potion)
+    Result.new(status: :ok, message: "道具屋で#{shop_item.item_name}を1つ購入した。#{shop_item.price}コル支払った。", item: item)
+  end
+
+  def self.buy_potion!(player)
+    buy_shop_item!(player, "ポーション")
   end
 
   def self.produce_potion!(player)

@@ -33,7 +33,8 @@ seed_rows("routes.csv") do |row|
     name: row["name"],
     travel_time: to_int(row["travel_time"]),
     danger_level: to_int(row["danger_level"]),
-    distance: to_int(row["distance"]) || 100
+    distance: to_int(row["distance"]) || 100,
+    mapping_difficulty: row["mapping_difficulty"].presence || 1.0
   )
 end
 
@@ -117,7 +118,9 @@ seed_rows("mobs.csv") do |row|
     level: to_int(row["level"]),
     agility: to_int(row["agility"]),
     durability: to_int(row["durability"]),
-    exp_reward: to_int(row["exp_reward"])
+    exp_reward: to_int(row["exp_reward"]),
+    col_min: to_int(row["col_min"]) || 1,
+    col_max: to_int(row["col_max"]) || 3
   )
   mobs[mob.name] = mob
 end

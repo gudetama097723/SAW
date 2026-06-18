@@ -6,6 +6,7 @@ class GameController < ApplicationController
     @battle = current_battle
     @rest = current_rest
     @routes = FieldService.available_routes_for(@player)
+    @town_discovery = @player.town_discovery_for if @player.location&.safe_area?
     if @battle
       BattleService.ensure_battle_enemies!(@battle)
       @battle_enemies = @battle.alive_enemies.includes(mob: :mob_parts).to_a
@@ -27,15 +28,22 @@ class GameController < ApplicationController
 
     result = rand(100)
     next_time = (player.current_time.to_i + 10) % 1440
+    discovery = player.town_discovery_for
 
-    if !player.found_inn && result < 30
-      player.update!(found_inn: true, current_time: next_time)
+    if !discovery.found_inn? && result < 30
+      discovery.found_inn = true
+      player.current_time = next_time
+      ActiveRecord::Base.transaction { discovery.save!; player.save! }
       redirect_to game_path, notice: "広場の近くで宿屋を見つけた！"
-    elsif !player.found_item_shop && result < 60
-      player.update!(found_item_shop: true, current_time: next_time)
+    elsif !discovery.found_item_shop? && result < 60
+      discovery.found_item_shop = true
+      player.current_time = next_time
+      ActiveRecord::Base.transaction { discovery.save!; player.save! }
       redirect_to game_path, notice: "街を散策していると、道具屋を見つけた！"
-    elsif !player.found_blacksmith && result < 85
-      player.update!(found_blacksmith: true, current_time: next_time)
+    elsif !discovery.found_blacksmith? && result < 85
+      discovery.found_blacksmith = true
+      player.current_time = next_time
+      ActiveRecord::Base.transaction { discovery.save!; player.save! }
       redirect_to game_path, notice: "路地裏で鍛冶屋を見つけた！"
     else
       player.update!(current_time: next_time)
@@ -45,7 +53,7 @@ class GameController < ApplicationController
 
   def explore
     result = FieldService.explore!(current_player)
-    redirect_with_result(result)
+    redirect_with_result(result, battle_command: "attack", target_enemy_id: params[:target_enemy_id])
   end
 
   def gather
@@ -83,7 +91,7 @@ class GameController < ApplicationController
     skill_config = sword_skill_config(skill_key)
 
     unless proficiency >= skill_config[:required]
-      redirect_to game_path(battle_command: "sword_skill"), alert: "#{skill_config[:label]}はまだ習得していません。"
+      redirect_to game_path(battle_command: "sword_skill", selected_skill: skill_key), alert: "#{skill_config[:label]}はまだ習得していません。"
       return
     end
 
@@ -102,7 +110,13 @@ class GameController < ApplicationController
       sword_skill: true,
       area: skill_config[:area]
     )
-    redirect_with_result(result)
+    redirect_with_result(
+      result,
+      battle_command: "sword_skill",
+      selected_skill: skill_key,
+      target_enemy_id: params[:target_enemy_id],
+      group_start: params[:group_start]
+    )
   end
 
   def use_battle_item
@@ -115,19 +129,19 @@ class GameController < ApplicationController
     end
 
     unless params[:item_name] == "ポーション"
-      redirect_to game_path, alert: "そのアイテムはまだ使用できません。"
+      redirect_to game_path(battle_command: "item"), alert: "そのアイテムはまだ使用できません。"
       return
     end
 
     item_result = ItemService.consume_healing_potion!(player)
     unless item_result.status == :ok
-      redirect_to game_path, alert: item_result.message
+      redirect_to game_path(battle_command: "item"), alert: item_result.message
       return
     end
 
     enemy_result = BattleService.apply_enemy_attack!(player, battle)
 
-    redirect_to game_path, notice: "#{item_result.message}#{enemy_result.message}"
+    redirect_to game_path(battle_command: "item"), notice: "#{item_result.message}#{enemy_result.message}"
   end
 
   def use_item
@@ -179,7 +193,7 @@ class GameController < ApplicationController
     else
       enemy_result = BattleService.apply_enemy_attack!(player, battle)
 
-      redirect_to game_path, alert: "逃走に失敗した。#{enemy_result.message}"
+      redirect_to game_path(battle_command: params[:battle_command].presence), alert: "逃走に失敗した。#{enemy_result.message}"
     end
   end
 
@@ -310,8 +324,19 @@ class GameController < ApplicationController
       return
     end
 
+    unless FieldService.destination_discovered?(player, route)
+      redirect_to game_path, notice: "まだ目的地への道筋が掴めていない。探索でマッピングを進めよう。"
+      return
+    end
+
     advance = rand(15..25)
     direction = params[:direction]
+    reached_destination = FieldService.destination_reached?(player, route)
+
+    if direction == "backward" && !reached_destination
+      redirect_to game_path, notice: "まだ#{route.from_location.name}方面へ戻る道筋は整理できていない。まずは#{route.to_location.name}を目指そう。"
+      return
+    end
 
     if direction == "backward"
       player.field_position -= advance
@@ -336,15 +361,16 @@ class GameController < ApplicationController
 
     if player.field_position >= route.distance
       unless FieldService.route_mapped?(player, route)
-        player.field_position = route.distance
+        player.field_position = [route.distance - 10, 0].max
         player.save!
-        redirect_to game_path, notice: "#{route.name}はまだ地形を把握できていない。探索でマッピングを100%にする必要がある。"
+        redirect_to game_path, notice: "#{route.name}の奥まで進んだが、まだ目的地への道筋が掴めていない。探索でマッピングを進めよう。"
         return
       end
 
       player.location = route.to_location
       player.field_route = nil
       player.field_position = 0
+      FieldService.route_progress_for(player, route).update!(reached_destination: true)
       player.save!
 
       redirect_to game_path, notice: "#{route.to_location.name}へ到着した。#{elapsed_time}分経過した。"
@@ -352,26 +378,31 @@ class GameController < ApplicationController
     end
 
     player.save!
+    encounter_result = FieldService.movement_encounter!(player)
+    if encounter_result.status == :encounter
+      redirect_to game_path, alert: "#{route.name}を#{direction_text}方面へ進んだ。#{elapsed_time}分経過した。#{encounter_result.message}"
+      return
+    end
 
-    redirect_to game_path, notice: "#{route.name}を#{direction_text}方面へ進んだ。現在位置 #{player.field_position} / #{route.distance}。#{elapsed_time}分経過した。"
+    redirect_to game_path, notice: "#{route.name}を#{direction_text}方面へ進んだ。#{elapsed_time}分経過した。"
   end
 
   def item_shop
     player = current_player
 
-    unless player.location&.safe_area? && player.found_item_shop?
+    unless player.location&.safe_area? && player.town_discovery_for&.found_item_shop?
       redirect_to game_path, alert: "道具屋はまだ利用できません。"
       return
     end
 
-    result = ItemService.buy_potion!(player)
+    result = ItemService.buy_shop_item!(player, params[:item_name].presence || "ポーション")
     redirect_to game_path(panel: "item_shop", shop_menu: "buy"), flash_for(result)
   end
 
   def produce_item
     player = current_player
 
-    unless player.location&.safe_area? && player.found_item_shop?
+    unless player.location&.safe_area? && player.town_discovery_for&.found_item_shop?
       redirect_to game_path, alert: "道具屋はまだ利用できません。"
       return
     end
@@ -383,7 +414,7 @@ class GameController < ApplicationController
   def sell_item
     player = current_player
 
-    unless player.location&.safe_area? && player.found_item_shop?
+    unless player.location&.safe_area? && player.town_discovery_for&.found_item_shop?
       redirect_to game_path, alert: "道具屋はまだ利用できません。"
       return
     end
@@ -412,7 +443,7 @@ class GameController < ApplicationController
   def blacksmith
     player = current_player
 
-    unless player.location&.safe_area? && player.found_blacksmith?
+    unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
       redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
       return
     end
@@ -449,41 +480,47 @@ class GameController < ApplicationController
   def buy_bronze_sword
     player = current_player
 
-    unless player.location&.safe_area? && player.found_blacksmith?
+    unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
       redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
       return
     end
 
-    price = 100
+    weapon_definition = ShopCatalog.blacksmith_weapon(player.location, params[:weapon_name].presence || "ブロンズソード")
+    unless weapon_definition
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "buy"), alert: "この町ではその武器を購入できません。"
+      return
+    end
+
+    price = weapon_definition.price
     if player.col.to_i < price
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "buy"), alert: "コルが足りません。ブロンズソードは#{price}コルです。"
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "buy"), alert: "コルが足りません。#{weapon_definition.name}は#{price}コルです。"
       return
     end
 
     player.col = player.col.to_i - price
     player.weapons.create!(
-      name: "ブロンズソード",
-      weapon_type: "片手直剣",
-      rarity: "common",
-      attack_power: 9,
-      durability: 1200,
-      max_durability: 1200,
-      hp_bonus: 0,
-      strength_bonus: 2,
-      agility_bonus: 0,
-      critical_rate: 7,
-      part_break_power: 100,
+      name: weapon_definition.name,
+      weapon_type: weapon_definition.weapon_type,
+      rarity: weapon_definition.rarity,
+      attack_power: weapon_definition.attack_power,
+      durability: weapon_definition.durability,
+      max_durability: weapon_definition.max_durability,
+      hp_bonus: weapon_definition.hp_bonus,
+      strength_bonus: weapon_definition.strength_bonus,
+      agility_bonus: weapon_definition.agility_bonus,
+      critical_rate: weapon_definition.critical_rate,
+      part_break_power: weapon_definition.part_break_power,
       equipped: false
     )
     player.save!
 
-    redirect_to game_path(panel: "equipment"), notice: "ブロンズソードを購入した。"
+    redirect_to game_path(panel: "equipment"), notice: "#{weapon_definition.name}を購入した。"
   end
 
   def sell_weapon
     player = current_player
 
-    unless player.location&.safe_area? && player.found_blacksmith?
+    unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
       redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
       return
     end
@@ -599,12 +636,12 @@ class GameController < ApplicationController
   def inn
     player = current_player
 
-    unless player.location&.name == "はじまりの街"
-      redirect_to game_path, alert: "宿屋ははじまりの街で利用できます。"
+    unless player.location&.safe_area?
+      redirect_to game_path, alert: "宿屋は街で利用できます。"
       return
     end
 
-    unless player.found_inn?
+    unless player.town_discovery_for&.found_inn?
       redirect_to game_path, alert: "宿屋はまだ見つけていません。"
       return
     end
@@ -614,12 +651,20 @@ class GameController < ApplicationController
       return
     end
 
+    cost = inn_cost_for(player.location)
+    if player.col.to_i < cost
+      redirect_to game_path, alert: "コルが足りません。宿屋で休むには#{cost}コル必要です。"
+      return
+    end
+
     current_player.rests.destroy_all
+    player.col = player.col.to_i - cost
     player.hp = player.effective_max_hp
     player.current_time = (player.current_time.to_i + 60) % 1440
     player.save!
 
-    redirect_to game_path, notice: "宿屋で休憩した。HPが全快した。"
+    payment_message = cost.positive? ? "#{cost}コル支払った。" : ""
+    redirect_to game_path, notice: "宿屋で休憩した。#{payment_message}HPが全快した。"
   end
 
   private
@@ -666,11 +711,12 @@ class GameController < ApplicationController
     "#{encounter.message}#{enemy_result.message}"
   end
 
-  def redirect_with_result(result)
+  def redirect_with_result(result, path_options = {})
+    path_options.compact!
     if result.status == :error
-      redirect_to game_path, alert: result.message
+      redirect_to game_path(path_options), alert: result.message
     else
-      redirect_to game_path, notice: result.message
+      redirect_to game_path(path_options), notice: result.message
     end
   end
 
@@ -689,5 +735,14 @@ class GameController < ApplicationController
 
   def flash_for(result)
     result.status == :ok ? { notice: result.message } : { alert: result.message }
+  end
+
+  def inn_cost_for(location)
+    case location&.name
+    when "ホルンカの村"
+      50
+    else
+      0
+    end
   end
 end
