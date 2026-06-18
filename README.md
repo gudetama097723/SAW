@@ -1,24 +1,46 @@
-# README
+# Sword Art World
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+## 概要
+SAO風のVRMMORPGをブラウザ上で再現する、Rails製のシミュレーションRPGです。
+プレイヤーは階層世界を探索し、モンスターと戦い、スキル熟練度を上げながら上層を目指します。
 
-Things you may want to cover:
+## 制作目的
+ゲーム内で時間が流れ、町・フィールド・ダンジョンを移動しながら冒険する
+VRMMORPG風の体験を再現することを目的としています。
 
-* Ruby version
+## 使用技術
+- Ruby
+- Ruby on Rails
+- Bootstrap
+- Git / GitHub
 
-* System dependencies
+## 現在実装済みの機能
+- プレイヤーステータス表示
+- 現在地表示
+- 探索
+- モンスターとの戦闘
+- 攻撃・勝利処理
+- コル獲得
+- スキル熟練度上昇
+- アイテム入手
+- 休憩
+- 町・フィールド間の移動
+- ゲーム内時刻の進行
 
-* Configuration
+## 今後実装したい機能
+- ソードスキルの追加
+- クエスト
+- ダンジョン
+- 階層ボス
+- スキル習得条件
+- 熟練度・レベルバランス調整
 
-* Database creation
+## こだわりたいポイント
+- 単なる戦闘ゲームではなく、VRMMORPGらしい生活感を出す
+- 100層構造の世界を少しずつ拡張できる設計にする
+- 武器種やスキル熟練度によって成長を感じられるようにする
+- プレイヤーが「冒険している」と感じられる移動・探索システムを作る
 
-* Database initialization
-
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+## 開発状況
+現在は1層の基本システムを実装中です。
+戦闘、探索、移動、休憩などの基礎部分を作りながら、今後の拡張に耐えられる設計を検討しています。
