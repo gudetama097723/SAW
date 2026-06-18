@@ -64,11 +64,6 @@
             <div class="card-header"><%= @battle.present? ? "戦闘コマンド" : "情報" %></div>
             <div class="card-body">
                 <% if @battle.present? %>
-                  <% if @battle.ambush? %>
-                    <div class="alert alert-success py-2">
-                      先制攻撃のチャンス！
-                    </div>
-                  <% end %>
                   <% battle_command = params[:battle_command].presence %>
                   <% battle_enemies = @battle_enemies.presence || @battle.alive_enemies.to_a %>
                   <% selected_enemy = battle_enemies.find { |enemy| enemy.id == params[:target_enemy_id].to_i } || battle_enemies.first %>
