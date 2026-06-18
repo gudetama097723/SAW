@@ -67,6 +67,23 @@ class FieldService
     Result.new(status: :ok, message: message, battle: battle)
   end
 
+  def self.hunt!(player)
+    location = player.location
+    return Result.new(status: :error, message: "ここは安全地帯です。狩りはできません。") if location&.safe_area?
+
+    player.current_time = (player.current_time.to_i + 15) % 1440
+
+    if rand(100) < 85
+      battle = create_battle!(player, encounter_mobs_for(location), ambush: true)
+      message = "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}を発見した！先制攻撃のチャンス！"
+    else
+      message = "周辺を探したが、獲物は見つからなかった。"
+    end
+
+    player.save!
+    Result.new(status: :ok, message: message, battle: battle)
+  end
+  
   def self.rest_encounter!(player)
     danger = (player.location&.danger_level || 0).to_i
     return Result.new(status: :none) if danger <= 0
@@ -91,13 +108,13 @@ class FieldService
     Result.new(status: :encounter, message: "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に見つかった！", battle: battle)
   end
 
-  def self.create_battle!(player, mobs)
+  def self.create_battle!(player, mobs, ambush: false)
     mobs = Array(mobs).compact
     first_mob = mobs.first
     return unless first_mob
 
     player.battles.destroy_all
-    battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp)
+    battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp, ambush: ambush)
     mobs.first(5).each.with_index(1) do |mob, position|
       battle.battle_enemies.create!(mob: mob, enemy_hp: mob.hp, position: position)
     end
