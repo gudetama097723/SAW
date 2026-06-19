@@ -10,20 +10,24 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_19_093100) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_19_094000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
     t.datetime "created_at", null: false
     t.integer "defense", default: 0, null: false
+    t.boolean "discardable", default: true, null: false
     t.boolean "equipped", default: false, null: false
+    t.boolean "favorite", default: false, null: false
     t.integer "hp_bonus", default: 0, null: false
     t.string "name", null: false
     t.integer "player_id", null: false
+    t.boolean "protected_from_death_penalty", default: false, null: false
     t.string "rarity", default: "common", null: false
     t.string "slot", null: false
     t.text "status_resistance_data", default: "{}", null: false
     t.integer "strength_bonus", default: 0, null: false
+    t.boolean "unique_item", default: false, null: false
     t.datetime "updated_at", null: false
     t.integer "weight", default: 0, null: false
     t.index ["player_id"], name: "index_armors_on_player_id"
@@ -74,10 +78,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_093100) do
   create_table "items", force: :cascade do |t|
     t.string "category", default: "misc", null: false
     t.datetime "created_at", null: false
+    t.boolean "discardable", default: true, null: false
     t.string "name"
     t.integer "player_id", null: false
+    t.boolean "protected_from_death_penalty", default: false, null: false
     t.integer "quantity"
+    t.boolean "quest_item", default: false, null: false
+    t.boolean "unique_item", default: false, null: false
     t.datetime "updated_at", null: false
+    t.decimal "weight", precision: 8, scale: 2, default: "0.1", null: false
     t.index ["player_id"], name: "index_items_on_player_id"
   end
 
@@ -126,6 +135,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_093100) do
     t.string "weak_attack_attribute"
     t.index ["field_area_id"], name: "index_mobs_on_field_area_id"
     t.index ["route_id"], name: "index_mobs_on_route_id"
+  end
+
+  create_table "player_bases", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "base_type", default: "home", null: false
+    t.datetime "created_at", null: false
+    t.integer "location_id", null: false
+    t.integer "player_id", null: false
+    t.integer "rent", default: 0, null: false
+    t.boolean "rent_overdue", default: false, null: false
+    t.integer "storage_limit", default: 20, null: false
+    t.datetime "updated_at", null: false
+    t.index ["location_id"], name: "index_player_bases_on_location_id"
+    t.index ["player_id"], name: "index_player_bases_on_player_id"
   end
 
   create_table "player_boss_kills", force: :cascade do |t|
@@ -196,8 +219,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_093100) do
 
   create_table "players", force: :cascade do |t|
     t.integer "agility", default: 1, null: false
+    t.integer "base_col", default: 0, null: false
     t.integer "col"
     t.datetime "created_at", null: false
+    t.integer "current_day", default: 1, null: false
+    t.integer "current_month", default: 1, null: false
     t.integer "current_time", default: 480
     t.integer "exp", default: 0, null: false
     t.integer "field_position", default: 0, null: false
@@ -261,6 +287,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_093100) do
     t.index ["player_id"], name: "index_skills_on_player_id"
   end
 
+  create_table "storage_items", force: :cascade do |t|
+    t.string "category", default: "misc", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "player_base_id", null: false
+    t.integer "quantity", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["player_base_id", "name", "category"], name: "index_storage_items_on_player_base_id_and_name_and_category", unique: true
+    t.index ["player_base_id"], name: "index_storage_items_on_player_base_id"
+  end
+
   create_table "treasure_chests", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "discovery_type", default: "fixed", null: false
@@ -299,27 +336,46 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_093100) do
     t.index ["source_weapon_name"], name: "index_weapon_evolution_rules_on_source_weapon_name"
   end
 
+  create_table "weapon_upgrade_recipes", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "required_col", default: 0, null: false
+    t.text "required_materials_data", default: "{}", null: false
+    t.integer "target_level", null: false
+    t.datetime "updated_at", null: false
+    t.string "weapon_name"
+    t.string "weapon_type"
+    t.index ["weapon_name", "weapon_type", "target_level"], name: "index_weapon_upgrade_recipes_lookup"
+  end
+
   create_table "weapons", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
+    t.integer "agility_ratio", default: 30, null: false
     t.text "attack_attributes", default: "斬撃", null: false
     t.integer "attack_power", default: 1, null: false
     t.datetime "created_at", null: false
     t.integer "critical_rate", default: 5, null: false
+    t.text "description"
+    t.boolean "discardable", default: true, null: false
     t.integer "drop_rate", default: 0, null: false
     t.integer "durability", default: 10, null: false
     t.text "enhancement_data", default: "{}", null: false
     t.integer "enhancement_level", default: 0, null: false
     t.boolean "equipped", default: false, null: false
+    t.boolean "favorite", default: false, null: false
     t.integer "hp_bonus", default: 0, null: false
     t.integer "max_durability", default: 10, null: false
     t.integer "mob_id"
     t.string "name", null: false
     t.integer "part_break_power", default: 100, null: false
     t.integer "player_id"
+    t.boolean "protected_from_death_penalty", default: false, null: false
     t.string "rarity", default: "common", null: false
     t.integer "strength_bonus", default: 0, null: false
+    t.integer "strength_ratio", default: 70, null: false
+    t.boolean "unique_item", default: false, null: false
     t.datetime "updated_at", null: false
     t.string "weapon_type", null: false
+    t.decimal "weight", precision: 8, scale: 2, default: "5.0", null: false
     t.index ["mob_id"], name: "index_weapons_on_mob_id"
     t.index ["player_id"], name: "index_weapons_on_player_id"
   end
@@ -334,6 +390,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_093100) do
   add_foreign_key "mob_parts", "mobs"
   add_foreign_key "mobs", "field_areas"
   add_foreign_key "mobs", "routes"
+  add_foreign_key "player_bases", "locations"
+  add_foreign_key "player_bases", "players"
   add_foreign_key "player_boss_kills", "mobs"
   add_foreign_key "player_boss_kills", "players"
   add_foreign_key "player_field_area_progresses", "field_areas"
@@ -350,6 +408,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_093100) do
   add_foreign_key "routes", "locations", column: "from_location_id"
   add_foreign_key "routes", "locations", column: "to_location_id"
   add_foreign_key "skills", "players"
+  add_foreign_key "storage_items", "player_bases", column: "player_base_id"
   add_foreign_key "treasure_chests", "field_areas"
   add_foreign_key "treasure_chests", "routes"
   add_foreign_key "weapons", "mobs"

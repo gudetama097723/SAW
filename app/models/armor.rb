@@ -19,4 +19,16 @@ class Armor < ApplicationRecord
   def self.slot_name(slot)
     SLOT_NAMES.fetch(slot, slot)
   end
+
+  def protected_item?
+    equipped? || favorite? || protected_from_death_penalty? || unique_item? || !discardable?
+  end
+
+  def sellable_by_player?
+    !equipped? && !favorite? && discardable? && !protected_from_death_penalty?
+  end
+
+  def discardable_by_player?
+    !equipped? && !favorite? && discardable? && !unique_item?
+  end
 end

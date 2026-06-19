@@ -223,3 +223,15 @@ seed_rows("weapon_evolution_rules.csv") do |row|
     required_materials_data: row["required_materials_data"].presence || "{}"
   )
 end
+
+seed_rows("weapon_upgrade_recipes.csv") do |row|
+  recipe = WeaponUpgradeRecipe.find_or_initialize_by(
+    weapon_name: row["weapon_name"].presence,
+    weapon_type: row["weapon_type"].presence,
+    target_level: to_int(row["target_level"])
+  )
+  recipe.update!(
+    required_col: to_int(row["required_col"]) || 0,
+    required_materials_data: row["required_materials_data"].presence || "{}"
+  )
+end

@@ -16,6 +16,10 @@ class ShopCatalog
     :part_break_power,
     :attack_attributes,
     :enhancement_level,
+    :weight,
+    :strength_ratio,
+    :agility_ratio,
+    :description,
     keyword_init: true
   )
 
@@ -75,10 +79,14 @@ class ShopCatalog
         strength_bonus: row["strength_bonus"].to_i,
         agility_bonus: row["agility_bonus"].to_i,
         critical_rate: row["critical_rate"].to_i,
-part_break_power: row["part_break_power"].presence&.to_i || 100,
-  attack_attributes: row["attack_attributes"].presence || "斬撃",
-  enhancement_level: row["enhancement_level"].presence&.to_i || 0
-)
+        part_break_power: row["part_break_power"].presence&.to_i || 100,
+        attack_attributes: row["attack_attributes"].presence || "斬撃",
+        enhancement_level: row["enhancement_level"].presence&.to_i || 0,
+        weight: row["weight"].presence&.to_d || 5.to_d,
+        strength_ratio: row["strength_ratio"].presence&.to_i || 70,
+        agility_ratio: row["agility_ratio"].presence&.to_i || 30,
+        description: row["description"].presence || ""
+      )
     end
   end
 end

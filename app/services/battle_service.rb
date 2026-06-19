@@ -20,6 +20,7 @@
     return Result.new(status: :error, message: "攻撃対象がいません。") if target_enemies.empty?
 
     hit_messages = []
+    actual_attack_attribute = attack_attribute_for(weapon, attack_attribute, sword_skill)
 
     hits.times do |index|
       alive_targets = target_enemies.select(&:alive?)
@@ -33,7 +34,7 @@
           battle_enemy: battle_enemy,
           mob_part_id: (alive_targets.one? ? mob_part_id : nil),
           damage_multiplier: per_target_multiplier,
-          attack_attribute: attack_attribute_for(weapon, attack_attribute, sword_skill)
+          attack_attribute: actual_attack_attribute
         )
         hit_messages << hit_message(index, hits, result)
       end
@@ -41,7 +42,7 @@
 
     battle.update!(ambush: false) if battle.ambush?
 
-    weapon&.apply_durability_loss!(durability_cost)
+    weapon&.apply_durability_loss!(durability_loss_for(weapon, durability_cost, actual_attack_attribute))
 
     if battle.alive_enemies.reload.empty?
       return finish_battle_victory!(player, battle, weapon, label, hit_messages.join(" / "), skill_gain, sword_skill, skill_key)
@@ -90,10 +91,11 @@
         player.floor = 1
         player.col = 0
         player.location = town if town
+        lost_message = apply_death_item_penalty!(player)
         battle.destroy!
         player.save!
 
-        return Result.new(status: :defeated, message: "#{enemy_message("#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。はじまりの街へ戻された。")
+        return Result.new(status: :defeated, message: "#{enemy_message("#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。はじまりの街へ戻された。#{lost_message}")
       end
 
       messages << enemy_message("#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")
@@ -204,7 +206,8 @@
 
 def self.calculate_player_damage(player, weapon, battle_enemy, part, attack_attribute)
   weapon_power = weapon&.effective_attack_power.to_i
-  attack_power = (player.effective_strength * 0.7) + (weapon_power * 1.3)
+  stat_power = weapon ? weapon.stat_attack_power(player) : player.effective_strength
+  attack_power = (stat_power * 0.7) + (weapon_power * 1.3)
   attack_power *= attribute_multiplier(weapon, battle_enemy.mob, part, attack_attribute)
   attack_power *= weapon_proficiency_attack_bonus(player, weapon)
   defense_rate = 100.0 / (100 + [battle_enemy.effective_durability, 0].max)
@@ -227,7 +230,7 @@ def self.attack_attribute_for(weapon, attack_attribute, sword_skill)
   sword_skill ? weapon&.primary_attack_attribute || "斬撃" : weapon&.primary_attack_attribute || "斬撃"
 end
 
-def self.weapon_proficiency_attack_bonus(player, weapon)
+  def self.weapon_proficiency_attack_bonus(player, weapon)
   return 1.0 unless weapon
 
   skill = player.skills.find_by(name: weapon_skill_name(weapon))
@@ -243,6 +246,30 @@ end
     chance = chance.clamp(55, 98)
 
     rand(100) < chance
+  end
+
+  def self.durability_loss_for(weapon, base_cost, attack_attribute)
+    return base_cost.to_i unless weapon
+    return base_cost.to_i if weapon.matches_attack_attribute?(attack_attribute)
+
+    [base_cost.to_i * 2, base_cost.to_i + 1].max
+  end
+
+  def self.apply_death_item_penalty!(player)
+    candidates = player.items.reject(&:protected_item?).flat_map do |item|
+      Array.new(item.quantity.to_i) { item }
+    end
+    return "" if candidates.empty?
+
+    lost_count = (candidates.size / 2.0).floor
+    return "" if lost_count <= 0
+
+    lost = candidates.sample(lost_count).tally
+    lost.each do |item, count|
+      item.quantity = [item.quantity.to_i - count, 0].max
+      item.quantity.zero? ? item.destroy! : item.save!
+    end
+    " 所持アイテムを#{lost_count}個失った。"
   end
 
   def self.finish_battle_victory!(player, battle, weapon, label, damage_message, skill_gain, sword_skill, skill_key)
@@ -392,7 +419,8 @@ end
 
   def self.evaded_enemy_attack?(player, battle_enemy)
     agility_gap = player.effective_agility - mob_effective_agility(battle_enemy)
-    chance = [[10 + (agility_gap * 5), 5].max, 75].min
+    weight_penalty = player.overweight? ? (player.overweight_amount * 2).ceil : 0
+    chance = [[10 + (agility_gap * 5) - weight_penalty, 5].max, 75].min
     rand(100) < chance
   end
 

@@ -20,7 +20,7 @@ class ItemService
     return Result.new(status: :error, message: "コルが足りません。#{item_name}は#{shop_item.price}コルです。") if player.col.to_i < shop_item.price
 
     player.col = player.col.to_i - shop_item.price
-    player.current_time = (player.current_time.to_i + 5) % 1440
+    player.advance_time!(5)
     item = add_item!(player, shop_item.item_name, shop_item.category)
 
     ActiveRecord::Base.transaction do
@@ -47,7 +47,7 @@ class ItemService
 
     herb.quantity -= HERBS_PER_POTION
     player.col = player.col.to_i - POTION_PRODUCTION_COST
-    player.current_time = (player.current_time.to_i + 15) % 1440
+    player.advance_time!(15)
     potion = add_item!(player, "ポーション", "healing")
 
     ActiveRecord::Base.transaction do
@@ -59,13 +59,14 @@ class ItemService
     Result.new(status: :ok, message: "薬草#{HERBS_PER_POTION}個と#{POTION_PRODUCTION_COST}コルでポーションを1本生産した。", item: potion)
   end
 
-  def self.sell_item!(player, item)
+  def self.sell_item!(player, item, confirm_unique: false)
     return Result.new(status: :error, message: "売却できるアイテムがありません。") unless item&.quantity.to_i.positive?
+    return Result.new(status: :error, message: "このアイテムは売却できません。") unless item.sellable_by_player?(confirm_unique: confirm_unique)
 
     price = item.sell_price
     item.quantity -= 1
     player.col = player.col.to_i + price
-    player.current_time = (player.current_time.to_i + 5) % 1440
+    player.advance_time!(5)
 
     ActiveRecord::Base.transaction do
       item.quantity.to_i <= 0 ? item.destroy! : item.save!

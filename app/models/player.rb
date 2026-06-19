@@ -36,7 +36,83 @@ class Player < ApplicationRecord
   has_many :field_areas, through: :player_field_area_progresses
   has_many :player_treasure_chests, dependent: :destroy
   has_many :player_boss_kills, dependent: :destroy
+  has_many :player_bases, class_name: "PlayerBase", dependent: :destroy
   
+def formatted_datetime
+  format("%d月 %d日 %02d:%02d", current_month.to_i, current_day.to_i, current_time.to_i / 60, current_time.to_i % 60)
+end
+
+def advance_time!(minutes)
+  total = current_time.to_i + minutes.to_i
+  days = total / 1440
+  self.current_time = total % 1440
+  days.times { advance_day! }
+end
+
+def advance_day!
+  self.current_day = current_day.to_i + 1
+  return if current_day <= 30
+
+  self.current_day = 1
+  self.current_month = current_month.to_i + 1
+  self.current_month = 1 if current_month > 12
+  process_monthly_base_rent!
+end
+
+def process_monthly_base_rent!
+  player_bases.where(base_type: "home", active: true).find_each do |base|
+    next if base.rent.to_i <= 0
+
+    if col.to_i >= base.rent
+      self.col = col.to_i - base.rent
+      base.update!(rent_overdue: false)
+    elsif base_col.to_i >= base.rent
+      self.base_col = base_col.to_i - base.rent
+      base.update!(rent_overdue: false)
+    else
+      base.update!(rent_overdue: true)
+    end
+  end
+end
+
+def home_base
+  player_bases.find_by(base_type: "home", active: true)
+end
+
+def carried_item_weight
+  items.sum { |item| item.total_weight }
+end
+
+def carried_weapon_weight
+  weapons.sum { |weapon| weapon.weight.to_d }
+end
+
+def carried_armor_weight
+  armors.sum { |armor| armor.weight.to_d }
+end
+
+def carry_weight
+  carried_item_weight + carried_weapon_weight + carried_armor_weight
+end
+
+def max_carry_weight
+  30 + effective_strength * 2
+end
+
+def overweight_amount
+  [carry_weight.to_f - max_carry_weight.to_f, 0].max
+end
+
+def overweight?
+  overweight_amount.positive?
+end
+
+def movement_speed_multiplier
+  bonus = effective_agility.to_i / 10.0
+  penalty = overweight? ? [overweight_amount / 20.0, 0.75].min : 0
+  [1.0 + bonus - penalty, 0.35].max
+end
+
   def equipped_weapons
     weapons.where(equipped: true)
   end

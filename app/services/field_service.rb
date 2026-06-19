@@ -27,9 +27,9 @@ class FieldService
       area_progress.save!
     end
 
-    player.current_time = (player.current_time.to_i + 10) % 1440
+    player.advance_time!(10)
     previous_area = area
-    advance = exploration_holds_position?(player, area, mapping_before) ? 0 : explore_advance_for(route)
+    advance = exploration_holds_position?(player, area, mapping_before) ? 0 : explore_advance_for(route, player)
     next_position = [player.field_position.to_i + advance, route.distance].min
 
     if area &&
@@ -80,7 +80,7 @@ class FieldService
     route = player.field_route
     return Result.new(status: :error, message: "街中では採取できません。フィールドへ出てください。") unless route
 
-    player.current_time = (player.current_time.to_i + 10) % 1440
+    player.advance_time!(10)
     event = rand(100)
 
     if event < gather_encounter_chance(player)
@@ -90,7 +90,7 @@ class FieldService
       item_name = gatherable_items_for(player).sample
       item = ItemService.add_item!(player, item_name, "gathered")
       item.save!
-      message = "#{item_name}を採取した！"
+      message = "#{item_name}を 1 個採取した。現在の所持数：#{item.quantity} 個"
     else
       message = "採取を試みたが、何も見つからなかった。"
     end
@@ -103,7 +103,7 @@ class FieldService
     route = player.field_route
     return Result.new(status: :error, message: "街中では狩りはできません。フィールドへ出てください。") unless route
 
-    player.current_time = (player.current_time.to_i + 15) % 1440
+    player.advance_time!(15)
 
     if rand(100) < 85
       battle = create_battle!(player, encounter_mobs_for(player), ambush: true)
@@ -357,9 +357,10 @@ class FieldService
       player.field_position.to_i >= area.start_distance.to_i
   end
 
-  def self.explore_advance_for(route)
+  def self.explore_advance_for(route, player)
     distance = [route.distance.to_i, 1].max
-    [[rand(8..16), (distance / 6.0).ceil].min, 1].max
+    base = [[rand(8..16), (distance / 6.0).ceil].min, 1].max
+    (base * player.movement_speed_multiplier).round.clamp(1, distance)
   end
 
   def self.mapping_gain_for(mapping_progress, player, route)
@@ -378,6 +379,7 @@ class FieldService
       end
 
     gain += 1 if player.skills.exists?(name: "探索")
+    gain = (gain * player.movement_speed_multiplier).ceil
     difficulty = route.mapping_difficulty.to_f
     difficulty = 1.0 if difficulty <= 0
     (gain / difficulty).ceil
