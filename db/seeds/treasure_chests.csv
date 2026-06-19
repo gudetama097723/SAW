@@ -1,0 +1,11 @@
+﻿route,field_area,name,position,discovery_type,required_mapping,reward_data,respawnable,hazard_type,hazard_level
+はじまりの草原,はじまりの街近辺,街道脇の小箱,12,fixed,0,"{""col"":20,""items"":[{""name"":""薬草"",""quantity"":2,""category"":""gathered""}]}",FALSE,normal,0
+はじまりの草原,整備された街道,古びた宝箱,35,fixed,0,"{""col"":50,""items"":[{""name"":""ポーション"",""quantity"":2,""category"":""healing""}]}",FALSE,normal,0
+はじまりの草原,整備された街道,旅人の隠し荷物,45,mapping,50,"{""col"":60,""items"":[{""name"":""薬草"",""quantity"":5,""category"":""gathered""}]}",FALSE,normal,0
+はじまりの草原,草原中央,草むらに隠れた宝箱,70,mapping,60,"{""col"":80,""items"":[{""name"":""薬草"",""quantity"":3,""category"":""gathered""}]}",FALSE,trap,2
+はじまりの草原,草原中央,朽ちた補給箱,88,fixed,30,"{""col"":120,""items"":[{""name"":""ポーション"",""quantity"":1,""category"":""healing""},{""name"":""硬質ゼリー片"",""quantity"":1,""category"":""drop""}]}",FALSE,normal,0
+はじまりの草原,草原中央,古い冒険者の袋,82,mapping,70,"{""col"":90,""items"":[{""name"":""薄羽蜂の針"",""quantity"":2,""category"":""drop""},{""name"":""硬い甲殻"",""quantity"":1,""category"":""drop""}]}",FALSE,normal,0
+はじまりの草原,獣道・狼の縄張り,獣道の封印箱,108,mapping,80,"{""col"":180,""items"":[{""name"":""ポーション"",""quantity"":3,""category"":""healing""}]}",FALSE,mimic,4
+はじまりの草原,獣道・狼の縄張り,壊れた荷馬車の積荷,116,fixed,60,"{""col"":160,""items"":[{""name"":""野猪の牙"",""quantity"":1,""category"":""drop""},{""name"":""蟹の脚殻"",""quantity"":2,""category"":""drop""}]}",FALSE,trap,3
+はじまりの草原,ホルンカ村近辺,村境の守り箱,136,fixed,40,"{""col"":250,""items"":[{""name"":""ポーション"",""quantity"":2,""category"":""healing""},{""name"":""ホーンラビットの角"",""quantity"":1,""category"":""drop""}]}",FALSE,normal,0
+はじまりの草原,ホルンカ村近辺,旅商人の忘れ物,145,mapping,85,"{""col"":300,""items"":[{""name"":""斥候の徽章"",""quantity"":1,""category"":""drop""},{""name"":""小さな魔石"",""quantity"":1,""category"":""drop""}]}",FALSE,normal,0

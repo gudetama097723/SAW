@@ -37,8 +37,10 @@ class PlayerInitializer
         strength_bonus: to_int(row["strength_bonus"]),
         agility_bonus: to_int(row["agility_bonus"]),
         critical_rate: to_int(row["critical_rate"]),
-        part_break_power: to_int(row["part_break_power"]) || 100,
-        equipped: to_bool(row["equipped"])
+part_break_power: to_int(row["part_break_power"]) || 100,
+attack_attributes: row["attack_attributes"].presence || "斬撃",
+enhancement_level: to_int(row["enhancement_level"]) || 0,
+equipped: to_bool(row["equipped"])
       )
     end
   end
@@ -65,8 +67,10 @@ class PlayerInitializer
       player.skills.create!(
         name: row["name"],
         proficiency: to_int(row["proficiency"]) || 0,
-        skill_exp: to_int(row["skill_exp"]) || 0
-      )
+skill_exp: to_int(row["skill_exp"]) || 0,
+  skill_category: row["skill_category"].presence || "general",
+  weapon_skill: to_bool(row["weapon_skill"])
+)
     end
   end
 

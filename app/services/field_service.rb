@@ -28,7 +28,8 @@ class FieldService
     end
 
     player.current_time = (player.current_time.to_i + 10) % 1440
-    advance = destination_discovered?(player, route) ? 0 : explore_advance_for(route)
+    previous_area = area
+    advance = exploration_holds_position?(player, area, mapping_before) ? 0 : explore_advance_for(route)
     next_position = [player.field_position.to_i + advance, route.distance].min
 
     if area &&
@@ -38,6 +39,7 @@ class FieldService
     end
 
     player.field_position = next_position
+    current_area = current_area_for(player)
 
     event = rand(100)
     encounter_rate = current_area_for(player)&.encounter_rate || field_danger_level(player)
@@ -52,18 +54,23 @@ class FieldService
       end
 
     message += " #{route.name}を探索した。"
+    if previous_area && current_area && previous_area != current_area
+      message += " [mapping]#{current_area.name}へ進んだ。[/mapping]"
+    end
     mapping_after = area_progress&.mapping_progress.to_i
     mapping_added = mapping_after - mapping_before
 
     if area_progress && mapping_before < 100 && mapping_added.positive?
-      message += " #{area.name}の踏破度 +#{mapping_added}%（#{mapping_after}%）"
+      message += " [mapping]#{area.name}の踏破度 +#{mapping_added}%（#{mapping_after}%）[/mapping]"
     end
 
     if area_progress && mapping_before < 100 && mapping_after >= 100
-      message += " #{area.name}を完全に把握した！"
+      message += " [mapping]#{area.name}を完全に把握した！[/mapping]"
     elsif !destination_discovered_before && destination_discovered?(player, route)
-      message += " #{route.to_location.name}を発見した！"
+      message += " [mapping]#{route.to_location.name}を発見した！[/mapping]"
     end
+
+    message += ExplorationRewardService.discoveries_after_explore!(player, area, mapping_before, mapping_after)
 
     player.save!
     Result.new(status: :ok, message: message, battle: battle)
@@ -327,6 +334,27 @@ class FieldService
 
   def self.destination_reached?(player, route)
     route_progress_for(player, route).reached_destination?
+  end
+
+  def self.next_discovered_area_for(player, route)
+    current_area = current_area_for(player)
+    return unless current_area
+
+    current_progress = player.progress_for_area(current_area)
+    return if current_progress.mapping_progress.to_i < current_area.required_mapping_to_enter_next.to_i
+
+    areas = route.field_areas.ordered.to_a
+    index = areas.index(current_area)
+    return unless index
+
+    areas[index + 1]
+  end
+
+  def self.exploration_holds_position?(player, area, mapping_progress)
+    return false unless area
+
+    mapping_progress.to_i >= area.required_mapping_to_enter_next.to_i &&
+      player.field_position.to_i >= area.start_distance.to_i
   end
 
   def self.explore_advance_for(route)

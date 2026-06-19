@@ -10,6 +10,7 @@ class SkillCatalog
     :hits,
     :area,
     :target_type,
+    :attack_attribute,
     :summary,
     :description,
     keyword_init: true
@@ -60,6 +61,7 @@ class SkillCatalog
         hits: row["hits"].to_i,
         area: row["area"].to_s.casecmp?("true"),
         target_type: row["target_type"],
+        attack_attribute: AttackAttribute.normalize(row["attack_attribute"].presence || "斬撃"),
         summary: row["summary"],
         description: row["description"]
       )
@@ -69,7 +71,7 @@ class SkillCatalog
 
   def self.fallback_definitions
     [
-      SkillDefinition.new(key: "vertical", name: "バーチカル", skill_set: "片手剣", required_proficiency: 0, damage_multiplier: 150, durability_cost: 2, skill_gain: 3, hits: 1, area: false, target_type: "single", summary: "倍率150% / 単体攻撃", description: "単発の縦斬り。通常攻撃より高威力。使用後に硬直が発生します。")
+      SkillDefinition.new(key: "vertical", name: "バーチカル", skill_set: "片手剣", required_proficiency: 0, damage_multiplier: 150, durability_cost: 2, skill_gain: 3, hits: 1, area: false, target_type: "single", attack_attribute: "斬撃", summary: "倍率150% / 単体攻撃", description: "単発の縦斬り。通常攻撃より高威力。使用後に硬直が発生します。")
     ]
   end
 end

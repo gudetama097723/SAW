@@ -1,4 +1,4 @@
-class GameController < ApplicationController
+﻿class GameController < ApplicationController
   before_action :require_login
 
   def index
@@ -8,6 +8,8 @@ class GameController < ApplicationController
     @routes = FieldService.available_routes_for(@player)
     @current_field_area = FieldService.current_area_for(@player)
     @current_field_area_progress = @player.progress_for_area(@current_field_area)
+    @available_treasures = ExplorationRewardService.discovered_treasures(@player)
+    @available_bosses = ExplorationRewardService.discovered_bosses(@player)
     @town_discovery = @player.town_discovery_for if @player.location&.safe_area?
     if @battle
       BattleService.ensure_battle_enemies!(@battle)
@@ -55,7 +57,7 @@ class GameController < ApplicationController
 
   def explore
     result = FieldService.explore!(current_player)
-    redirect_with_result(result, battle_command: "attack", target_enemy_id: params[:target_enemy_id])
+    redirect_with_result(result)
   end
 
   def gather
@@ -68,7 +70,49 @@ class GameController < ApplicationController
     redirect_to game_path, notice: result.message
   end
 
-  def attack
+  def open_treasure
+    treasure = TreasureChest.find_by(id: params[:treasure_chest_id])
+    result = treasure ? ExplorationRewardService.open_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "その宝箱は存在しません。")
+    redirect_with_result(result)
+  end
+
+def inspect_treasure
+  treasure = TreasureChest.find_by(id: params[:treasure_chest_id])
+  result = treasure ? ExplorationRewardService.inspect_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "を習得した。を習得した。")
+  redirect_with_result(result)
+end
+
+def ignore_treasure
+  treasure = TreasureChest.find_by(id: params[:treasure_chest_id])
+  result = treasure ? ExplorationRewardService.ignore_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "を習得した。を習得した。")
+  redirect_with_result(result)
+end
+
+def challenge_boss
+
+    mob = Mob.find_by(id: params[:mob_id])
+    result = mob ? ExplorationRewardService.start_boss_battle!(current_player, mob) : ExplorationRewardService::Result.new(status: :error, message: "そのボスは存在しません。")
+    redirect_with_result(result, battle_command: "attack")
+  end
+
+def learn_skill
+  definition = SkillUnlockService.available_for(current_player).find { |candidate| candidate.name == params[:skill_name] }
+  unless definition
+    redirect_to game_path(panel: "growth"), alert: "そのスキルはまだ習得できません。"
+    return
+  end
+
+  if current_player.remaining_skill_slots <= 0
+    redirect_to game_path(panel: "growth"), alert: "スキルスロットが足りません。"
+    return
+  end
+
+  current_player.skills.create!(name: definition.name, proficiency: 0, skill_exp: 0, skill_category: definition.skill_category, weapon_skill: definition.weapon_skill)
+  redirect_to game_path(panel: "growth"), notice: "#{definition.name}を習得した。"
+end
+
+def attack
+
     result = BattleService.resolve_player_attack!(
       battle: current_battle,
       player: current_player,
@@ -82,7 +126,7 @@ class GameController < ApplicationController
       hits: 1,
       sword_skill: false
     )
-    redirect_with_result(result, battle_command: "attack", target_enemy_id: params[:target_enemy_id])
+    redirect_with_result(result, battle_command: "attack", target_enemy_id: params[:target_enemy_id], attack_attribute: params[:attack_attribute])
   end
 
   def sword_skill
@@ -332,19 +376,35 @@ class GameController < ApplicationController
     direction = params[:direction]
     reached_destination = FieldService.destination_reached?(player, route)
 
-    if direction == "backward" && !reached_destination
-      redirect_to game_path, notice: "まだ#{route.from_location.name}方面へ戻る道筋は整理できていない。まずは#{route.to_location.name}を目指そう。"
+    if direction == "backward" && player.field_position.to_i <= 0
+      player.location = route.from_location
+      player.field_route = nil
+      player.field_position = 0
+      player.current_time = (player.current_time.to_i + 5) % 1440
+      player.save!
+      redirect_to game_path, notice: "#{route.from_location.name}へ戻った。5分経過した。"
       return
     end
 
-    next_position =
-      if direction == "backward"
-        player.field_position.to_i - advance
-      else
-        player.field_position.to_i + advance
+    if direction == "area"
+      target_area = FieldService.next_discovered_area_for(player, route)
+      unless target_area
+        redirect_to game_path, notice: "進める探索済みエリアはまだ見つかっていない。"
+        return
       end
 
+      next_position = target_area.start_distance
+    else
+      next_position =
+        if direction == "backward"
+          player.field_position.to_i - advance
+        else
+          player.field_position.to_i + advance
+        end
+    end
+
     if direction != "backward" &&
+      direction != "area" &&
       current_area &&
       next_position > current_area.end_distance.to_i &&
       current_area_progress.mapping_progress.to_i < current_area.required_mapping_to_enter_next.to_i
@@ -357,6 +417,8 @@ class GameController < ApplicationController
     direction_text =
       if direction == "backward"
         route.from_location.name
+      elsif direction == "area"
+        FieldService.current_area_for(player)&.name || "探索済みエリア"
       else
         route.to_location.name
       end
@@ -465,18 +527,18 @@ class GameController < ApplicationController
 
     weapon = player.equipped_weapon
     unless weapon
-      redirect_to game_path, alert: "手入れする武器がありません。"
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "手入れする武器がありません。"
       return
     end
 
     price = weapon.repair_cost
     if price <= 0
-      redirect_to game_path, notice: "#{weapon.name}は十分に手入れされています。"
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), notice: "#{weapon.name}は十分に手入れされています。"
       return
     end
 
     if player.col.to_i < price
-      redirect_to game_path, alert: "コルが足りません。#{weapon.name}の手入れには#{price}コル必要です。"
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "コルが足りません。#{weapon.name}の手入れには#{price}コル必要です。"
       return
     end
 
@@ -489,7 +551,7 @@ class GameController < ApplicationController
       weapon.save!
     end
 
-    redirect_to game_path, notice: "鍛冶屋で#{weapon.name}を手入れした。耐久力が全回復した。#{price}コル支払った。"
+    redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), notice: "鍛冶屋で#{weapon.name}を手入れした。耐久力が全回復した。#{price}コル支払った。"
   end
 
   def buy_bronze_sword
@@ -529,7 +591,7 @@ class GameController < ApplicationController
     )
     player.save!
 
-    redirect_to game_path(panel: "equipment"), notice: "#{weapon_definition.name}を購入した。"
+    redirect_to game_path(panel: "blacksmith", blacksmith_menu: "buy"), notice: "#{weapon_definition.name}を購入した。"
   end
 
   def sell_weapon
@@ -641,34 +703,60 @@ class GameController < ApplicationController
   end
 
   def allocate_strength
-    allocate_stat!(:strength, "筋力")
+    redirect_to game_path(panel: "growth", strength_points: 1, agility_points: 0)
   end
 
   def allocate_agility
-    allocate_stat!(:agility, "敏捷")
+    redirect_to game_path(panel: "growth", strength_points: 0, agility_points: 1)
+  end
+
+  def allocate_stats
+    player = current_player
+    available_points = [player.stat_points.to_i, 3].min
+    strength_points = params[:strength_points].to_i
+    agility_points = params[:agility_points].to_i
+    total_points = strength_points + agility_points
+
+    if available_points <= 0
+      redirect_to game_path(panel: "growth"), alert: "振り分けポイントがありません。"
+      return
+    end
+
+    if strength_points.negative? || agility_points.negative? || total_points <= 0 || total_points > available_points
+      redirect_to game_path(panel: "growth", strength_points: strength_points, agility_points: agility_points), alert: "#{available_points}ポイント以内で振り分けてください。"
+      return
+    end
+
+    player.skip_stat_allocate_confirm = true if params[:skip_confirm] == "1"
+    player.strength = player.strength.to_i + strength_points
+    player.agility = player.agility.to_i + agility_points
+    player.stat_points = player.stat_points.to_i - total_points
+    player.save!
+
+    redirect_to game_path(panel: "growth"), notice: "筋力に#{strength_points}、敏捷に#{agility_points}ポイント振り分けた。"
   end
 
   def inn
     player = current_player
 
     unless player.location&.safe_area?
-      redirect_to game_path, alert: "宿屋は街で利用できます。"
+      redirect_to game_path(panel: "inn"), alert: "宿屋は街で利用できます。"
       return
     end
 
     unless player.town_discovery_for&.found_inn?
-      redirect_to game_path, alert: "宿屋はまだ見つけていません。"
+      redirect_to game_path(panel: "inn"), alert: "宿屋はまだ見つけていません。"
       return
     end
 
     if current_player.battles.exists?
-      redirect_to game_path, alert: "戦闘中は宿屋を利用できません。"
+      redirect_to game_path(panel: "inn"), alert: "戦闘中は宿屋を利用できません。"
       return
     end
 
     cost = inn_cost_for(player.location)
     if player.col.to_i < cost
-      redirect_to game_path, alert: "コルが足りません。宿屋で休むには#{cost}コル必要です。"
+      redirect_to game_path(panel: "inn"), alert: "コルが足りません。宿屋で休むには#{cost}コル必要です。"
       return
     end
 
@@ -679,7 +767,7 @@ class GameController < ApplicationController
     player.save!
 
     payment_message = cost.positive? ? "#{cost}コル支払った。" : ""
-    redirect_to game_path, notice: "宿屋で休憩した。#{payment_message}HPが全快した。"
+    redirect_to game_path(panel: "inn"), notice: "宿屋で休憩した。#{payment_message}HPが全快した。"
   end
 
   private
@@ -699,21 +787,6 @@ class GameController < ApplicationController
       redirect_to game_path, alert: result.message
       return ""
     end
-  end
-
-  def allocate_stat!(attribute, label)
-    player = current_player
-
-    if player.stat_points.to_i <= 0
-      redirect_to game_path, alert: "振り分けポイントがありません。"
-      return
-    end
-
-    player.public_send("#{attribute}=", player.public_send(attribute).to_i + 1)
-    player.stat_points -= 1
-    player.save!
-
-    redirect_to game_path(panel: "growth"), notice: "#{label}に1ポイント振り分けた。"
   end
 
   def check_item_use_surprise_encounter!(player)

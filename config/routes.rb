@@ -9,6 +9,11 @@ Rails.application.routes.draw do
   post "explore", to: "game#explore"
   post "gather", to: "game#gather"
   post "hunt", to: "game#hunt"
+  post "open_treasure", to: "game#open_treasure"
+  post "inspect_treasure", to: "game#inspect_treasure"
+  post "ignore_treasure", to: "game#ignore_treasure"
+  post "challenge_boss", to: "game#challenge_boss"
+  post "learn_skill", to: "game#learn_skill"
   post "attack", to: "game#attack"
   post "sword_skill", to: "game#sword_skill"
   post "use_battle_item", to: "game#use_battle_item"
@@ -34,4 +39,5 @@ Rails.application.routes.draw do
   post "inn", to: "game#inn"
   post "allocate_strength", to: "game#allocate_strength"
   post "allocate_agility", to: "game#allocate_agility"
+  post "allocate_stats", to: "game#allocate_stats"
 end
