@@ -20,7 +20,12 @@
 
   def repair_cost
     missing = [max_durability.to_i - durability.to_i, 0].max
-    missing * rarity_cost_multiplier
+    return 0 if missing <= 0
+
+    missing_rate = missing.to_f / [max_durability.to_i, 1].max
+    estimated_price = [attack_power.to_i * 12 + max_durability.to_i / 20 + enhancement_level.to_i * 120, 100].max
+    full_repair_cost = (estimated_price * rarity_cost_multiplier * 0.5).ceil
+    [(full_repair_cost * missing_rate).ceil, 1].max
   end
 
 def display_name

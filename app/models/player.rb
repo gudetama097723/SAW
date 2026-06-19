@@ -300,6 +300,8 @@ end
       self.exp -= exp_to_next_level
       self.level = level.to_i + 1
       self.max_hp = self.class.max_hp_for_level(level)
+      self.strength = strength.to_i + 1
+      self.agility = agility.to_i + 1
       self.stat_points = stat_points.to_i + 3
     end
 

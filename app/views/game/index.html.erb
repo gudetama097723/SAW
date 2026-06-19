@@ -523,13 +523,24 @@
                   <% @player.agility = original_agility %>
                   <div class="border border-warning rounded p-2 mb-2">
                     <p class="mb-1">最大<%= allocatable_points %>ポイントをまとめて振り分けます。</p>
+                    <p class="mb-2">残り: <%= allocatable_points - strength_points - agility_points %> pt</p>
+                    <div class="d-grid gap-2 mb-2">
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="flex-fill">筋力 +<%= strength_points %></span>
+                        <%= link_to "－", game_path(panel: "growth", strength_points: [strength_points - 1, 0].max, agility_points: agility_points), class: "btn btn-outline-light btn-sm" %>
+                        <% next_strength = strength_points + agility_points < allocatable_points ? strength_points + 1 : strength_points %>
+                        <%= link_to "＋", game_path(panel: "growth", strength_points: next_strength, agility_points: agility_points), class: "btn btn-outline-warning btn-sm" %>
+                      </div>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="flex-fill">敏捷 +<%= agility_points %></span>
+                        <%= link_to "－", game_path(panel: "growth", strength_points: strength_points, agility_points: [agility_points - 1, 0].max), class: "btn btn-outline-light btn-sm" %>
+                        <% next_agility = strength_points + agility_points < allocatable_points ? agility_points + 1 : agility_points %>
+                        <%= link_to "＋", game_path(panel: "growth", strength_points: strength_points, agility_points: next_agility), class: "btn btn-outline-warning btn-sm" %>
+                      </div>
+                    </div>
                     <%= form_with url: allocate_stats_path, method: :post, class: "d-grid gap-2" do %>
-                      <label class="small">筋力
-                        <%= number_field_tag :strength_points, strength_points, min: 0, max: allocatable_points, class: "form-control form-control-sm" %>
-                      </label>
-                      <label class="small">敏捷
-                        <%= number_field_tag :agility_points, agility_points, min: 0, max: allocatable_points, class: "form-control form-control-sm" %>
-                      </label>
+                      <%= hidden_field_tag :strength_points, strength_points %>
+                      <%= hidden_field_tag :agility_points, agility_points %>
                       <p class="mb-1">最大HP: <%= before_hp %> → <%= after_hp %>（+<%= after_hp - before_hp %>）</p>
                       <p class="mb-1">筋力: <%= before_strength %> → <%= after_strength %></p>
                       <p class="mb-1">敏捷: <%= before_agility %> → <%= after_agility %></p>
@@ -540,7 +551,7 @@
                           以降このメッセージを表示しない
                         </label>
                       <% end %>
-                      <%= submit_tag "この配分で確定する", class: "btn btn-warning w-100" %>
+                      <%= submit_tag "この配分で確定する", class: "btn btn-warning w-100", disabled: (strength_points + agility_points != allocatable_points) %>
                     <% end %>
                   </div>
                 <% end %>
@@ -644,12 +655,71 @@
               <div class="card bg-secondary text-light mb-3">
                 <% if selected_panel == "inn" %>
                   <% inn_cost = @player.location&.name == "ホルンカの村" ? 50 : 0 %>
+                  <% current_base = @player.player_bases.find_by(location: @player.location, base_type: "home", active: true) %>
                   <div class="card-header">宿屋</div>
-                  <div class="card-body d-grid gap-2">
+                  <div class="card-body">
+                    <div class="d-grid gap-2 mb-3">
                     <%= button_to "休憩する（#{inn_cost}コル）", inn_path, method: :post, class: "btn btn-outline-success w-100" %>
-                    <%= button_to "拠点にする", set_home_base_path, method: :post, class: "btn btn-outline-info w-100" %>
+                    <% if params[:confirm_home_base] == "1" %>
+                      <div class="border border-info rounded p-2">
+                        <p class="mb-2">ここを本拠点にしますか？</p>
+                        <div class="d-flex gap-2">
+                          <%= button_to "はい", set_home_base_path(confirm: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-info w-100" %>
+                          <%= link_to "いいえ", game_path(panel: "inn"), class: "btn btn-outline-light flex-fill" %>
+                        </div>
+                      </div>
+                    <% else %>
+                      <%= button_to "拠点にする", set_home_base_path, method: :post, class: "btn btn-outline-info w-100" %>
+                    <% end %>
+                    </div>
+
                     <% if @player.home_base %>
-                      <div class="small text-light">預け金: <%= @player.base_col.to_i %>コル</div>
+                      <div class="small text-light mb-2">本拠点: <%= @player.home_base.location.name %> / 預け金: <%= @player.base_col.to_i %>コル</div>
+                    <% end %>
+
+                    <% if current_base %>
+                      <h6>所持金管理</h6>
+                      <div class="border rounded p-2 mb-3">
+                        <%= form_with url: deposit_base_col_path, method: :post, class: "d-grid gap-2 mb-2" do %>
+                          <%= number_field_tag :amount, 100, min: 1, max: @player.col.to_i, class: "form-control form-control-sm" %>
+                          <%= submit_tag "コルを預ける", class: "btn btn-outline-info w-100" %>
+                        <% end %>
+                        <%= form_with url: withdraw_base_col_path, method: :post, class: "d-grid gap-2" do %>
+                          <%= number_field_tag :amount, 100, min: 1, max: @player.base_col.to_i, class: "form-control form-control-sm" %>
+                          <%= submit_tag "コルを引き出す", class: "btn btn-outline-light w-100" %>
+                        <% end %>
+                      </div>
+
+                      <h6>アイテム収納 <%= current_base.storage_type_count %> / <%= current_base.storage_limit %>種類</h6>
+                      <% if current_base.storage_items.where("quantity > 0").any? %>
+                        <div class="d-grid gap-2 mb-3">
+                          <% current_base.storage_items.where("quantity > 0").order(:category, :name).each do |storage_item| %>
+                            <div class="border rounded p-2">
+                              <p class="mb-2"><%= storage_item.name %> × <%= storage_item.quantity %></p>
+                              <%= button_to "1個取り出す", withdraw_item_path(storage_item_id: storage_item.id), method: :post, class: "btn btn-outline-info w-100" %>
+                            </div>
+                          <% end %>
+                        </div>
+                      <% else %>
+                        <p class="text-secondary small">収納中のアイテムはありません。</p>
+                      <% end %>
+
+                      <h6>手持ちから預ける</h6>
+                      <% carried_items = @player.items.where("quantity > 0").order(:category, :name) %>
+                      <% if carried_items.any? %>
+                        <div class="d-grid gap-2">
+                          <% carried_items.each do |item| %>
+                            <div class="border rounded p-2">
+                              <p class="mb-2"><%= item.name %> × <%= item.quantity %></p>
+                              <%= button_to "1個預ける", store_item_path(item_id: item.id), method: :post, class: "btn btn-outline-light w-100" %>
+                            </div>
+                          <% end %>
+                        </div>
+                      <% else %>
+                        <p class="text-secondary small mb-0">預けられるアイテムはありません。</p>
+                      <% end %>
+                    <% else %>
+                      <p class="text-secondary small mb-0">この宿屋を本拠点にすると、アイテム収納を使えます。</p>
                     <% end %>
                   </div>
                 <% elsif selected_panel == "item_shop" %>
