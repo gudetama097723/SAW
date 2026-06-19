@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_19_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_19_090002) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -60,6 +60,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_090000) do
     t.integer "encounter_rate", default: 30, null: false
     t.integer "end_distance", null: false
     t.string "name", null: false
+    t.integer "required_mapping_to_enter_next", default: 30, null: false
+    t.integer "required_mapping_to_reach_town", default: 0, null: false
     t.integer "rest_safety", default: 70, null: false
     t.integer "route_id", null: false
     t.integer "start_distance", null: false
@@ -115,6 +117,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_090000) do
     t.string "name"
     t.string "rarity"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "player_field_area_progresses", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "field_area_id", null: false
+    t.integer "mapping_progress", default: 0, null: false
+    t.integer "player_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["field_area_id"], name: "index_player_field_area_progresses_on_field_area_id"
+    t.index ["player_id", "field_area_id"], name: "index_player_area_progress_unique", unique: true
+    t.index ["player_id"], name: "index_player_field_area_progresses_on_player_id"
   end
 
   create_table "player_route_progresses", force: :cascade do |t|
@@ -240,6 +253,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_090000) do
   add_foreign_key "field_areas", "routes"
   add_foreign_key "items", "players"
   add_foreign_key "mob_parts", "mobs"
+  add_foreign_key "player_field_area_progresses", "field_areas"
+  add_foreign_key "player_field_area_progresses", "players"
   add_foreign_key "player_route_progresses", "players"
   add_foreign_key "player_route_progresses", "routes"
   add_foreign_key "player_town_discoveries", "locations"

@@ -16,15 +16,28 @@ class FieldService
     route = player.field_route
     return Result.new(status: :error, message: "街中では探索できません。フィールドへ出てください。") unless route
 
-    progress = route_progress_for(player, route)
-    mapping_before = progress.progress.to_i
+    area = current_area_for(player)
+    area_progress = player.progress_for_area(area)
+    mapping_before = area_progress&.mapping_progress.to_i
     destination_discovered_before = destination_discovered?(player, route)
     mapping_gain = mapping_gain_for(mapping_before, player, route)
-    progress.progress = [mapping_before + mapping_gain, 100].min
-    progress.save!
+
+    if area_progress
+      area_progress.mapping_progress = [mapping_before + mapping_gain, 100].min
+      area_progress.save!
+    end
+
     player.current_time = (player.current_time.to_i + 10) % 1440
     advance = destination_discovered?(player, route) ? 0 : explore_advance_for(route)
-    player.field_position = [player.field_position.to_i + advance, route.distance].min
+    next_position = [player.field_position.to_i + advance, route.distance].min
+
+    if area &&
+      next_position > area.end_distance.to_i &&
+      mapping_before < area.required_mapping_to_enter_next.to_i
+      next_position = area.end_distance
+    end
+
+    player.field_position = next_position
 
     event = rand(100)
     encounter_rate = current_area_for(player)&.encounter_rate || field_danger_level(player)
@@ -39,10 +52,15 @@ class FieldService
       end
 
     message += " #{route.name}を探索した。"
-    mapping_added = progress.progress - mapping_before
-    message += " マッピング進行度 +#{mapping_added}%（#{progress.progress}%）" if mapping_before < 100 && mapping_added.positive?
-    if mapping_before < 100 && progress.progress >= 100
-      message += " #{route.name}を完全に踏破した！"
+    mapping_after = area_progress&.mapping_progress.to_i
+    mapping_added = mapping_after - mapping_before
+
+    if area_progress && mapping_before < 100 && mapping_added.positive?
+      message += " #{area.name}の踏破度 +#{mapping_added}%（#{mapping_after}%）"
+    end
+
+    if area_progress && mapping_before < 100 && mapping_after >= 100
+      message += " #{area.name}を完全に把握した！"
     elsif !destination_discovered_before && destination_discovered?(player, route)
       message += " #{route.to_location.name}を発見した！"
     end
@@ -286,11 +304,25 @@ class FieldService
   end
 
   def self.route_mapped?(player, route)
-    route_progress_for(player, route).progress.to_i >= REQUIRED_MAPPING_TO_REACH_DESTINATION
+    areas = route.field_areas.ordered.to_a
+    return false if areas.empty?
+
+    areas_for_travel = areas[0...-1]
+    return true if areas_for_travel.empty?
+
+    progresses = player.player_field_area_progresses.where(field_area: areas_for_travel).index_by(&:field_area_id)
+
+    areas_for_travel.all? do |area|
+      progresses[area.id]&.mapping_progress.to_i >= area.required_mapping_to_enter_next.to_i
+    end
   end
 
   def self.destination_discovered?(player, route)
-    route_mapped?(player, route)
+    destination_area = route.field_areas.ordered.last
+    return route_mapped?(player, route) unless destination_area
+
+    progress = player.progress_for_area(destination_area)
+    progress.mapping_progress.to_i >= destination_area.required_mapping_to_reach_town.to_i
   end
 
   def self.destination_reached?(player, route)

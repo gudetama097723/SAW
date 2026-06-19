@@ -47,6 +47,8 @@ seed_rows("field_areas.csv") do |row|
     end_distance: to_int(row["end_distance"]),
     encounter_rate: to_int(row["encounter_rate"]) || 30,
     rest_safety: to_int(row["rest_safety"]) || 70,
+    required_mapping_to_enter_next: to_int(row["required_mapping_to_enter_next"]) || 30,
+    required_mapping_to_reach_town: to_int(row["required_mapping_to_reach_town"]) || 0,
     description: row["description"].presence
   )
 end
