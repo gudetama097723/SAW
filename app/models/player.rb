@@ -32,6 +32,8 @@ class Player < ApplicationRecord
   belongs_to :user, optional: true
   belongs_to :location, optional: true
   belongs_to :field_route, class_name: "Route", optional: true
+  has_many :player_field_area_progresses, dependent: :destroy
+  has_many :field_areas, through: :player_field_area_progresses
   
   def equipped_weapons
     weapons.where(equipped: true)
@@ -184,5 +186,36 @@ class Player < ApplicationRecord
     end
 
     save!
+  end
+
+  def current_field_area
+    return nil unless field_route
+
+    field_route.field_areas.ordered.find do |area|
+      area.include_distance?(field_position)
+    end
+  end
+
+  def progress_for_area(area)
+    return nil unless area
+
+    player_field_area_progresses.find_or_create_by!(field_area: area) do |progress|
+      progress.mapping_progress = 0
+    end
+  end
+
+  def field_route_mapping_progress
+    return 0 unless field_route
+
+    areas = field_route.field_areas.ordered.to_a
+    return 0 if areas.empty?
+
+    progresses = player_field_area_progresses.where(field_area: areas).index_by(&:field_area_id)
+
+    total = areas.sum do |area|
+      progresses[area.id]&.mapping_progress.to_i
+    end
+
+    total / areas.size
   end
 end

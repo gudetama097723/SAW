@@ -3,11 +3,11 @@ class CreateFieldAreas < ActiveRecord::Migration[8.0]
     create_table :field_areas do |t|
       t.references :route, null: false, foreign_key: true
       t.string :name, null: false
-      t.integer :start_distance, null: false
-      t.integer :end_distance, null: false
-      t.integer :encounter_rate, null: false, default: 30
-      t.integer :rest_safety, null: false, default: 70
-      t.text :description
+      t.integer :start_position, null: false
+      t.integer :end_position, null: false
+      t.integer :danger_level, null: false, default: 1
+      t.integer :required_mapping_to_enter_next, null: false, default: 30
+      t.integer :required_mapping_to_reach_town, null: false, default: 40
 
       t.timestamps
     end

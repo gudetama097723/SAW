@@ -1,0 +1,11 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  player: one
+  field_area: one
+  mapping_progress: 1
+
+two:
+  player: two
+  field_area: two
+  mapping_progress: 1

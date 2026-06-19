@@ -7,6 +7,7 @@ class GameController < ApplicationController
     @rest = current_rest
     @routes = FieldService.available_routes_for(@player)
     @current_field_area = FieldService.current_area_for(@player)
+    @current_field_area_progress = @player.progress_for_area(@current_field_area)
     @town_discovery = @player.town_discovery_for if @player.location&.safe_area?
     if @battle
       BattleService.ensure_battle_enemies!(@battle)
@@ -325,12 +326,9 @@ class GameController < ApplicationController
       return
     end
 
-    unless FieldService.destination_discovered?(player, route)
-      redirect_to game_path, notice: "まだ目的地への道筋が掴めていない。探索でマッピングを進めよう。"
-      return
-    end
-
     advance = rand(15..25)
+    current_area = FieldService.current_area_for(player)
+    current_area_progress = player.progress_for_area(current_area)
     direction = params[:direction]
     reached_destination = FieldService.destination_reached?(player, route)
 
@@ -339,13 +337,29 @@ class GameController < ApplicationController
       return
     end
 
-    if direction == "backward"
-      player.field_position -= advance
-      direction_text = route.from_location.name
-    else
-      player.field_position += advance
-      direction_text = route.to_location.name
+    next_position =
+      if direction == "backward"
+        player.field_position.to_i - advance
+      else
+        player.field_position.to_i + advance
+      end
+
+    if direction != "backward" &&
+      current_area &&
+      next_position > current_area.end_distance.to_i &&
+      current_area_progress.mapping_progress.to_i < current_area.required_mapping_to_enter_next.to_i
+      redirect_to game_path, notice: "#{current_area.name}の地形把握が足りず、先へ進めない。探索で踏破度を上げよう。"
+      return
     end
+
+    player.field_position = next_position
+
+    direction_text =
+      if direction == "backward"
+        route.from_location.name
+      else
+        route.to_location.name
+      end
 
     elapsed_time = rand(10..20)
     player.current_time = (player.current_time.to_i + elapsed_time) % 1440
@@ -361,7 +375,7 @@ class GameController < ApplicationController
     end
 
     if player.field_position >= route.distance
-      unless FieldService.route_mapped?(player, route)
+      unless FieldService.destination_discovered?(player, route)
         player.field_position = [route.distance - 10, 0].max
         player.save!
         redirect_to game_path, notice: "#{route.name}の奥まで進んだが、まだ目的地への道筋が掴めていない。探索でマッピングを進めよう。"
