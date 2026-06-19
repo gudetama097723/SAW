@@ -79,10 +79,10 @@
           <div class="card bg-secondary text-light mb-3">
             <div class="card-header">情報コマンド</div>
             <div class="card-body d-grid gap-2">
-              <%= link_to "装備を見る", game_path(panel: "equipment"), class: "btn btn-outline-light w-100" %>
-              <%= link_to "所持品を見る", game_path(panel: "items"), class: "btn btn-outline-light w-100" %>
-              <%= link_to "スキルを見る", game_path(panel: "skills"), class: "btn btn-outline-light w-100" %>
-              <%= link_to "成長を見る", game_path(panel: "growth"), class: @player.stat_points.to_i.positive? ? "btn btn-warning w-100" : "btn btn-outline-light w-100" %>
+              <%= link_to "装備", game_path(panel: "equipment"), class: "btn btn-outline-light w-100" %>
+              <%= link_to "アイテム", game_path(panel: "items"), class: "btn btn-outline-light w-100" %>
+              <%= link_to "スキル", game_path(panel: "skills"), class: "btn btn-outline-light w-100" %>
+              <%= link_to "ステータス", game_path(panel: "growth"), class: @player.stat_points.to_i.positive? ? "btn btn-warning w-100" : "btn btn-outline-light w-100" %>
             </div>
           </div>
         </div>
@@ -301,75 +301,6 @@
                   <% armor = @player.armor_for(slot) %>
                   <p class="mb-1"><%= Armor.slot_name(slot) %>: <%= armor ? armor.name : "未装備" %></p>
                 <% end %>
-
-                <h5 class="mt-3">所持武器</h5>
-                <% if @player.weapons.any? %>
-                  <div class="d-grid gap-2">
-                    <% @player.weapons.each do |weapon| %>
-                      <div class="border rounded p-2">
-                        <p class="mb-1">
-                          <%= weapon.display_name %>
-                          <% if weapon.equipped? %>
-                            <span class="badge text-bg-warning">装備中</span>
-                          <% end %>
-                        </p>
-                        <p class="mb-1">攻撃力: <%= weapon.attack_power %> / 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
-                        <% if weapon.effective_part_break_power > 100 %>
-                          <p class="mb-1">特性: 部位破壊率が高い</p>
-                        <% end %>
-                        <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
-                        <p class="mb-2">補正: HP +<%= weapon.hp_bonus %> / 筋力 +<%= weapon.strength_bonus %> / 敏捷 +<%= weapon.agility_bonus %></p>
-                        <% unless weapon.equipped? %>
-                          <p class="mb-2"><%= weapon.display_name %>を装備しますか？</p>
-                          <%= button_to "装備する", equip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-warning w-100" %>
-                        <% end %>
-                        <%= button_to(weapon.favorite? ? "★ お気に入り解除" : "☆ お気に入り登録",
-                            toggle_weapon_favorite_path(weapon_id: weapon.id),
-                            method: :post,
-                            class: "btn btn-outline-light w-100 mt-2") %>
-                        <% if weapon.discardable_by_player? %>
-                          <%= button_to "捨てる", discard_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-danger w-100 mt-2" %>
-                        <% end %>
-                      </div>
-                    <% end %>
-                  </div>
-                <% else %>
-                  <p class="mb-0">所持武器なし</p>
-                <% end %>
-
-                <h5 class="mt-3">所持防具</h5>
-                <% if @player.armors.any? %>
-                  <div class="d-grid gap-2">
-                    <% @player.armors.each do |armor| %>
-                      <div class="border rounded p-2">
-                        <p class="mb-1">
-                          <%= armor.name %>
-                          <% if armor.equipped? %>
-                            <span class="badge text-bg-info">装備中</span>
-                          <% end %>
-                        </p>
-                        <p class="mb-1">種別: <%= armor.armor_type %> / 部位: <%= armor.slot_name %></p>
-                        <p class="mb-1">防御: <%= armor.defense %> / 重量: <%= armor.weight %></p>
-                        <p class="mb-2">補正: HP +<%= armor.hp_bonus %>% / 筋力 +<%= armor.strength_bonus %> / 敏捷 +<%= armor.agility_bonus %></p>
-                        <% if armor.equipped? %>
-                          <%= button_to "取り外す", unequip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-light w-100" %>
-                        <% else %>
-                          <p class="mb-2"><%= armor.name %>を装備しますか？</p>
-                          <%= button_to "装備する", equip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-info w-100" %>
-                        <% end %>
-                        <%= button_to(armor.favorite? ? "★ お気に入り解除" : "☆ お気に入り登録",
-                            toggle_armor_favorite_path(armor_id: armor.id),
-                            method: :post,
-                            class: "btn btn-outline-light w-100 mt-2") %>
-                        <% if armor.discardable_by_player? %>
-                          <%= button_to "捨てる", discard_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-danger w-100 mt-2" %>
-                        <% end %>
-                      </div>
-                    <% end %>
-                  </div>
-                <% else %>
-                  <p class="mb-0">所持防具なし</p>
-                <% end %>
               <% elsif selected_panel == "items" %>
                 <% item_category = params[:item_category].presence %>
                 <h5>所持品</h5>
@@ -568,13 +499,16 @@
                   </div>
                 <% end %>
               <% elsif selected_panel == "inn" %>
-
                 <h5>宿屋</h5>
+
                 <% unless @player.town_discovery_for&.found_inn? %>
                   <p class="mb-0">宿屋はまだ見つけていません。</p>
                 <% else %>
                   <div class="d-grid gap-2">
-                    <%= link_to "休憩", game_path(panel: "inn"), class: "btn btn-outline-success w-100" %>
+                    <%= link_to "休憩", game_path(panel: "inn", inn_menu: "rest"), class: "btn btn-outline-success w-100" %>
+                    <%= link_to "本拠点", game_path(panel: "inn", inn_menu: "base"), class: "btn btn-outline-info w-100" %>
+                    <%= link_to "所持金管理", game_path(panel: "inn", inn_menu: "col"), class: "btn btn-outline-warning w-100" %>
+                    <%= link_to "アイテム収納", game_path(panel: "inn", inn_menu: "storage"), class: "btn btn-outline-light w-100" %>
                     <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
                   </div>
                 <% end %>
@@ -650,76 +584,231 @@
             </div>
 
           <% else %>
-            <% facility_panel_open = selected_panel.in?(%w[inn item_shop blacksmith]) && @player.location&.safe_area? %>
+            <% facility_panel_open = selected_panel.in?(%w[inn item_shop blacksmith equipment]) && @player.location&.safe_area? %>
             <% if facility_panel_open %>
               <div class="card bg-secondary text-light mb-3">
-                <% if selected_panel == "inn" %>
-                  <% inn_cost = @player.location&.name == "ホルンカの村" ? 50 : 0 %>
-                  <% current_base = @player.player_bases.find_by(location: @player.location, base_type: "home", active: true) %>
-                  <div class="card-header">宿屋</div>
+                <% if selected_panel == "equipment" %>
+                  <div class="card-header">所持装備</div>
                   <div class="card-body">
-                    <div class="d-grid gap-2 mb-3">
-                    <%= button_to "休憩する（#{inn_cost}コル）", inn_path, method: :post, class: "btn btn-outline-success w-100" %>
-                    <% if params[:confirm_home_base] == "1" %>
-                      <div class="border border-info rounded p-2">
-                        <p class="mb-2">ここを本拠点にしますか？</p>
-                        <div class="d-flex gap-2">
-                          <%= button_to "はい", set_home_base_path(confirm: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-info w-100" %>
-                          <%= link_to "いいえ", game_path(panel: "inn"), class: "btn btn-outline-light flex-fill" %>
+                    <h6>所持武器</h6>
+
+                    <% @player.weapons.each do |weapon| %>
+                      <div class="border rounded mb-2">
+                        <button class="btn btn-dark w-100 text-start"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#weapon-<%= weapon.id %>">
+                          <%= weapon.display_name %>
+                          <% if weapon.equipped? %>（装備中）<% end %>
+                          <% if weapon.favorite? %> ★<% end %>
+                        </button>
+
+                        <div class="collapse p-2" id="weapon-<%= weapon.id %>">
+                          <p class="mb-1">攻撃力: <%= weapon.attack_power %></p>
+                          <p class="mb-1">耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                          <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
+
+                          <% unless weapon.equipped? %>
+                            <%= button_to "装備する", equip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-warning w-100 mt-2" %>
+                          <% else %>
+                            <%= button_to "取り外す", unequip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
+                          <% end %>
+                          <%= button_to weapon.favorite? ? "★ お気に入り解除" : "☆ お気に入り登録",
+                              toggle_weapon_favorite_path(weapon_id: weapon.id),
+                              method: :post,
+                              class: "btn btn-outline-light w-100 mt-2" %>
                         </div>
                       </div>
-                    <% else %>
-                      <%= button_to "拠点にする", set_home_base_path, method: :post, class: "btn btn-outline-info w-100" %>
-                    <% end %>
-                    </div>
-
-                    <% if @player.home_base %>
-                      <div class="small text-light mb-2">本拠点: <%= @player.home_base.location.name %> / 預け金: <%= @player.base_col.to_i %>コル</div>
                     <% end %>
 
-                    <% if current_base %>
+                    <h6 class="mt-3">所持防具</h6>
+
+                    <% @player.armors.each do |armor| %>
+                      <div class="border rounded mb-2">
+                        <button class="btn btn-dark w-100 text-start"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#armor-<%= armor.id %>">
+                          <%= armor.name %>
+                          <% if armor.equipped? %>（装備中）<% end %>
+                          <% if armor.favorite? %> ★<% end %>
+                        </button>
+
+                        <div class="collapse p-2" id="armor-<%= armor.id %>">
+                          <p class="mb-1">部位: <%= armor.slot_name %></p>
+                          <p class="mb-1">防御: <%= armor.defense %></p>
+                          <p class="mb-1">重量: <%= armor.weight %></p>
+
+                          <% if armor.equipped? %>
+                            <%= button_to "取り外す", unequip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
+                          <% else %>
+                            <%= button_to "装備する", equip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-info w-100 mt-2" %>
+                          <% end %>
+                          <%= button_to armor.favorite? ? "★ お気に入り解除" : "☆ お気に入り登録",
+                              toggle_armor_favorite_path(armor_id: armor.id),
+                              method: :post,
+                              class: "btn btn-outline-light w-100 mt-2" %>
+                        </div>
+                      </div>
+                    <% end %>
+                  </div>
+
+                <% elsif selected_panel == "inn" %>
+                  <% inn_menu = params[:inn_menu].presence || "rest" %>
+                  <% inn_cost = @player.location&.name == "ホルンカの村" ? 50 : 0 %>
+                  <% current_base = @player.player_bases.find_by(location: @player.location, base_type: "home", active: true) %>
+
+                  <div class="card-header">宿屋</div>
+                  <div class="card-body">
+
+                    <% if inn_menu == "rest" %>
+                      <h6>休憩</h6>
+                      <p>宿屋で休憩してHPを回復します。</p>
+                      <%= button_to "休憩する（#{inn_cost}コル）", inn_path, method: :post, class: "btn btn-outline-success w-100" %>
+
+                    <% elsif inn_menu == "base" %>
+                      <h6>本拠点</h6>
+
+                      <% if @player.home_base %>
+                        <p>現在の本拠点: <%= @player.home_base.location.name %></p>
+                      <% else %>
+                        <p>本拠点は未設定です。</p>
+                      <% end %>
+
+                      <% if @player.home_base&.location_id != @player.location_id %>
+                        <% if params[:confirm_home_base] == "1" %>
+                          <div class="border border-info rounded p-2">
+                            <p class="mb-2">ここを本拠点にしますか？</p>
+                            <div class="d-flex gap-2">
+                              <%= button_to "はい", set_home_base_path(confirm: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-info w-100" %>
+                              <%= link_to "いいえ", game_path(panel: "inn", inn_menu: "base"), class: "btn btn-outline-light flex-fill" %>
+                            </div>
+                          </div>
+                        <% else %>
+                          <%= link_to "この宿屋を本拠点にする", game_path(panel: "inn", inn_menu: "base", confirm_home_base: "1"), class: "btn btn-outline-info w-100" %>
+                        <% end %>
+                      <% else %>
+                        <div class="text-info small text-center">現在の本拠点です</div>
+                      <% end %>
+
+                    <% elsif inn_menu == "col" %>
                       <h6>所持金管理</h6>
-                      <div class="border rounded p-2 mb-3">
-                        <%= form_with url: deposit_base_col_path, method: :post, class: "d-grid gap-2 mb-2" do %>
+
+                      <% if current_base %>
+                        <p>預け金: <%= @player.base_col.to_i %>コル</p>
+
+                        <%= form_with url: deposit_base_col_path, method: :post, class: "d-grid gap-2 mb-3" do %>
                           <%= number_field_tag :amount, 100, min: 1, max: @player.col.to_i, class: "form-control form-control-sm" %>
                           <%= submit_tag "コルを預ける", class: "btn btn-outline-info w-100" %>
                         <% end %>
+
                         <%= form_with url: withdraw_base_col_path, method: :post, class: "d-grid gap-2" do %>
                           <%= number_field_tag :amount, 100, min: 1, max: @player.base_col.to_i, class: "form-control form-control-sm" %>
                           <%= submit_tag "コルを引き出す", class: "btn btn-outline-light w-100" %>
                         <% end %>
-                      </div>
-
-                      <h6>アイテム収納 <%= current_base.storage_type_count %> / <%= current_base.storage_limit %>種類</h6>
-                      <% if current_base.storage_items.where("quantity > 0").any? %>
-                        <div class="d-grid gap-2 mb-3">
-                          <% current_base.storage_items.where("quantity > 0").order(:category, :name).each do |storage_item| %>
-                            <div class="border rounded p-2">
-                              <p class="mb-2"><%= storage_item.name %> × <%= storage_item.quantity %></p>
-                              <%= button_to "1個取り出す", withdraw_item_path(storage_item_id: storage_item.id), method: :post, class: "btn btn-outline-info w-100" %>
-                            </div>
-                          <% end %>
-                        </div>
                       <% else %>
-                        <p class="text-secondary small">収納中のアイテムはありません。</p>
+                        <p class="text-secondary small mb-0">この宿屋を本拠点にすると、所持金管理を使えます。</p>
                       <% end %>
 
-                      <h6>手持ちから預ける</h6>
-                      <% carried_items = @player.items.where("quantity > 0").order(:category, :name) %>
-                      <% if carried_items.any? %>
-                        <div class="d-grid gap-2">
-                          <% carried_items.each do |item| %>
-                            <div class="border rounded p-2">
-                              <p class="mb-2"><%= item.name %> × <%= item.quantity %></p>
-                              <%= button_to "1個預ける", store_item_path(item_id: item.id), method: :post, class: "btn btn-outline-light w-100" %>
+                    <% elsif inn_menu == "storage" %>
+                      <h6>アイテム収納</h6>
+
+                      <% if current_base %>
+                        <% storage_tab = params[:storage_tab].presence || "store" %>
+                        <% item_category = params[:item_category].presence %>
+
+                        <ul class="nav nav-tabs mb-2">
+                          <li class="nav-item">
+                            <%= link_to "預ける", game_path(panel: "inn", inn_menu: "storage", storage_tab: "store", item_category: item_category), class: "nav-link #{storage_tab == 'store' ? 'active' : ''}" %>
+                          </li>
+                          <li class="nav-item">
+                            <%= link_to "取り出す", game_path(panel: "inn", inn_menu: "storage", storage_tab: "withdraw", item_category: item_category), class: "nav-link #{storage_tab == 'withdraw' ? 'active' : ''}" %>
+                          </li>
+                        </ul>
+
+                    <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <%= link_to "全部",
+                      game_path(panel: "inn", inn_menu: "storage", storage_tab: storage_tab),
+                      class: "btn btn-sm #{item_category.blank? ? 'btn-info' : 'btn-outline-light'}" %>
+                      <%= link_to "回復", game_path(panel: "inn", inn_menu: "storage", storage_tab: storage_tab, item_category: "healing"), class: "btn btn-sm #{item_category == 'healing' ? 'btn-info' : 'btn-outline-light'}" %>
+
+                      <%= link_to "採取", game_path(panel: "inn", inn_menu: "storage", storage_tab: storage_tab, item_category: "gathered"), class: "btn btn-sm #{item_category == 'gathered' ? 'btn-info' : 'btn-outline-light'}" %>
+
+                      <%= link_to "ドロップ", game_path(panel: "inn", inn_menu: "storage", storage_tab: storage_tab, item_category: "drop"), class: "btn btn-sm #{item_category == 'drop' ? 'btn-info' : 'btn-outline-light'}" %>
+                    </div>
+
+                        <% if storage_tab == "store" %>
+                          <% carried_items = @player.items.where("quantity > 0").order(:category, :name) %>
+                          <% carried_items = carried_items.where(category: item_category) if item_category.present? %>
+
+                          <% if carried_items.any? %>
+                            <div class="d-grid gap-2">
+                              <% carried_items.each do |item| %>
+                                <div class="border rounded">
+                                  <button class="btn btn-dark w-100 text-start"
+                                          type="button"
+                                          data-bs-toggle="collapse"
+                                          data-bs-target="#store-item-<%= item.id %>">
+                                    <%= item.name %> × <%= item.quantity %>
+                                  </button>
+
+                                  <div class="collapse p-2" id="store-item-<%= item.id %>">
+                                    <%= form_with url: store_item_path(item_id: item.id), method: :post, class: "d-flex gap-2 mb-2" do %>
+                                      <%= number_field_tag :quantity, item.quantity, min: 1, max: item.quantity, class: "form-control form-control-sm" %>
+                                      <%= submit_tag "預ける", class: "btn btn-outline-light btn-sm" %>
+                                    <% end %>
+
+                                    <%= button_to "全部預ける",
+                                                  store_item_path(item_id: item.id, quantity: item.quantity),
+                                                  method: :post,
+                                                  class: "btn btn-outline-info btn-sm w-100" %>
+                                  </div>
+                                </div>
+                              <% end %>
                             </div>
+                          <% else %>
+                            <p class="text-secondary small mb-0">預けられるアイテムはありません。</p>
                           <% end %>
-                        </div>
+
+                        <% else %>
+                          <% storage_items = current_base.storage_items.where("quantity > 0").order(:category, :name) %>
+                          <% storage_items = storage_items.where(category: item_category) if item_category.present? %>
+
+                          <% if storage_items.any? %>
+                            <div class="d-grid gap-2">
+                              <% storage_items.each do |storage_item| %>
+                                <div class="border rounded">
+                                  <button class="btn btn-dark w-100 text-start"
+                                          type="button"
+                                          data-bs-toggle="collapse"
+                                          data-bs-target="#withdraw-item-<%= storage_item.id %>">
+                                    <%= storage_item.name %> × <%= storage_item.quantity %>
+                                  </button>
+
+                                  <div class="collapse p-2" id="withdraw-item-<%= storage_item.id %>">
+                                    <%= form_with url: withdraw_item_path(storage_item_id: storage_item.id), method: :post, class: "d-flex gap-2 mb-2" do %>
+                                      <%= number_field_tag :quantity, storage_item.quantity, min: 1, max: storage_item.quantity, class: "form-control form-control-sm" %>
+                                      <%= submit_tag "取り出す", class: "btn btn-outline-light btn-sm" %>
+                                    <% end %>
+
+                                    <%= button_to "全部取り出す",
+                                                  withdraw_item_path(storage_item_id: storage_item.id, quantity: storage_item.quantity),
+                                                  method: :post,
+                                                  class: "btn btn-outline-info btn-sm w-100" %>
+                                  </div>
+                                </div>
+                              <% end %>
+                            </div>
+                          <% else %>
+                            <p class="text-secondary small mb-0">収納中のアイテムはありません。</p>
+                          <% end %>
+                        <% end %>
+
                       <% else %>
-                        <p class="text-secondary small mb-0">預けられるアイテムはありません。</p>
+                        <p class="text-secondary small mb-0">
+                          この宿屋を本拠点にすると、アイテム収納を使えます。
+                        </p>
                       <% end %>
-                    <% else %>
-                      <p class="text-secondary small mb-0">この宿屋を本拠点にすると、アイテム収納を使えます。</p>
                     <% end %>
                   </div>
                 <% elsif selected_panel == "item_shop" %>
