@@ -600,11 +600,111 @@ def set_home_base
     return
   end
 
+  unless params[:confirm] == "1"
+    redirect_to game_path(panel: "inn", confirm_home_base: "1"),
+                notice: "ここを本拠点にしますか？"
+    return
+  end
+
   PlayerBase.transaction do
     current_player.player_bases.where(base_type: "home").update_all(active: false)
     current_player.player_bases.find_or_create_by!(location: location, base_type: "home").update!(active: true, rent: location.name == "はじまりの街" ? 0 : 300, storage_limit: 30)
   end
   redirect_to game_path(panel: "inn"), notice: "#{location.name}を本拠点にした。"
+end
+
+def store_item
+  player = current_player
+  base = player.player_bases.find_by(location: player.location, base_type: "home", active: true)
+  item = player.items.find_by(id: params[:item_id])
+
+  unless base
+    redirect_to game_path(panel: "inn"), alert: "この場所は本拠点ではありません。"
+    return
+  end
+  unless item&.quantity.to_i.positive?
+    redirect_to game_path(panel: "inn"), alert: "預けるアイテムがありません。"
+    return
+  end
+  if base.storage_full_for?(item.name, item.category)
+    redirect_to game_path(panel: "inn"), alert: "収納の空き種類数が足りません。"
+    return
+  end
+
+  storage_item = base.storage_items.find_or_initialize_by(name: item.name, category: item.category)
+  ActiveRecord::Base.transaction do
+    storage_item.quantity = storage_item.quantity.to_i + 1
+    item.quantity -= 1
+    item.quantity.to_i <= 0 ? item.destroy! : item.save!
+    storage_item.save!
+  end
+
+  redirect_to game_path(panel: "inn"), notice: "#{storage_item.name}を1個収納した。"
+end
+
+def deposit_base_col
+  player = current_player
+  base = player.player_bases.find_by(location: player.location, base_type: "home", active: true)
+  amount = params[:amount].to_i
+
+  unless base
+    redirect_to game_path(panel: "inn"), alert: "この場所は本拠点ではありません。"
+    return
+  end
+  if amount <= 0 || player.col.to_i < amount
+    redirect_to game_path(panel: "inn"), alert: "預けるコルが足りません。"
+    return
+  end
+
+  player.col = player.col.to_i - amount
+  player.base_col = player.base_col.to_i + amount
+  player.save!
+  redirect_to game_path(panel: "inn"), notice: "#{amount}コルを預けた。"
+end
+
+def withdraw_base_col
+  player = current_player
+  base = player.player_bases.find_by(location: player.location, base_type: "home", active: true)
+  amount = params[:amount].to_i
+
+  unless base
+    redirect_to game_path(panel: "inn"), alert: "この場所は本拠点ではありません。"
+    return
+  end
+  if amount <= 0 || player.base_col.to_i < amount
+    redirect_to game_path(panel: "inn"), alert: "引き出すコルが足りません。"
+    return
+  end
+
+  player.base_col = player.base_col.to_i - amount
+  player.col = player.col.to_i + amount
+  player.save!
+  redirect_to game_path(panel: "inn"), notice: "#{amount}コルを引き出した。"
+end
+
+def withdraw_item
+  player = current_player
+  base = player.player_bases.find_by(location: player.location, base_type: "home", active: true)
+  storage_item = base&.storage_items&.find_by(id: params[:storage_item_id])
+
+  unless base
+    redirect_to game_path(panel: "inn"), alert: "この場所は本拠点ではありません。"
+    return
+  end
+  unless storage_item&.quantity.to_i.positive?
+    redirect_to game_path(panel: "inn"), alert: "取り出すアイテムがありません。"
+    return
+  end
+
+  item = player.items.find_or_initialize_by(name: storage_item.name, category: storage_item.category)
+  ActiveRecord::Base.transaction do
+    item.quantity = item.quantity.to_i + 1
+    storage_item.quantity -= 1
+    storage_item.quantity.to_i <= 0 ? storage_item.destroy! : storage_item.save!
+    item.save!
+  end
+
+  redirect_to game_path(panel: "inn"), notice: "#{item.name}を1個取り出した。"
 end
 
 def toggle_route_direction
@@ -839,8 +939,8 @@ def toggle_route_direction
       return
     end
 
-    if strength_points.negative? || agility_points.negative? || total_points <= 0 || total_points > available_points
-      redirect_to game_path(panel: "growth", strength_points: strength_points, agility_points: agility_points), alert: "#{available_points}ポイント以内で振り分けてください。"
+    if strength_points.negative? || agility_points.negative? || total_points != available_points
+      redirect_to game_path(panel: "growth", strength_points: strength_points, agility_points: agility_points), alert: "#{available_points}ポイントをすべて振り分けてください。"
       return
     end
 
