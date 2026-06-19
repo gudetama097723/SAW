@@ -596,12 +596,12 @@ end
 def set_home_base
   location = current_player.location
   unless location&.safe_area? && current_player.town_discovery_for&.found_inn?
-    redirect_to game_path(panel: "inn"), alert: "宿屋を見つけていません。"
+    redirect_to game_path(panel: "inn", inn_menu: "base"), alert: "宿屋を見つけていません。"
     return
   end
 
   unless params[:confirm] == "1"
-    redirect_to game_path(panel: "inn", confirm_home_base: "1"),
+    redirect_to game_path(panel: "inn", inn_menu: "base", confirm_home_base: "1"),
                 notice: "ここを本拠点にしますか？"
     return
   end
@@ -610,7 +610,7 @@ def set_home_base
     current_player.player_bases.where(base_type: "home").update_all(active: false)
     current_player.player_bases.find_or_create_by!(location: location, base_type: "home").update!(active: true, rent: location.name == "はじまりの街" ? 0 : 300, storage_limit: 30)
   end
-  redirect_to game_path(panel: "inn"), notice: "#{location.name}を本拠点にした。"
+  redirect_to game_path(panel: "inn", inn_menu: "base"), notice: "#{location.name}を本拠点にした。"
 end
 
 def store_item
@@ -619,27 +619,34 @@ def store_item
   item = player.items.find_by(id: params[:item_id])
 
   unless base
-    redirect_to game_path(panel: "inn"), alert: "この場所は本拠点ではありません。"
+    redirect_to game_path(panel: "inn", inn_menu: "storage"), alert: "この場所は本拠点ではありません。"
     return
   end
+
   unless item&.quantity.to_i.positive?
-    redirect_to game_path(panel: "inn"), alert: "預けるアイテムがありません。"
+    redirect_to game_path(panel: "inn", inn_menu: "storage"), alert: "預けるアイテムがありません。"
     return
   end
+
+  quantity = params[:quantity].to_i
+  quantity = 1 if quantity <= 0
+  quantity = [quantity, item.quantity.to_i].min
+
   if base.storage_full_for?(item.name, item.category)
-    redirect_to game_path(panel: "inn"), alert: "収納の空き種類数が足りません。"
+    redirect_to game_path(panel: "inn", inn_menu: "storage"), alert: "収納の空き種類数が足りません。"
     return
   end
 
   storage_item = base.storage_items.find_or_initialize_by(name: item.name, category: item.category)
+
   ActiveRecord::Base.transaction do
-    storage_item.quantity = storage_item.quantity.to_i + 1
-    item.quantity -= 1
+    storage_item.quantity = storage_item.quantity.to_i + quantity
+    item.quantity -= quantity
     item.quantity.to_i <= 0 ? item.destroy! : item.save!
     storage_item.save!
   end
 
-  redirect_to game_path(panel: "inn"), notice: "#{storage_item.name}を1個収納した。"
+  redirect_to game_path(panel: "inn", inn_menu: "storage"), notice: "#{storage_item.name}を#{quantity}個収納した。"
 end
 
 def deposit_base_col
@@ -688,23 +695,29 @@ def withdraw_item
   storage_item = base&.storage_items&.find_by(id: params[:storage_item_id])
 
   unless base
-    redirect_to game_path(panel: "inn"), alert: "この場所は本拠点ではありません。"
-    return
-  end
-  unless storage_item&.quantity.to_i.positive?
-    redirect_to game_path(panel: "inn"), alert: "取り出すアイテムがありません。"
+    redirect_to game_path(panel: "inn", inn_menu: "storage", storage_tab: "withdraw"), alert: "この場所は本拠点ではありません。"
     return
   end
 
+  unless storage_item&.quantity.to_i.positive?
+    redirect_to game_path(panel: "inn", inn_menu: "storage", storage_tab: "withdraw"), alert: "取り出すアイテムがありません。"
+    return
+  end
+
+  quantity = params[:quantity].to_i
+  quantity = 1 if quantity <= 0
+  quantity = [quantity, storage_item.quantity.to_i].min
+
   item = player.items.find_or_initialize_by(name: storage_item.name, category: storage_item.category)
+
   ActiveRecord::Base.transaction do
-    item.quantity = item.quantity.to_i + 1
-    storage_item.quantity -= 1
+    item.quantity = item.quantity.to_i + quantity
+    storage_item.quantity -= quantity
     storage_item.quantity.to_i <= 0 ? storage_item.destroy! : storage_item.save!
     item.save!
   end
 
-  redirect_to game_path(panel: "inn"), notice: "#{item.name}を1個取り出した。"
+  redirect_to game_path(panel: "inn", inn_menu: "storage", storage_tab: "withdraw"), notice: "#{item.name}を#{quantity}個取り出した。"
 end
 
 def toggle_route_direction
