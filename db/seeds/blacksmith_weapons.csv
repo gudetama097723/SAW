@@ -1,8 +1,8 @@
-﻿location,name,weapon_type,rarity,price,attack_power,durability,max_durability,hp_bonus,strength_bonus,agility_bonus,critical_rate,part_break_power,attack_attributes,enhancement_level
-はじまりの街,ブロンズソード,片手直剣,common,100,9,1200,1200,0,2,0,7,100,斬撃,0
-はじまりの街,ブロンズレイピア,細剣,common,120,8,1000,1000,0,0,2,10,90,刺突,0
-はじまりの街,ウッドメイス,棍,common,90,7,1400,1400,0,1,-1,5,125,打撃,0
-ホルンカの村,ブロンズソード,片手直剣,common,90,9,1200,1200,0,2,0,7,100,斬撃,0
-ホルンカの村,アイアンショートソード,片手直剣,uncommon,220,14,1600,1600,0,3,0,8,105,斬撃,0
-ホルンカの村,ハンドアックス,斧,uncommon,260,15,1500,1500,0,4,-1,6,140,斬撃|打撃,0
-ホルンカの村,スティンガーレイピア,細剣,uncommon,240,12,1200,1200,0,0,4,13,90,刺突,0
+﻿location,name,weapon_type,rarity,price,attack_power,durability,max_durability,hp_bonus,strength_bonus,agility_bonus,critical_rate,part_break_power,attack_attributes,enhancement_level,weight,strength_ratio,agility_ratio,description
+はじまりの街,ブロンズソード,片手直剣,common,100,9,1200,1200,0,2,0,7,100,斬撃,0,4.5,70,30,扱いやすい片手直剣。斬撃に向く。
+はじまりの街,ブロンズレイピア,細剣,common,120,8,1000,1000,0,0,2,10,90,刺突,0,3.2,30,70,敏捷を活かす刺突武器。
+はじまりの街,ウッドメイス,棍,common,90,7,1400,1400,0,1,-1,5,125,打撃,0,5.8,90,10,硬い敵に強い打撃武器。
+ホルンカの村,ブロンズソード,片手直剣,common,90,9,1200,1200,0,2,0,7,100,斬撃,0,4.5,70,30,扱いやすい片手直剣。斬撃に向く。
+ホルンカの村,アイアンショートソード,片手直剣,uncommon,220,14,1600,1600,0,3,0,8,105,斬撃,0,5.2,72,28,重めだが火力の高い片手直剣。
+ホルンカの村,ハンドアックス,斧,uncommon,260,15,1500,1500,0,4,-1,6,140,斬撃|打撃,0,7.0,85,15,斬撃と打撃を兼ねる部位破壊向きの斧。
+ホルンカの村,スティンガーレイピア,細剣,uncommon,240,12,1200,1200,0,0,4,13,90,刺突,0,3.5,25,75,刺突に特化した軽量武器。

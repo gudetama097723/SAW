@@ -23,10 +23,33 @@
     missing * rarity_cost_multiplier
   end
 
-  def sell_price
+def display_name
+  enhancement_level.to_i.positive? ? "#{name} +#{enhancement_level}" : name
+end
+
+def protected_item?
+  equipped? || favorite? || protected_from_death_penalty? || unique_item? || !discardable?
+end
+
+def sellable_by_player?
+  !starter_weapon? && !equipped? && !favorite? && discardable? && !protected_from_death_penalty?
+end
+
+def discardable_by_player?
+  !starter_weapon? && !equipped? && !favorite? && discardable? && !unique_item?
+end
+
+def stat_attack_power(player)
+  strength_part = player.effective_strength * strength_ratio.to_i / 100.0
+  agility_part = player.effective_agility * agility_ratio.to_i / 100.0
+  strength_part + agility_part
+end
+
+def sell_price
+
     return 0 if starter_weapon?
 
-    base = attack_power.to_i * 4
+    base = effective_attack_power.to_i * 4
     durability_rate = max_durability.to_i.positive? ? durability.to_i.to_f / max_durability.to_i : 0.5
     [(base * durability_rate * rarity_cost_multiplier / 2.0).floor, 1].max
   end

@@ -31,26 +31,23 @@
     end
 
     result = rand(100)
-    next_time = (player.current_time.to_i + 10) % 1440
+    player.advance_time!(10)
     discovery = player.town_discovery_for
 
     if !discovery.found_inn? && result < 30
       discovery.found_inn = true
-      player.current_time = next_time
       ActiveRecord::Base.transaction { discovery.save!; player.save! }
       redirect_to game_path, notice: "広場の近くで宿屋を見つけた！"
     elsif !discovery.found_item_shop? && result < 60
       discovery.found_item_shop = true
-      player.current_time = next_time
       ActiveRecord::Base.transaction { discovery.save!; player.save! }
       redirect_to game_path, notice: "街を散策していると、道具屋を見つけた！"
     elsif !discovery.found_blacksmith? && result < 85
       discovery.found_blacksmith = true
-      player.current_time = next_time
       ActiveRecord::Base.transaction { discovery.save!; player.save! }
       redirect_to game_path, notice: "路地裏で鍛冶屋を見つけた！"
     else
-      player.update!(current_time: next_time)
+      player.save!
       redirect_to game_path, notice: "街を散策した。特に新しい発見はなかった。"
     end
   end
@@ -78,13 +75,13 @@
 
 def inspect_treasure
   treasure = TreasureChest.find_by(id: params[:treasure_chest_id])
-  result = treasure ? ExplorationRewardService.inspect_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "を習得した。を習得した。")
+  result = treasure ? ExplorationRewardService.inspect_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "その宝箱は見つかりません。")
   redirect_with_result(result)
 end
 
 def ignore_treasure
   treasure = TreasureChest.find_by(id: params[:treasure_chest_id])
-  result = treasure ? ExplorationRewardService.ignore_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "を習得した。を習得した。")
+  result = treasure ? ExplorationRewardService.ignore_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "その宝箱は見つかりません。")
   redirect_with_result(result)
 end
 
@@ -209,7 +206,7 @@ def attack
       return
     end
 
-    player.current_time = (player.current_time.to_i + 10) % 1440
+    player.advance_time!(10)
     player.save!
 
     surprise_message = check_item_use_surprise_encounter!(player)
@@ -282,7 +279,7 @@ def attack
       heal = 10
       player.hp = [player.hp.to_i + heal, player.effective_max_hp].min
       skill.proficiency += 1
-      player.current_time = (player.current_time.to_i + 10) % 1440
+      player.advance_time!(10)
 
       player.save
       skill.save
@@ -311,7 +308,7 @@ def attack
       return
     end
 
-    player.current_time = (player.current_time.to_i + 10) % 1440
+    player.advance_time!(10)
     player.save!
 
     check_rest_encounter!(player)
@@ -357,7 +354,7 @@ def attack
         return
       end
 
-      player.current_time = (player.current_time.to_i + 5) % 1440
+      player.advance_time!(5)
       player.save!
 
       redirect_to game_path, notice: "#{route.name}に出た。"
@@ -370,7 +367,7 @@ def attack
       return
     end
 
-    advance = rand(15..25)
+    advance = [(rand(15..25) * player.movement_speed_multiplier).round, 1].max
     current_area = FieldService.current_area_for(player)
     current_area_progress = player.progress_for_area(current_area)
     direction = params[:direction]
@@ -380,7 +377,7 @@ def attack
       player.location = route.from_location
       player.field_route = nil
       player.field_position = 0
-      player.current_time = (player.current_time.to_i + 5) % 1440
+      player.advance_time!(5)
       player.save!
       redirect_to game_path, notice: "#{route.from_location.name}へ戻った。5分経過した。"
       return
@@ -421,10 +418,10 @@ def attack
         FieldService.current_area_for(player)&.name || "探索済みエリア"
       else
         route.to_location.name
-      end
+    end
 
     elapsed_time = rand(10..20)
-    player.current_time = (player.current_time.to_i + elapsed_time) % 1440
+    player.advance_time!(elapsed_time)
 
     if player.field_position <= 0
       player.location = route.from_location
@@ -497,11 +494,121 @@ def attack
     end
 
     item = player.items.find_by(name: params[:item_name])
-    result = ItemService.sell_item!(player, item)
+    if item&.unique_item? && params[:confirm_unique] != "1"
+      redirect_to game_path(panel: "item_shop", shop_menu: "sell", confirm_item_id: item.id),
+                  alert: "このアイテムは二度と手に入らないかもしれません。本当に売却しますか？"
+      return
+    end
+
+    result = ItemService.sell_item!(player, item, confirm_unique: params[:confirm_unique] == "1")
     redirect_to game_path(panel: "item_shop", shop_menu: "sell"), flash_for(result)
   end
 
-  def toggle_route_direction
+def discard_item
+  player = current_player
+  item = player.items.find_by(id: params[:item_id]) || player.items.find_by(name: params[:item_name])
+  unless item&.quantity.to_i.positive?
+    redirect_to game_path(panel: "items"), alert: "そのアイテムは所持していません。"
+    return
+  end
+  unless item.discardable_by_player?
+    redirect_to game_path(panel: "items"), alert: "そのアイテムは捨てられません。"
+    return
+  end
+
+  item.quantity -= 1
+  item.quantity.to_i <= 0 ? item.destroy! : item.save!
+  redirect_to game_path(panel: "items"), notice: "#{item.name}を1個捨てた。"
+end
+
+def discard_weapon
+  weapon = current_player.weapons.find_by(id: params[:weapon_id])
+  unless weapon&.discardable_by_player?
+    redirect_to game_path(panel: "equipment"), alert: "その武器は捨てられません。"
+    return
+  end
+
+  name = weapon.name
+  weapon.destroy!
+  redirect_to game_path(panel: "equipment"), notice: "#{name}を捨てた。"
+end
+
+def discard_armor
+  armor = current_player.armors.find_by(id: params[:armor_id])
+  unless armor&.discardable_by_player?
+    redirect_to game_path(panel: "equipment"), alert: "その防具は捨てられません。"
+    return
+  end
+
+  name = armor.name
+  armor.destroy!
+  redirect_to game_path(panel: "equipment"), notice: "#{name}を捨てた。"
+end
+
+def toggle_weapon_favorite
+  weapon = current_player.weapons.find_by(id: params[:weapon_id])
+  unless weapon
+    redirect_to game_path(panel: "equipment"), alert: "その武器は所持していません。"
+    return
+  end
+
+  weapon.update!(favorite: !weapon.favorite?)
+  redirect_to game_path(panel: "equipment"), notice: weapon.favorite? ? "#{weapon.name}をお気に入り登録した。" : "#{weapon.name}のお気に入りを解除した。"
+end
+
+def toggle_armor_favorite
+  armor = current_player.armors.find_by(id: params[:armor_id])
+  unless armor
+    redirect_to game_path(panel: "equipment"), alert: "その防具は所持していません。"
+    return
+  end
+
+  armor.update!(favorite: !armor.favorite?)
+  redirect_to game_path(panel: "equipment"), notice: armor.favorite? ? "#{armor.name}をお気に入り登録した。" : "#{armor.name}のお気に入りを解除した。"
+end
+
+def upgrade_weapon
+  weapon = current_player.weapons.find_by(id: params[:weapon_id])
+  result = WeaponUpgradeService.upgrade!(current_player, weapon)
+  redirect_to game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: weapon&.id), flash_for(result)
+end
+
+def evolve_weapon
+  weapon = current_player.weapons.find_by(id: params[:weapon_id])
+  rule = WeaponEvolutionRule.find_by(source_weapon_name: weapon&.name)
+  if !weapon || !rule
+    redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve"), alert: "進化できる武器ではありません。"
+    return
+  end
+  unless weapon.max_enhancement?
+    redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve", weapon_id: weapon.id), alert: "+10まで強化した武器のみ進化できます。"
+    return
+  end
+  if current_player.level.to_i < rule.required_player_level.to_i
+    redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve", weapon_id: weapon.id), alert: "鍛冶屋「お前にはまだ早い」"
+    return
+  end
+
+  weapon.update!(name: rule.target_weapon_name, enhancement_level: 0)
+  redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve"), notice: "#{rule.target_weapon_name}へ進化した。"
+end
+
+def set_home_base
+  location = current_player.location
+  unless location&.safe_area? && current_player.town_discovery_for&.found_inn?
+    redirect_to game_path(panel: "inn"), alert: "宿屋を見つけていません。"
+    return
+  end
+
+  PlayerBase.transaction do
+    current_player.player_bases.where(base_type: "home").update_all(active: false)
+    current_player.player_bases.find_or_create_by!(location: location, base_type: "home").update!(active: true, rent: location.name == "はじまりの街" ? 0 : 300, storage_limit: 30)
+  end
+  redirect_to game_path(panel: "inn"), notice: "#{location.name}を本拠点にした。"
+end
+
+def toggle_route_direction
+
     player = current_player
     progress = player.player_route_progresses.find(params[:progress_id])
 
@@ -543,7 +650,7 @@ def attack
     end
 
     player.col = player.col.to_i - price
-    player.current_time = (player.current_time.to_i + 20) % 1440
+    player.advance_time!(20)
     weapon.durability = weapon.max_durability
 
     ActiveRecord::Base.transaction do
@@ -587,6 +694,11 @@ def attack
       agility_bonus: weapon_definition.agility_bonus,
       critical_rate: weapon_definition.critical_rate,
       part_break_power: weapon_definition.part_break_power,
+      attack_attributes: weapon_definition.attack_attributes,
+      weight: weapon_definition.weight,
+      strength_ratio: weapon_definition.strength_ratio,
+      agility_ratio: weapon_definition.agility_ratio,
+      description: weapon_definition.description,
       equipped: false
     )
     player.save!
@@ -608,14 +720,19 @@ def attack
       return
     end
 
-    if weapon.starter_weapon?
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "sell"), alert: "スモールソードは売却できません。"
+    unless weapon.sellable_by_player?
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "sell"), alert: "装備中・お気に入り・保護対象の武器は売却できません。"
+      return
+    end
+    if weapon.unique_item? && params[:confirm_unique] != "1"
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "sell", confirm_weapon_id: weapon.id),
+                  alert: "この武器は二度と手に入らないかもしれません。本当に売却しますか？"
       return
     end
 
     price = weapon.sell_price
     player.col = player.col.to_i + price
-    player.current_time = (player.current_time.to_i + 10) % 1440
+    player.advance_time!(10)
 
     ActiveRecord::Base.transaction do
       weapon.destroy!
@@ -763,7 +880,7 @@ def attack
     current_player.rests.destroy_all
     player.col = player.col.to_i - cost
     player.hp = player.effective_max_hp
-    player.current_time = (player.current_time.to_i + 60) % 1440
+    player.advance_time!(60)
     player.save!
 
     payment_message = cost.positive? ? "#{cost}コル支払った。" : ""

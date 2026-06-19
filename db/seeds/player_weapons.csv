@@ -1,2 +1,2 @@
-﻿name,weapon_type,rarity,attack_power,durability,max_durability,hp_bonus,strength_bonus,agility_bonus,critical_rate,part_break_power,attack_attributes,enhancement_level,equipped
-スモールソード,片手直剣,common,6,1000,1000,0,1,0,5,100,斬撃,0,TRUE
+﻿name,weapon_type,rarity,attack_power,durability,max_durability,hp_bonus,strength_bonus,agility_bonus,critical_rate,part_break_power,attack_attributes,enhancement_level,weight,strength_ratio,agility_ratio,description,equipped
+スモールソード,片手直剣,common,6,1000,1000,0,1,0,5,100,斬撃,0,3.8,70,30,初心者用の片手直剣。壊れにくい。,TRUE
