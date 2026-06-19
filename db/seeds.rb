@@ -93,8 +93,10 @@ seed_rows("player_weapons.csv") do |row|
     strength_bonus: to_int(row["strength_bonus"]),
     agility_bonus: to_int(row["agility_bonus"]),
     critical_rate: to_int(row["critical_rate"]),
-    part_break_power: to_int(row["part_break_power"]) || 100,
-    equipped: to_bool(row["equipped"])
+part_break_power: to_int(row["part_break_power"]) || 100,
+attack_attributes: row["attack_attributes"].presence || "斬撃",
+enhancement_level: to_int(row["enhancement_level"]) || 0,
+equipped: to_bool(row["equipped"])
   )
 end
 
@@ -149,8 +151,9 @@ seed_rows("mob_parts.csv") do |row|
     max_durability: to_int(row["max_durability"]),
     break_effect: row["break_effect"].presence,
     drop_item_name: row["drop_item_name"].presence,
-    drop_rate: to_int(row["drop_rate"]) || 0
-  )
+drop_rate: to_int(row["drop_rate"]) || 0,
+  weak_attack_attribute: row["weak_attack_attribute"].presence
+)
 end
 
 seed_rows("mob_weapons.csv") do |row|
@@ -166,7 +169,57 @@ seed_rows("mob_weapons.csv") do |row|
     strength_bonus: to_int(row["strength_bonus"]),
     agility_bonus: to_int(row["agility_bonus"]),
     critical_rate: to_int(row["critical_rate"]),
-    part_break_power: to_int(row["part_break_power"]) || 100,
-    drop_rate: to_int(row["drop_rate"])
+part_break_power: to_int(row["part_break_power"]) || 100,
+attack_attributes: row["attack_attributes"].presence || "斬撃",
+enhancement_level: to_int(row["enhancement_level"]) || 0,
+drop_rate: to_int(row["drop_rate"])
+  )
+end
+
+seed_rows("boss_mobs.csv") do |row|
+  route = routes.fetch(row["route"])
+  area = row["field_area"].present? ? route.field_areas.find_by!(name: row["field_area"]) : nil
+  mob = Mob.find_or_create_by!(name: row["name"])
+  mob.update!(
+    hp: to_int(row["hp"]),
+    atk: to_int(row["atk"]),
+    rarity: row["rarity"],
+    level: to_int(row["level"]),
+    agility: to_int(row["agility"]),
+    durability: to_int(row["durability"]),
+    exp_reward: to_int(row["exp_reward"]),
+    col_min: to_int(row["col_min"]) || 1,
+    col_max: to_int(row["col_max"]) || 3,
+    route: route,
+    field_area: area,
+    boss_type: row["boss_type"],
+    reward_data: row["reward_data"].presence || "{}"
+  )
+end
+
+seed_rows("treasure_chests.csv") do |row|
+  route = routes.fetch(row["route"])
+  area = row["field_area"].present? ? route.field_areas.find_by!(name: row["field_area"]) : nil
+  chest = TreasureChest.find_or_initialize_by(route: route, name: row["name"])
+  chest.update!(
+    field_area: area,
+    position: to_int(row["position"]) || 0,
+    discovery_type: row["discovery_type"],
+    required_mapping: to_int(row["required_mapping"]) || 0,
+    reward_data: row["reward_data"].presence || "{}",
+respawnable: to_bool(row["respawnable"]),
+  hazard_type: row["hazard_type"].presence || "normal",
+  hazard_level: to_int(row["hazard_level"]) || 0
+)
+end
+
+seed_rows("weapon_evolution_rules.csv") do |row|
+  rule = WeaponEvolutionRule.find_or_initialize_by(source_weapon_name: row["source_weapon_name"], target_weapon_name: row["target_weapon_name"])
+  rule.update!(
+    required_enhancement_level: to_int(row["required_enhancement_level"]) || 10,
+    required_player_level: to_int(row["required_player_level"]) || 1,
+    required_floor: to_int(row["required_floor"]),
+    blacksmith_location_name: row["blacksmith_location_name"].presence,
+    required_materials_data: row["required_materials_data"].presence || "{}"
   )
 end

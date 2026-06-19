@@ -1,5 +1,13 @@
-class MobPart < ApplicationRecord
+﻿class MobPart < ApplicationRecord
   belongs_to :mob
+
+  def weak_attribute
+    AttackAttribute.normalize(weak_attack_attribute.presence || (weakness? ? "斬撃" : nil))
+  end
+
+  def weak_to_attribute?(attribute)
+    weak_attack_attribute.present? && weak_attribute == AttackAttribute.normalize(attribute)
+  end
 
   def severable?
     break_effect.in?(%w[strength_down agility_down])
@@ -15,3 +23,4 @@ class MobPart < ApplicationRecord
     end
   end
 end
+

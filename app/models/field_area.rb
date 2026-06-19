@@ -1,5 +1,7 @@
 class FieldArea < ApplicationRecord
   belongs_to :route
+  has_many :treasure_chests, dependent: :destroy
+  has_many :boss_mobs, class_name: "Mob", dependent: :nullify
   has_many :player_field_area_progresses, dependent: :destroy
 
   scope :ordered, -> { order(:start_distance, :end_distance) }

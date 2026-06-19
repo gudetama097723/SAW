@@ -1,4 +1,5 @@
-class Weapon < ApplicationRecord
+﻿class Weapon < ApplicationRecord
+  MAX_ENHANCEMENT_LEVEL = 10
   belongs_to :player, optional: true
   belongs_to :mob, optional: true
 
@@ -30,6 +31,40 @@ class Weapon < ApplicationRecord
     [(base * durability_rate * rarity_cost_multiplier / 2.0).floor, 1].max
   end
 
+  def attack_attribute_list
+    attack_attributes.to_s.split(/[|,、]/).map { |attribute| AttackAttribute.normalize(attribute) }.presence || ["斬撃"]
+  end
+
+  def primary_attack_attribute
+    attack_attribute_list.first
+  end
+
+  def matches_attack_attribute?(attribute)
+    attack_attribute_list.include?(AttackAttribute.normalize(attribute))
+  end
+
+  def enhancement_level=(value)
+    super(value.to_i.clamp(0, MAX_ENHANCEMENT_LEVEL))
+  end
+
+  def effective_attack_power
+    attack_power.to_i + enhancement_attack_bonus
+  end
+
+  def enhancement_attack_bonus
+    (attack_power.to_i * enhancement_level.to_i * 0.06).floor
+  end
+
+  def max_enhancement?
+    enhancement_level.to_i >= MAX_ENHANCEMENT_LEVEL
+  end
+
+  def enhancement_requirements
+    JSON.parse(enhancement_data.presence || "{}")
+  rescue JSON::ParserError
+    {}
+  end
+
   def effective_critical_rate
     [[critical_rate.to_i, 0].max, 100].min
   end
@@ -48,3 +83,4 @@ class Weapon < ApplicationRecord
     }.fetch(rarity, 2)
   end
 end
+

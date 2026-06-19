@@ -1,0 +1,5 @@
+﻿source_weapon_name,target_weapon_name,required_enhancement_level,required_player_level,required_floor,blacksmith_location_name,required_materials_data
+スモールソード,スモールソード改,10,5,1,ホルンカの村,"{""items"":{""スライムの核"":3}}"
+ブロンズソード,アイアンショートソード,10,8,1,ホルンカの村,"{""items"":{""硬い甲殻"":2,""コボルドの牙"":2}}"
+ブロンズレイピア,スティンガーレイピア,10,8,1,ホルンカの村,"{""items"":{""薄羽蜂の針"":3,""ホーンラビットの角"":1}}"
+ウッドメイス,クラブハンマー,10,7,1,ホルンカの村,"{""items"":{""蟹の脚殻"":3,""小さな魔石"":1}}"

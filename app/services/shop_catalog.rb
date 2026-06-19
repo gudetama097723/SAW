@@ -14,6 +14,8 @@ class ShopCatalog
     :agility_bonus,
     :critical_rate,
     :part_break_power,
+    :attack_attributes,
+    :enhancement_level,
     keyword_init: true
   )
 
@@ -73,8 +75,10 @@ class ShopCatalog
         strength_bonus: row["strength_bonus"].to_i,
         agility_bonus: row["agility_bonus"].to_i,
         critical_rate: row["critical_rate"].to_i,
-        part_break_power: row["part_break_power"].presence&.to_i || 100
-      )
+part_break_power: row["part_break_power"].presence&.to_i || 100,
+  attack_attributes: row["attack_attributes"].presence || "斬撃",
+  enhancement_level: row["enhancement_level"].presence&.to_i || 0
+)
     end
   end
 end

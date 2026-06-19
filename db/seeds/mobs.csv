@@ -3,3 +3,7 @@ name,hp,atk,rarity,level,agility,durability,exp_reward,col_min,col_max
 ホーンラビット,15,5,normal,1,4,2,12,2,6
 変異スライム,30,10,rare,2,2,4,25,6,15
 コボルド歩哨,24,8,normal,2,3,3,18,4,10
+ロッククラブ,34,9,normal,2,1,8,22,5,12
+フォレストワスプ,18,7,normal,2,8,2,20,4,9
+ワイルドボア,42,12,normal,3,4,6,32,8,18
+コボルド斥候,36,11,rare,3,6,5,40,10,24

@@ -1,4 +1,4 @@
-class BattleService
+﻿class BattleService
   Result = Struct.new(:status, :message, keyword_init: true)
 
   def self.ensure_mob_parts!(mob)
@@ -9,7 +9,7 @@ class BattleService
     mob.mob_parts.to_a
   end
 
-  def self.resolve_player_attack!(battle:, player:, mob_part_id:, target_enemy_id: nil, group_start: nil, label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:, area: false)
+  def self.resolve_player_attack!(battle:, player:, mob_part_id:, target_enemy_id: nil, group_start: nil, label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:, area: false, attack_attribute: nil, skill_key: nil)
     return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
 
     weapon = player.equipped_weapon
@@ -32,7 +32,8 @@ class BattleService
           weapon: weapon,
           battle_enemy: battle_enemy,
           mob_part_id: (alive_targets.one? ? mob_part_id : nil),
-          damage_multiplier: per_target_multiplier
+          damage_multiplier: per_target_multiplier,
+          attack_attribute: attack_attribute_for(weapon, attack_attribute, sword_skill)
         )
         hit_messages << hit_message(index, hits, result)
       end
@@ -43,10 +44,10 @@ class BattleService
     weapon&.apply_durability_loss!(durability_cost)
 
     if battle.alive_enemies.reload.empty?
-      return finish_battle_victory!(player, battle, weapon, label, hit_messages.join(" / "), skill_gain, sword_skill)
+      return finish_battle_victory!(player, battle, weapon, label, hit_messages.join(" / "), skill_gain, sword_skill, skill_key)
     end
 
-    skill_message = sword_skill ? gain_weapon_skill!(player, weapon, skill_gain) : ""
+    skill_message = sword_skill ? gain_sword_skill_use!(player, weapon, skill_key, skill_gain) : ""
 
     player.save!
     battle.save!
@@ -154,7 +155,7 @@ class BattleService
     end
   end
 
-  def self.resolve_hit!(player:, weapon:, battle_enemy:, mob_part_id:, damage_multiplier:)
+  def self.resolve_hit!(player:, weapon:, battle_enemy:, mob_part_id:, damage_multiplier:, attack_attribute:)
     parts = ensure_mob_parts!(battle_enemy.mob)
     ensure_part_states!(battle_enemy, parts)
     target_part = if mob_part_id.present?
@@ -172,7 +173,7 @@ class BattleService
       return "#{battle_enemy.mob.name}: #{guard_result[:message]}ミス"
     end
 
-    base_hit_damage = (calculate_player_damage(player, weapon, battle_enemy, actual_part) * damage_multiplier / 100.0).ceil
+    base_hit_damage = (calculate_player_damage(player, weapon, battle_enemy, actual_part, attack_attribute) * damage_multiplier / 100.0).ceil
     varied_damage = apply_player_damage_variance(base_hit_damage)
     part_damage = calculate_part_damage(varied_damage, weapon, actual_part)
     critical = critical_hit?(player, weapon, battle_enemy, actual_part, part_damage)
@@ -201,13 +202,37 @@ class BattleService
     (damage_multiplier * reduction).ceil
   end
 
-  def self.calculate_player_damage(player, weapon, battle_enemy, part)
-    weapon_power = weapon&.attack_power.to_i
-    attack_power = (player.effective_strength * 0.7) + (weapon_power * 1.3)
-    defense_rate = 100.0 / (100 + [battle_enemy.effective_durability, 0].max)
-    base_damage = attack_power * defense_rate
-    [(base_damage * part.damage_multiplier.to_i / 100.0).ceil, 1].max
-  end
+def self.calculate_player_damage(player, weapon, battle_enemy, part, attack_attribute)
+  weapon_power = weapon&.effective_attack_power.to_i
+  attack_power = (player.effective_strength * 0.7) + (weapon_power * 1.3)
+  attack_power *= attribute_multiplier(weapon, battle_enemy.mob, part, attack_attribute)
+  attack_power *= weapon_proficiency_attack_bonus(player, weapon)
+  defense_rate = 100.0 / (100 + [battle_enemy.effective_durability, 0].max)
+  base_damage = attack_power * defense_rate
+  [(base_damage * part.damage_multiplier.to_i / 100.0).ceil, 1].max
+end
+
+def self.attribute_multiplier(weapon, mob, part, attack_attribute)
+  attribute = AttackAttribute.normalize(attack_attribute)
+  multiplier = 1.0
+  multiplier *= 1.2 if weapon&.matches_attack_attribute?(attribute)
+  multiplier *= 1.5 if mob&.weak_to_attribute?(attribute)
+  multiplier *= 1.5 if part&.weak_to_attribute?(attribute)
+  multiplier
+end
+
+def self.attack_attribute_for(weapon, attack_attribute, sword_skill)
+  return AttackAttribute.normalize(attack_attribute) if attack_attribute.present?
+
+  sword_skill ? weapon&.primary_attack_attribute || "斬撃" : weapon&.primary_attack_attribute || "斬撃"
+end
+
+def self.weapon_proficiency_attack_bonus(player, weapon)
+  return 1.0 unless weapon
+
+  skill = player.skills.find_by(name: weapon_skill_name(weapon))
+  1.0 + (skill&.proficiency.to_i / 1000.0 * 0.15)
+end
 
   def self.player_attack_hit?(player, battle_enemy, part)
     agility_gap = player.effective_agility - mob_effective_agility(battle_enemy)
@@ -220,7 +245,7 @@ class BattleService
     rand(100) < chance
   end
 
-  def self.finish_battle_victory!(player, battle, weapon, label, damage_message, skill_gain, sword_skill)
+  def self.finish_battle_victory!(player, battle, weapon, label, damage_message, skill_gain, sword_skill, skill_key)
     defeated_enemies = battle.battle_enemies.includes(:mob).to_a
     col_reward = defeated_enemies.sum(&:col_reward)
     player.col = player.col.to_i + col_reward
@@ -228,13 +253,14 @@ class BattleService
     dropped_weapon_message = defeated_enemies.map { |enemy| try_drop_weapon!(player, enemy.mob) }.join
     dropped_item_message = defeat_drop_message!(player, defeated_enemies)
     broken_part_drop_message = broken_part_drop_message!(player, defeated_enemies)
+    boss_reward_message = defeated_enemies.map { |enemy| ExplorationRewardService.boss_victory_message!(player, enemy.mob) }.join
     exp_message = gain_exp_message(player, defeated_enemies)
-    skill_message = gain_weapon_skill_for_victory!(player, weapon, defeated_enemies.count, skill_gain, sword_skill)
+    skill_message = gain_weapon_skill_for_victory!(player, weapon, defeated_enemies.count, skill_gain, sword_skill, skill_key)
     battle.destroy!
 
     broken_message = destroy_weapon_if_broken!(weapon)
     victory_message = defeated_enemies.many? ? "敵を全て倒した！" : ""
-    Result.new(status: :ok, message: "#{label}！#{damage_message}！#{victory_message}#{col_reward}コル獲得！#{exp_message}#{dropped_item_message}#{broken_part_drop_message}#{dropped_weapon_message}#{broken_message}#{skill_message}")
+    Result.new(status: :ok, message: "#{label}！#{damage_message}！#{victory_message}#{col_reward}コル獲得！#{exp_message}#{boss_reward_message}#{dropped_item_message}#{broken_part_drop_message}#{dropped_weapon_message}#{broken_message}#{skill_message}")
   end
 
   def self.hit_message(index, hits, message)
@@ -394,17 +420,34 @@ class BattleService
     [(battle_enemy.effective_exp_reward * multiplier).round, 1].max
   end
 
-  def self.gain_weapon_skill_for_victory!(player, weapon, defeated_count, use_exp, sword_skill)
-    return "" unless weapon
+def self.gain_weapon_skill_for_victory!(player, weapon, defeated_count, use_exp, sword_skill, skill_key)
+  return "" unless weapon
 
-    growth = SkillGrowthCatalog.find(weapon_skill_name(weapon))
-    amount = growth.kill_exp.to_i * defeated_count.to_i
-    amount += use_exp.to_i if sword_skill
-    amount += growth.sword_skill_kill_bonus.to_i * defeated_count.to_i if sword_skill
-    gain_weapon_skill!(player, weapon, amount)
+  growth = SkillGrowthCatalog.find(weapon_skill_name(weapon))
+  amount = growth.kill_exp.to_i * defeated_count.to_i
+  amount += use_exp.to_i if sword_skill
+  amount += growth.sword_skill_kill_bonus.to_i * defeated_count.to_i if sword_skill
+  message = gain_weapon_skill!(player, weapon, amount)
+  message += gain_sword_skill_use!(player, weapon, skill_key, use_exp.to_i) if sword_skill
+  message
+end
+
+def self.gain_sword_skill_use!(player, weapon, skill_key, amount)
+  return "" unless weapon && skill_key.present? && amount.to_i.positive?
+
+  skill = player.skills.find_or_create_by!(name: weapon_skill_name(weapon)) do |new_skill|
+    new_skill.proficiency = 0
+    new_skill.skill_exp = 0 if new_skill.has_attribute?(:skill_exp)
+    new_skill.skill_category = "weapon" if new_skill.has_attribute?(:skill_category)
+    new_skill.weapon_skill = true if new_skill.has_attribute?(:weapon_skill)
   end
+  before_level = skill.sword_skill_level(skill_key)
+  after_level = skill.gain_sword_skill_exp!(skill_key, amount)
+  after_level > before_level ? " #{SkillCatalog.find(skill_key).name} Lv.#{after_level}に上昇した！" : ""
+end
 
-  def self.gain_weapon_skill!(player, weapon, amount)
+def self.gain_weapon_skill!(player, weapon, amount)
+
     return "" unless weapon
     return "" if amount.to_i <= 0
 
@@ -413,6 +456,8 @@ class BattleService
     skill = player.skills.find_or_create_by!(name: skill_name) do |new_skill|
       new_skill.proficiency = 0
       new_skill.skill_exp = 0 if new_skill.has_attribute?(:skill_exp)
+      new_skill.skill_category = "weapon" if new_skill.has_attribute?(:skill_category)
+      new_skill.weapon_skill = true if new_skill.has_attribute?(:weapon_skill)
     end
     before = skill.proficiency.to_i
     awarded_capstone_slot = skill.gain_skill_exp!(amount, growth_scale: growth.growth_scale)

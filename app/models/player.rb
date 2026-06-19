@@ -34,6 +34,8 @@ class Player < ApplicationRecord
   belongs_to :field_route, class_name: "Route", optional: true
   has_many :player_field_area_progresses, dependent: :destroy
   has_many :field_areas, through: :player_field_area_progresses
+  has_many :player_treasure_chests, dependent: :destroy
+  has_many :player_boss_kills, dependent: :destroy
   
   def equipped_weapons
     weapons.where(equipped: true)
@@ -64,6 +66,46 @@ class Player < ApplicationRecord
   def effective_max_hp
     max_hp_before_armor_hp_bonus + armor_hp_bonus
   end
+
+def status_value_data
+  JSON.parse(status_values.presence || "{}")
+rescue JSON::ParserError
+  {}
+end
+
+def injury_state_data
+  JSON.parse(injury_states.presence || "{}")
+rescue JSON::ParserError
+  {}
+end
+
+def skill_counter_data
+  JSON.parse(skill_counters.presence || "{}")
+rescue JSON::ParserError
+  {}
+end
+
+def skill_counter(key)
+  skill_counter_data[key.to_s].to_i
+end
+
+def increment_skill_counter!(key, amount = 1)
+  data = skill_counter_data
+  data[key.to_s] = data[key.to_s].to_i + amount.to_i
+  update!(skill_counters: data.to_json)
+end
+
+def injury_severity
+  rate = hp.to_i.to_f / [effective_max_hp, 1].max
+  return "severe" if rate < 0.30
+  return "minor" if rate < 0.70
+
+  "none"
+end
+
+def injured?
+  injury_severity != "none"
+end
 
   def effective_strength
     strength.to_i + weapon_strength_bonus + armor_strength_bonus
