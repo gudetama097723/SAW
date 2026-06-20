@@ -1,0 +1,14 @@
+          <% elsif @rest.present? %>
+            <div class="card bg-info text-dark mb-3">
+              <div class="card-header">休憩中</div>
+              <div class="card-body">
+                <p>安全を確保して休憩している。</p>
+
+                <% if @player.skills.exists?(name: "昼寝") %>
+                  <%= button_to "昼寝する", use_rest_skill_path, method: :post, class: "btn btn-success w-100 mb-2" %>
+                <% end %>
+
+                <%= button_to "ポーションを使う", use_rest_item_path, method: :post, class: "btn btn-outline-success w-100 mb-2" %>
+                <%= button_to "休憩を終える", end_rest_path, method: :post, class: "btn btn-outline-dark w-100" %>
+              </div>
+            </div>

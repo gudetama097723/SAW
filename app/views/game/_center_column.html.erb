@@ -1,0 +1,12 @@
+        <div class="col-md-4">
+          <div class="card bg-secondary text-light mb-3">
+            <div class="card-header"><%= @battle.present? ? "戦闘コマンド" : "情報" %></div>
+            <div class="card-body">
+              <% if @battle.present? %>
+                <%= render "battle_commands", equipped_weapon: equipped_weapon %>
+              <% else %>
+                <%= render "info_panel", selected_panel: selected_panel, equipped_weapons: equipped_weapons %>
+              <% end %>
+            </div>
+          </div>
+        </div>

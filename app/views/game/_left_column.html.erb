@@ -1,0 +1,60 @@
+        <div class="col-md-4">
+          <div class="card bg-secondary text-light mb-3">
+            <div class="card-header">ステータス</div>
+            <div class="card-body">
+              <div class="d-flex gap-3 align-items-center">
+                <p>名前: <%= @player.name %></p>
+                <p>Lv: <%= @player.level.to_i %></p>
+                <% if @player.home_base %>
+                  <p class="ms-auto">本拠点: <%= @player.home_base.location.name %></p>
+                <% end %>
+              </div>
+              <p>HP: <%= @player.hp %> / <%= @player.effective_max_hp %></p>
+              <div class="progress mb-2">
+                <div class="progress-bar bg-success" style="width: <%= [[@player.hp.to_i * 100 / [@player.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
+              </div>
+              <p>経験値: <%= @player.exp.to_i %> / <%= @player.exp_to_next_level %></p>
+              <div class="progress mb-2" style="height: 6px;">
+                <div class="progress-bar bg-info" style="width: <%= [[@player.exp.to_i * 100 / [@player.exp_to_next_level, 1].max, 0].max, 100].min %>%"></div>
+              </div>
+              <% if equipped_weapons.any? %>
+                <% equipped_weapons.each do |weapon| %>
+                  <p class="mb-1"><%= weapon.display_name %> 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                <% end %>
+              <% end %>
+              <p>スキルスロット: <%= @player.used_skill_slots %> / <%= @player.skill_slots.to_i %></p>
+              <p>コル: <%= @player.col %></p>
+              <p>所持重量: <%= number_with_precision(@player.carry_weight, precision: 1) %> / <%= number_with_precision(@player.max_carry_weight, precision: 1) %></p>
+              <% if @player.overweight? %>
+                <p class="text-warning mb-0">重量オーバー：移動速度と回避率が低下しています</p>
+              <% end %>
+            </div>
+          </div>
+
+          <div class="card bg-secondary text-light mb-3">
+            <div class="card-header">情報コマンド</div>
+            <div class="card-body d-grid gap-2">
+              <% if selected_panel == "equipment" %>
+                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+              <% else %>
+                <%= link_to "装備", game_path(panel: "equipment"), class: "btn btn-outline-light w-100" %>
+              <% end %>
+
+              <% if selected_panel == "items" %>
+                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+              <% else %>
+                <%= link_to "所持品", game_path(panel: "items"), class: "btn btn-outline-light w-100" %>
+              <% end %>
+              <% if selected_panel == "skills" %>
+                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+              <% else %>
+                <%= link_to "スキル", game_path(panel: "skills"), class: "btn btn-outline-light w-100" %>
+              <% end %>
+              <% if selected_panel == "growth" %>
+                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+              <% else %>
+              <%= link_to "ステータス", game_path(panel: "growth"), class: @player.stat_points.to_i.positive? ? "btn btn-warning w-100" : "btn btn-outline-light w-100" %>
+              <% end %>
+            </div>
+          </div>
+        </div>

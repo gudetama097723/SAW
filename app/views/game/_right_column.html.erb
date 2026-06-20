@@ -1,0 +1,9 @@
+        <div class="col-md-4">
+          <% if @battle.present? %>
+            <%= render "enemy_panel" %>
+          <% elsif @rest.present? %>
+            <%= render "rest_panel" %>
+          <% else %>
+            <%= render "world_panel", selected_panel: selected_panel, equipped_weapon: equipped_weapon %>
+          <% end %>
+        </div>

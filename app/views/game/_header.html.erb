@@ -1,0 +1,23 @@
+    <div class="card-header text-center">
+      <h1 class="mb-0">Sword Art World</h1>
+      <div class="d-flex align-items-start gap-4">
+        <div><h2>第1層</h2></div>
+        <div>
+          <div>フィールド名: <%= @player.field_route ? "#{@player.field_route.name}（移動中）" : (@player.location&.name || "不明") %></div>
+          <% if @current_field_area %>
+            <div class="small text-light">全体踏破度 <%= @player.field_route_mapping_progress %>%</div>
+          <% end %>
+        </div>
+        <% if @player.field_route.present? %>
+          <div>
+            <div>現在地: <%= @current_field_area&.name || "不明" %></div>
+            <div class="small text-light">
+              エリア踏破度 <%= @current_field_area_progress&.mapping_progress.to_i %>%
+            </div>
+          </div>
+        <% end %>
+
+        <div class="ms-auto"><%= @player.formatted_datetime %></div>
+
+      </div>
+    </div>

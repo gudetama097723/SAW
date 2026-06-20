@@ -1,0 +1,11 @@
+      <div class="message-window mb-3 p-0 text-start overflow-auto" style="min-height: 6rem; max-height: 10rem;">
+        <% message_text = alert.presence || notice.presence %>
+        <% message_class = alert.present? ? "text-warning" : "text-success" %>
+        <div class="message-line <%= message_text.present? ? "" : "text-secondary" %>" style="line-height: 1.35;">
+          <% if message_text.present? %>
+            <% message_text.to_s.split(/(\[enemy\].*?\[\/enemy\]|\[mapping\].*?\[\/mapping\])/m).each do |segment| %><% if segment.start_with?("[enemy]") %><span class="text-danger"><%= segment.delete_prefix("[enemy]").delete_suffix("[/enemy]") %></span><% elsif segment.start_with?("[mapping]") %><span class="text-info"><%= segment.delete_prefix("[mapping]").delete_suffix("[/mapping]") %></span><% else %><span class="<%= message_class %>"><%= segment %></span><% end %><% end %>
+          <% else %>
+            メッセージはありません。
+          <% end %>
+        </div>
+      </div>

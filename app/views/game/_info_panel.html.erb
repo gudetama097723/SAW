@@ -1,0 +1,197 @@
+              <% if selected_panel == "equipment" %>
+                <h5>装備</h5>
+                <% if equipped_weapons.any? %>
+                  <% equipped_weapons.each do |weapon| %>
+                    <div class="border rounded p-2 mb-2">
+                      <p class="mb-1">武器: <%= weapon.display_name %></p>
+                      <p class="mb-1">種別: <%= weapon.weapon_type %></p>
+                      <p class="mb-1">攻撃力: <%= weapon.attack_power %></p>
+                      <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
+                      <p class="mb-1">耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                      <% if weapon.effective_part_break_power > 100 %>
+                        <p class="mb-1">特性: 部位破壊率が高い</p>
+                      <% end %>
+                      <p class="mb-0">補正: HP +<%= weapon.hp_bonus %> / 筋力 +<%= weapon.strength_bonus %> / 敏捷 +<%= weapon.agility_bonus %></p>
+                      <%= button_to "取り外す", unequip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
+                    </div>
+                  <% end %>
+                  <p>武器枠: <%= equipped_weapons.count %> / <%= @player.dual_wield? ? 2 : 1 %></p>
+                <% else %>
+                  <p class="mb-0">装備中の武器なし</p>
+                <% end %>
+
+                <h5 class="mt-3">装備中の防具</h5>
+                <p>装備重量: <%= @player.equipment_weight %> / 重量ペナルティ: <%= @player.equipment_weight_penalty %></p>
+                <p>防御: <%= @player.damage_cut %></p>
+                <% Armor::EQUIPPABLE_SLOTS.each do |slot| %>
+                  <% armor = @player.armor_for(slot) %>
+                  <p class="mb-1"><%= Armor.slot_name(slot) %>: <%= armor ? armor.name : "未装備" %></p>
+                <% end %>
+              <% elsif selected_panel == "items" %>
+                <% item_category = params[:item_category].presence %>
+                <h5>所持品</h5>
+                <div class="d-grid gap-2 mb-3">
+                  <%= link_to "所持武器", game_path(panel: "items", item_category: "weapons"), class: "btn btn-outline-light w-100" %>
+                  <%= link_to "所持防具", game_path(panel: "items", item_category: "armors"), class: "btn btn-outline-light w-100" %>
+                  <%= link_to "回復アイテム", game_path(panel: "items", item_category: "healing"), class: "btn btn-outline-light w-100" %>
+                  <%= link_to "採取アイテム", game_path(panel: "items", item_category: "gathered"), class: "btn btn-outline-light w-100" %>
+                  <%= link_to "ドロップアイテム", game_path(panel: "items", item_category: "drop"), class: "btn btn-outline-light w-100" %>
+                </div>
+
+
+
+              <% elsif selected_panel == "skills" %>
+                <% selected_skill_set = params[:skill_set].presence %>
+                <% selected_sword_skill = params[:sword_skill].presence %>
+                <h5>スキル</h5>
+                <p>スキルスロット: <%= @player.used_skill_slots %> / <%= @player.skill_slots.to_i %>（空き <%= @player.remaining_skill_slots %>）</p>
+                <% @player.skills.each do |skill| %>
+                  <%= link_to "#{skill.name}: #{skill.proficiency.to_i}/1000", game_path(panel: "skills", skill_set: skill.name), class: "btn btn-outline-light w-100 mb-2" %>
+                  <div class="progress mb-3">
+                    <div class="progress-bar" style="width: <%= skill.proficiency.to_i / 10 %>%"></div>
+                  </div>
+                <% end %>
+                <% if selected_skill_set == "片手剣" %>
+                  <% sword_skill = @player.skills.find_by(name: "片手剣") %>
+                  <% sword_skill_level = (sword_skill&.proficiency || 0).to_i %>
+                  <h5 class="mt-3">片手直剣ソードスキル</h5>
+                  <% SkillCatalog.sword_skills.select { |skill_definition| skill_definition.unlocked?(sword_skill_level) }.each do |skill_definition| %>
+                    <%= link_to "#{skill_definition.name} / 倍率#{skill_definition.damage_multiplier}%#{skill_definition.hits > 1 ? "×#{skill_definition.hits}" : ""} / #{skill_definition.target_label}",
+                        game_path(panel: "skills", skill_set: "片手剣", sword_skill: skill_definition.key),
+                        class: "btn btn-outline-light w-100 mb-2" %>
+                  <% end %>
+
+                  <% if selected_sword_skill.present? %>
+                    <% detail_skill = SkillCatalog.find(selected_sword_skill) %>
+                    <% if detail_skill&.unlocked?(sword_skill_level) %>
+                      <div class="border rounded p-2 mt-3">
+                        <p class="mb-1"><%= detail_skill.name %></p>
+                        <p class="mb-1">必要熟練度: <%= detail_skill.required_proficiency %></p>
+                        <p class="mb-1">攻撃倍率: <%= detail_skill.damage_multiplier %>%<%= detail_skill.hits > 1 ? " × #{detail_skill.hits}撃" : "" %></p>
+                        <p class="mb-1">種別: <%= detail_skill.target_label %></p>
+                        <p class="mb-0"><%= detail_skill.description %></p>
+                      </div>
+                    <% end %>
+                  <% end %>
+                <% end %>
+              <% elsif selected_panel == "growth" %>
+                <h5>成長</h5>
+                <h6>装備込みステータス</h6>
+                <p>レベル: <%= @player.level.to_i %></p>
+                <p>HP: <%= @player.hp.to_i %> / <%= @player.effective_max_hp %>（基礎最大 <%= @player.max_hp.to_i %> / 筋力 +<%= @player.strength_hp_bonus %> / 武器 +<%= @player.weapon_hp_bonus %> / 防具 +<%= @player.armor_hp_bonus %>（<%= @player.armor_hp_bonus_percent %>%））</p>
+                <p>筋力: <%= @player.effective_strength %>（基礎 <%= @player.strength.to_i %> / 武器 +<%= @player.weapon_strength_bonus %> / 防具 +<%= @player.armor_strength_bonus %>）</p>
+                <p>敏捷: <%= @player.effective_agility %>（基礎 <%= @player.agility.to_i %> / 武器 +<%= @player.weapon_agility_bonus %> / 防具 +<%= @player.armor_agility_bonus %> / 重量 -<%= @player.equipment_weight_penalty %>）</p>
+                <p>防御: <%= @player.damage_cut %></p>
+                <p>装備重量: <%= @player.equipment_weight %></p>
+                <p>経験値: <%= @player.exp.to_i %> / <%= @player.exp_to_next_level %></p>
+                <p>スキルスロット: <%= @player.used_skill_slots %> / <%= @player.skill_slots.to_i %>（空き <%= @player.remaining_skill_slots %>）</p>
+                <h6 class="mt-3">ポイント振り分け</h6>
+                <p>振り分け: <%= @player.stat_points.to_i %> pt</p>
+                <% if @player.stat_points.to_i > 0 %>
+                  <% allocatable_points = [@player.stat_points.to_i, 3].min %>
+                  <% strength_points = [[params[:strength_points].to_i, 0].max, allocatable_points].min %>
+                  <% agility_points = [[params[:agility_points].to_i, 0].max, allocatable_points - strength_points].min %>
+                  <% before_hp = @player.effective_max_hp %>
+                  <% before_strength = @player.effective_strength %>
+                  <% before_agility = @player.effective_agility %>
+                  <% original_strength = @player.strength.to_i %>
+                  <% original_agility = @player.agility.to_i %>
+                  <% @player.strength = original_strength + strength_points %>
+                  <% @player.agility = original_agility + agility_points %>
+                  <% after_hp = @player.effective_max_hp %>
+                  <% after_strength = @player.effective_strength %>
+                  <% after_agility = @player.effective_agility %>
+                  <% @player.strength = original_strength %>
+                  <% @player.agility = original_agility %>
+                  <div class="border border-warning rounded p-2 mb-2">
+                    <p class="mb-1">最大<%= allocatable_points %>ポイントをまとめて振り分けます。</p>
+                    <p class="mb-2">残り: <%= allocatable_points - strength_points - agility_points %> pt</p>
+                    <div class="d-grid gap-2 mb-2">
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="flex-fill">筋力 +<%= strength_points %></span>
+                        <%= link_to "－", game_path(panel: "growth", strength_points: [strength_points - 1, 0].max, agility_points: agility_points), class: "btn btn-outline-light btn-sm" %>
+                        <% next_strength = strength_points + agility_points < allocatable_points ? strength_points + 1 : strength_points %>
+                        <%= link_to "＋", game_path(panel: "growth", strength_points: next_strength, agility_points: agility_points), class: "btn btn-outline-warning btn-sm" %>
+                      </div>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="flex-fill">敏捷 +<%= agility_points %></span>
+                        <%= link_to "－", game_path(panel: "growth", strength_points: strength_points, agility_points: [agility_points - 1, 0].max), class: "btn btn-outline-light btn-sm" %>
+                        <% next_agility = strength_points + agility_points < allocatable_points ? agility_points + 1 : agility_points %>
+                        <%= link_to "＋", game_path(panel: "growth", strength_points: strength_points, agility_points: next_agility), class: "btn btn-outline-warning btn-sm" %>
+                      </div>
+                    </div>
+                    <%= form_with url: allocate_stats_path, method: :post, class: "d-grid gap-2" do %>
+                      <%= hidden_field_tag :strength_points, strength_points %>
+                      <%= hidden_field_tag :agility_points, agility_points %>
+                      <p class="mb-1">最大HP: <%= before_hp %> → <%= after_hp %>（+<%= after_hp - before_hp %>）</p>
+                      <p class="mb-1">筋力: <%= before_strength %> → <%= after_strength %></p>
+                      <p class="mb-1">敏捷: <%= before_agility %> → <%= after_agility %></p>
+                      <% unless @player.skip_stat_allocate_confirm? %>
+                        <p class="mb-1 text-warning">本当に振り分けますか？ 振り直しはできません。</p>
+                        <label class="small">
+                          <%= check_box_tag :skip_confirm, "1", false %>
+                          以降このメッセージを表示しない
+                        </label>
+                      <% end %>
+                      <%= submit_tag "この配分で確定する", class: "btn btn-warning w-100", disabled: (strength_points + agility_points != allocatable_points) %>
+                    <% end %>
+                  </div>
+                <% end %>
+                <% learnable_skills = SkillUnlockService.available_for(@player) %>
+                <% if learnable_skills.any? %>
+                  <h6 class="mt-3">習得可能スキル</h6>
+                  <div class="d-grid gap-2">
+                    <% learnable_skills.each do |skill_definition| %>
+                      <div class="border rounded p-2">
+                        <p class="mb-2"><%= skill_definition.name %></p>
+                        <%= button_to "習得する", learn_skill_path(skill_name: skill_definition.name), method: :post, class: "btn btn-outline-info w-100" %>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+              <% elsif selected_panel == "inn" %>
+                <h5>宿屋</h5>
+
+                <% unless @player.town_discovery_for&.found_inn? %>
+                  <p class="mb-0">宿屋はまだ見つけていません。</p>
+                <% else %>
+                  <div class="d-grid gap-2">
+                    <%= link_to "休憩", game_path(panel: "inn", inn_menu: "rest"), class: "btn btn-outline-success w-100" %>
+                    <%= link_to "本拠点", game_path(panel: "inn", inn_menu: "base"), class: "btn btn-outline-info w-100" %>
+                    <%= link_to "所持金管理", game_path(panel: "inn", inn_menu: "col"), class: "btn btn-outline-warning w-100" %>
+                    <%= link_to "アイテム収納", game_path(panel: "inn", inn_menu: "storage"), class: "btn btn-outline-light w-100" %>
+                    <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
+                  </div>
+                <% end %>
+              <% elsif selected_panel == "item_shop" %>
+                <% shop_menu = params[:shop_menu].presence %>
+                <h5>道具屋</h5>
+                <% unless @player.town_discovery_for&.found_item_shop? %>
+                  <p class="mb-0">道具屋はまだ見つけていません。</p>
+                <% else %>
+                  <div class="d-grid gap-2 mb-3">
+                    <%= link_to "道具を購入", game_path(panel: "item_shop", shop_menu: "buy"), class: "btn btn-outline-warning w-100" %>
+                    <%= link_to "道具を生産", game_path(panel: "item_shop", shop_menu: "produce"), class: "btn btn-outline-warning w-100" %>
+                    <%= link_to "アイテムを売却", game_path(panel: "item_shop", shop_menu: "sell"), class: "btn btn-outline-warning w-100" %>
+                    <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
+                  </div>
+                <% end %>
+              <% elsif selected_panel == "blacksmith" %>
+                <% blacksmith_menu = params[:blacksmith_menu].presence %>
+                <h5>鍛冶屋</h5>
+                <% unless @player.town_discovery_for&.found_blacksmith? %>
+                  <p class="mb-0">鍛冶屋はまだ見つけていません。</p>
+                <% else %>
+                  <div class="d-grid gap-2 mb-3">
+                    <%= link_to "武器を購入する", game_path(panel: "blacksmith", blacksmith_menu: "buy"), class: "btn btn-outline-warning w-100" %>
+                    <%= link_to "武器を整備する", game_path(panel: "blacksmith", blacksmith_menu: "repair"), class: "btn btn-outline-warning w-100" %>
+                    <%= link_to "武器を強化する", game_path(panel: "blacksmith", blacksmith_menu: "upgrade"), class: "btn btn-outline-warning w-100" %>
+                    <%= link_to "武器を進化する", game_path(panel: "blacksmith", blacksmith_menu: "evolve"), class: "btn btn-outline-warning w-100" %>
+                    <%= link_to "武器を売却する", game_path(panel: "blacksmith", blacksmith_menu: "sell"), class: "btn btn-outline-warning w-100" %>
+                    <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
+                  </div>
+                <% end %>
+              <% else %>
+                <p class="mb-0">左のコマンドから情報を選択してください。</p>
+              <% end %>
+              <% end %>
