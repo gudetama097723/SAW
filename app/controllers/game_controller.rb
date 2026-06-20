@@ -516,9 +516,14 @@ def discard_item
     return
   end
 
-  item.quantity -= 1
+  quantity = params[:quantity].to_i
+  quantity = 1 if quantity <= 0
+  quantity = [quantity, item.quantity.to_i].min
+
+  item.quantity -= quantity
   item.quantity.to_i <= 0 ? item.destroy! : item.save!
-  redirect_to game_path(panel: "items"), notice: "#{item.name}を1個捨てた。"
+
+  redirect_to game_path(panel: "items", item_category: item.category), notice: "#{item.name}を#{quantity}個捨てた。"
 end
 
 def discard_weapon

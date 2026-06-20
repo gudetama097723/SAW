@@ -79,10 +79,27 @@
           <div class="card bg-secondary text-light mb-3">
             <div class="card-header">情報コマンド</div>
             <div class="card-body d-grid gap-2">
-              <%= link_to "装備", game_path(panel: "equipment"), class: "btn btn-outline-light w-100" %>
-              <%= link_to "アイテム", game_path(panel: "items"), class: "btn btn-outline-light w-100" %>
-              <%= link_to "スキル", game_path(panel: "skills"), class: "btn btn-outline-light w-100" %>
+              <% if selected_panel == "equipment" %>
+                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+              <% else %>
+                <%= link_to "装備", game_path(panel: "equipment"), class: "btn btn-outline-light w-100" %>
+              <% end %>
+
+              <% if selected_panel == "items" %>
+                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+              <% else %>
+                <%= link_to "所持品", game_path(panel: "items"), class: "btn btn-outline-light w-100" %>
+              <% end %>
+              <% if selected_panel == "skills" %>
+                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+              <% else %>
+                <%= link_to "スキル", game_path(panel: "skills"), class: "btn btn-outline-light w-100" %>
+              <% end %>
+              <% if selected_panel == "growth" %>
+                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+              <% else %>
               <%= link_to "ステータス", game_path(panel: "growth"), class: @player.stat_points.to_i.positive? ? "btn btn-warning w-100" : "btn btn-outline-light w-100" %>
+              <% end %>
             </div>
           </div>
         </div>
@@ -312,83 +329,8 @@
                   <%= link_to "ドロップアイテム", game_path(panel: "items", item_category: "drop"), class: "btn btn-outline-light w-100" %>
                 </div>
 
-                <% if item_category == "weapons" %>
-                  <h6>所持武器</h6>
-                  <% if @player.weapons.any? %>
-                    <ul class="mb-0">
-                      <% @player.weapons.each do |weapon| %>
-                        <li><%= weapon.display_name %> <%= weapon.equipped? ? "（装備中）" : "" %></li>
-                      <% end %>
-                    </ul>
-                  <% else %>
-                    <p class="mb-0">所持武器なし</p>
-                  <% end %>
-                <% elsif item_category == "armors" %>
-                  <h6>所持防具</h6>
-                  <% if @player.armors.any? %>
-                    <ul class="mb-0">
-                      <% @player.armors.each do |armor| %>
-                        <li><%= armor.name %> / <%= armor.slot_name %> <%= armor.equipped? ? "（装備中）" : "" %></li>
-                      <% end %>
-                    </ul>
-                  <% else %>
-                    <p class="mb-0">所持防具なし</p>
-                  <% end %>
-                <% elsif item_category == "healing" %>
-                  <h6>回復アイテム</h6>
-                  <% healing_items = @player.items.select { |item| item.category == "healing" && item.quantity.to_i.positive? } %>
-                  <% if healing_items.any? %>
-                    <ul class="mb-3">
-                      <% healing_items.each do |item| %>
-                        <li class="mb-2">
-                          <%= item.name %> × <%= item.quantity %>
-                          <% if item.discardable_by_player? %>
-                            <%= button_to "1個捨てる", discard_item_path(item_id: item.id), method: :post, class: "btn btn-sm btn-outline-danger mt-1" %>
-                          <% end %>
-                        </li>
-                      <% end %>
-                    </ul>
-                    <%= button_to "ポーションを使う", use_item_path(item_name: "ポーション"), method: :post, class: "btn btn-outline-success w-100" %>
-                  <% else %>
-                    <p class="mb-0">回復アイテムなし</p>
-                  <% end %>
-                <% elsif item_category == "gathered" %>
-                  <h6>採取アイテム</h6>
-                  <% gathered_items = @player.items.select { |item| item.category == "gathered" && item.quantity.to_i.positive? } %>
-                  <% if gathered_items.any? %>
-                    <ul class="mb-0">
-                      <% gathered_items.each do |item| %>
-                        <li class="mb-2">
-                          <%= item.name %> × <%= item.quantity %>
-                          <% if item.discardable_by_player? %>
-                            <%= button_to "1個捨てる", discard_item_path(item_id: item.id), method: :post, class: "btn btn-sm btn-outline-danger mt-1" %>
-                          <% end %>
-                        </li>
-                      <% end %>
-                    </ul>
-                  <% else %>
-                    <p class="mb-0">採取アイテムなし</p>
-                  <% end %>
-                <% elsif item_category == "drop" %>
-                  <h6>ドロップアイテム</h6>
-                  <% drop_items = @player.items.select { |item| item.category == "drop" && item.quantity.to_i.positive? } %>
-                  <% if drop_items.any? %>
-                    <ul class="mb-0">
-                      <% drop_items.each do |item| %>
-                        <li class="mb-2">
-                          <%= item.name %> × <%= item.quantity %>
-                          <% if item.discardable_by_player? %>
-                            <%= button_to "1個捨てる", discard_item_path(item_id: item.id), method: :post, class: "btn btn-sm btn-outline-danger mt-1" %>
-                          <% end %>
-                        </li>
-                      <% end %>
-                    </ul>
-                  <% else %>
-                    <p class="mb-0">ドロップアイテムなし</p>
-                  <% end %>
-                <% else %>
-                  <p class="mb-0">種類を選択してください。</p>
-                <% end %>
+
+
               <% elsif selected_panel == "skills" %>
                 <% selected_skill_set = params[:skill_set].presence %>
                 <% selected_sword_skill = params[:sword_skill].presence %>
@@ -584,10 +526,120 @@
             </div>
 
           <% else %>
-            <% facility_panel_open = selected_panel.in?(%w[inn item_shop blacksmith equipment]) && @player.location&.safe_area? %>
+            <% facility_panel_open = selected_panel.in?(%w[inn item_shop blacksmith equipment items]) && @player.location&.safe_area? %>
             <% if facility_panel_open %>
               <div class="card bg-secondary text-light mb-3">
-                <% if selected_panel == "equipment" %>
+                <% if selected_panel == "items" %>
+
+                  <div class="card-header">所持品一覧</div>
+                  <div class="card-body">
+
+                    <% if params[:item_category] == "weapons" %>
+
+                      <% @player.weapons.each do |weapon| %>
+                        <div class="border rounded mb-2">
+                          <button class="btn btn-dark w-100 text-start"
+                                  type="button"
+                                  data-bs-toggle="collapse"
+                                  data-bs-target="#weapon-item-<%= weapon.id %>">
+
+                            <%= weapon.display_name %>
+                            <% if weapon.equipped? %>（装備中）<% end %>
+
+                          </button>
+
+                          <div class="collapse p-2"
+                              id="weapon-item-<%= weapon.id %>">
+
+                            <p>攻撃力: <%= weapon.attack_power %></p>
+                            <p>耐久力: <%= weapon.durability %>/<%= weapon.max_durability %></p>
+
+                            <% unless weapon.equipped? %>
+                              <%= button_to "装備する",
+                                  equip_weapon_path(weapon_id: weapon.id),
+                                  method: :post,
+                                  class: "btn btn-outline-warning w-100" %>
+                            <% end %>
+                          </div>
+                        </div>
+                      <% end %>
+
+                    <% elsif params[:item_category] == "armors" %>
+
+                      <% @player.armors.each do |armor| %>
+
+                        <div class="border rounded mb-2">
+                          <button class="btn btn-dark w-100 text-start"
+                                  type="button"
+                                  data-bs-toggle="collapse"
+                                  data-bs-target="#armor-item-<%= armor.id %>">
+
+                            <%= armor.name %>
+                            <% if armor.equipped? %>（装備中）<% end %>
+
+                          </button>
+
+                          <div class="collapse p-2"
+                              id="armor-item-<%= armor.id %>">
+
+                            <p>防御力: <%= armor.defense %></p>
+                            <p>重量: <%= armor.weight %></p>
+
+                          </div>
+                        </div>
+
+                      <% end %>
+
+                    <% elsif params[:item_category].in?(%w[healing gathered drop]) %>
+
+                      <% items = @player.items.where(category: params[:item_category])
+                                              .where("quantity > 0")
+                                              .order(:name) %>
+
+                      <% items.each do |item| %>
+
+                        <div class="border rounded mb-2">
+
+                          <button class="btn btn-dark w-100 text-start"
+                                  type="button"
+                                  data-bs-toggle="collapse"
+                                  data-bs-target="#item-right-<%= item.id %>">
+
+                            <%= item.name %> × <%= item.quantity %>
+
+                          </button>
+
+                          <div class="collapse p-2"
+                              id="item-right-<%= item.id %>">
+
+                            <% if item.category == "healing" %>
+                              <%= button_to "使う",
+                                  use_item_path(item_name: item.name),
+                                  method: :post,
+                                  class: "btn btn-outline-success w-100 mb-2" %>
+                            <% end %>
+
+                            <% if item.discardable_by_player? %>
+                              <%= button_to "全部捨てる",
+                                  discard_item_path(
+                                    item_id: item.id,
+                                    quantity: item.quantity
+                                  ),
+                                  method: :post,
+                                  class: "btn btn-outline-danger w-100" %>
+                            <% end %>
+
+                          </div>
+
+                        </div>
+
+                      <% end %>
+
+                    <% end %>
+
+                  </div>
+
+                <% elsif selected_panel == "equipment" %>
                   <div class="card-header">所持装備</div>
                   <div class="card-body">
                     <h6>所持武器</h6>
