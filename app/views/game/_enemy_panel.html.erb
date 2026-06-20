@@ -1,18 +1,17 @@
-          <% if @battle.present? %>
-            <div class="card bg-danger text-light mb-3">
-              <div class="card-header">敵情報</div>
-              <div class="card-body">
-                <% battle_enemies = @battle_enemies.presence || @battle.alive_enemies.to_a %>
-                <div class="d-flex flex-wrap gap-2">
-                  <% battle_enemies.each do |enemy| %>
-                    <div class="border rounded p-2 flex-fill" style="min-width: 140px;">
-                      <h5 class="mb-2"><%= enemy.position %>. <%= enemy.mob.name %> Lv<%= enemy.effective_level %></h5>
-                      <p class="mb-1">HP: <%= enemy.enemy_hp %> / <%= enemy.effective_max_hp %></p>
-                      <div class="progress mb-0">
-                        <div class="progress-bar bg-warning" style="width: <%= [[enemy.enemy_hp.to_i * 100 / [enemy.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
-                      </div>
-                    </div>
-                  <% end %>
-                </div>
-              </div>
-            </div>
+﻿<div class="card bg-danger text-light mb-3">
+  <div class="card-header">敵情報</div>
+  <div class="card-body">
+    <% battle_enemies = @battle_enemies.presence || @battle.alive_enemies.to_a %>
+    <div class="d-flex flex-wrap gap-2">
+      <% battle_enemies.each do |enemy| %>
+        <div class="border rounded p-2 flex-fill" style="min-width: 140px;">
+          <h5 class="mb-2"><%= enemy.position %>. <%= enemy.mob.name %> Lv<%= enemy.effective_level %></h5>
+          <p class="mb-1">HP: <%= enemy.enemy_hp %> / <%= enemy.effective_max_hp %></p>
+          <div class="progress mb-0">
+            <div class="progress-bar bg-warning" style="width: <%= [[enemy.enemy_hp.to_i * 100 / [enemy.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

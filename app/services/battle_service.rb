@@ -21,6 +21,7 @@
 
     hit_messages = []
     actual_attack_attribute = attack_attribute_for(weapon, attack_attribute, sword_skill)
+    record_normal_attack_use!(player, weapon) if weapon && !sword_skill
 
     hits.times do |index|
       alive_targets = target_enemies.select(&:alive?)
@@ -463,12 +464,9 @@ end
 def self.gain_sword_skill_use!(player, weapon, skill_key, amount)
   return "" unless weapon && skill_key.present? && amount.to_i.positive?
 
-  skill = player.skills.find_or_create_by!(name: weapon_skill_name(weapon)) do |new_skill|
-    new_skill.proficiency = 0
-    new_skill.skill_exp = 0 if new_skill.has_attribute?(:skill_exp)
-    new_skill.skill_category = "weapon" if new_skill.has_attribute?(:skill_category)
-    new_skill.weapon_skill = true if new_skill.has_attribute?(:weapon_skill)
-  end
+  skill = player.skills.find_by(name: weapon_skill_name(weapon))
+  return "" unless skill
+
   before_level = skill.sword_skill_level(skill_key)
   after_level = skill.gain_sword_skill_exp!(skill_key, amount)
   after_level > before_level ? " #{SkillCatalog.find(skill_key).name} Lv.#{after_level}に上昇した！" : ""
@@ -481,22 +479,19 @@ def self.gain_weapon_skill!(player, weapon, amount)
 
     skill_name = weapon_skill_name(weapon)
     growth = SkillGrowthCatalog.find(skill_name)
-    skill = player.skills.find_or_create_by!(name: skill_name) do |new_skill|
-      new_skill.proficiency = 0
-      new_skill.skill_exp = 0 if new_skill.has_attribute?(:skill_exp)
-      new_skill.skill_category = "weapon" if new_skill.has_attribute?(:skill_category)
-      new_skill.weapon_skill = true if new_skill.has_attribute?(:weapon_skill)
-    end
+    skill = player.skills.find_by(name: skill_name)
+    return "" unless skill
+
     before = skill.proficiency.to_i
     awarded_capstone_slot = skill.gain_skill_exp!(amount, growth_scale: growth.growth_scale)
 
-    learned = SkillCatalog.sword_skills.select do |skill_definition|
+    learned = SkillCatalog.sword_skills(skill_name).select do |skill_definition|
       skill_definition.required_proficiency.positive? &&
         before < skill_definition.required_proficiency &&
         skill.proficiency >= skill_definition.required_proficiency
     end.map(&:name)
     learned_message = learned.map do |name|
-      learned_skill = SkillCatalog.sword_skills.find { |skill_definition| skill_definition.name == name }
+      learned_skill = SkillCatalog.sword_skills(skill_name).find { |skill_definition| skill_definition.name == name }
       " #{skill_name}の熟練度が #{learned_skill.required_proficiency} に到達した。新しいソードスキル「#{name}」を習得した！"
     end.join
     capstone_message = awarded_capstone_slot ? " #{skill_name}熟練度がカンストした！スキルスロット +1" : ""
@@ -510,7 +505,9 @@ def self.gain_weapon_skill!(player, weapon, amount)
   def self.weapon_skill_name(weapon)
     case weapon.weapon_type
     when "片手直剣"
-      "片手剣"
+      "片手直剣"
+    when "細剣"
+      "細剣"
     else
       weapon.weapon_type.presence || "武器"
     end
@@ -537,6 +534,10 @@ def self.gain_weapon_skill!(player, weapon, amount)
     )
 
     " #{mob.name}が#{weapon.name}を落とした！"
+  end
+
+  def self.record_normal_attack_use!(player, weapon)
+    player.increment_skill_counter!(SkillUnlockService.weapon_attack_counter_key(weapon_skill_name(weapon)))
   end
 
   def self.destroy_weapon_if_broken!(weapon)

@@ -59,12 +59,13 @@ class ItemService
     Result.new(status: :ok, message: "薬草#{HERBS_PER_POTION}個と#{POTION_PRODUCTION_COST}コルでポーションを1本生産した。", item: potion)
   end
 
-  def self.sell_item!(player, item, confirm_unique: false)
+  def self.sell_item!(player, item, quantity: 1, confirm_unique: false)
     return Result.new(status: :error, message: "売却できるアイテムがありません。") unless item&.quantity.to_i.positive?
     return Result.new(status: :error, message: "このアイテムは売却できません。") unless item.sellable_by_player?(confirm_unique: confirm_unique)
 
-    price = item.sell_price
-    item.quantity -= 1
+    quantity = [[quantity.to_i, 1].max, item.quantity.to_i].min
+    price = item.sell_price * quantity
+    item.quantity -= quantity
     player.col = player.col.to_i + price
     player.advance_time!(5)
 
@@ -73,7 +74,7 @@ class ItemService
       player.save!
     end
 
-    Result.new(status: :ok, message: "#{item.name}を#{price}コルで売却した。")
+    Result.new(status: :ok, message: "#{item.name}を#{quantity}個、#{price}コルで売却した。")
   end
 
   def self.consume_healing_potion!(player)

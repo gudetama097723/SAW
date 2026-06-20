@@ -1,7 +1,12 @@
-﻿class Weapon < ApplicationRecord
+class Weapon < ApplicationRecord
   MAX_ENHANCEMENT_LEVEL = 10
   belongs_to :player, optional: true
   belongs_to :mob, optional: true
+  belongs_to :player_base, optional: true
+
+  def stored?
+    player_base_id.present?
+  end
 
   def broken?
     return false if starter_weapon?
@@ -111,4 +116,5 @@ def sell_price
     }.fetch(rarity, 2)
   end
 end
+
 

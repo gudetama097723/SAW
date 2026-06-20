@@ -28,12 +28,16 @@ class SkillCatalog
     end
   end
 
-  def self.sword_skills
-    all.select { |skill| skill.skill_set == "片手剣" }
+  def self.sword_skills(skill_set = "片手直剣")
+    all.select { |skill| skill.skill_set == skill_set.to_s }
   end
 
   def self.find(key)
     all.find { |skill| skill.key == key.to_s } || all.find { |skill| skill.key == "vertical" }
+  end
+
+  def self.first_for(skill_set)
+    sword_skills(skill_set).first || all.first
   end
 
   def self.all
@@ -71,7 +75,7 @@ class SkillCatalog
 
   def self.fallback_definitions
     [
-      SkillDefinition.new(key: "vertical", name: "バーチカル", skill_set: "片手剣", required_proficiency: 0, damage_multiplier: 150, durability_cost: 2, skill_gain: 3, hits: 1, area: false, target_type: "single", attack_attribute: "斬撃", summary: "倍率150% / 単体攻撃", description: "単発の縦斬り。通常攻撃より高威力。使用後に硬直が発生します。")
+      SkillDefinition.new(key: "vertical", name: "バーチカル", skill_set: "片手直剣", required_proficiency: 0, damage_multiplier: 150, durability_cost: 2, skill_gain: 3, hits: 1, area: false, target_type: "single", attack_attribute: "斬撃", summary: "倍率150% / 単体攻撃", description: "単発の縦斬り。通常攻撃より高威力。使用後に硬直が発生します。")
     ]
   end
 end

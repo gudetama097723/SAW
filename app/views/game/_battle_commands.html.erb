@@ -7,8 +7,12 @@
 
                 <div class="d-grid gap-2 mb-3">
                   <%= link_to "通常攻撃", game_path(battle_command: "attack"), class: "btn btn-outline-warning w-100" %>
-                  <% if equipped_weapon %>
+                  <% equipped_weapon_skill_name = equipped_weapon ? BattleService.weapon_skill_name(equipped_weapon) : nil %>
+                  <% equipped_weapon_skill_learned = equipped_weapon_skill_name.present? && @player.skills.exists?(name: equipped_weapon_skill_name) %>
+                  <% if equipped_weapon && equipped_weapon_skill_learned %>
                     <%= link_to "ソードスキル", game_path(battle_command: "sword_skill"), class: "btn btn-outline-danger w-100" %>
+                  <% elsif equipped_weapon %>
+                    <div class="btn btn-outline-secondary disabled w-100"><%= equipped_weapon_skill_name %>未習得</div>
                   <% else %>
                     <div class="btn btn-outline-secondary disabled w-100">ソードスキル（武器なし）</div>
                   <% end %>
@@ -53,19 +57,22 @@
                     </div>
                   <% end %>
                 <% elsif battle_command == "sword_skill" %>
-                  <% unless equipped_weapon %>
+                  <% if !equipped_weapon %>
                     <p class="mb-0">武器を装備していないため、ソードスキルは使用できません。</p>
+                  <% elsif !equipped_weapon_skill_learned %>
+                    <p class="mb-0"><%= equipped_weapon_skill_name %>スキルを習得していないため、ソードスキルは使用できません。</p>
                   <% else %>
-                  <% sword_skill = @player.skills.find_by(name: "片手剣") %>
+                  <% skill_set = BattleService.weapon_skill_name(equipped_weapon) %>
+                  <% sword_skill = @player.skills.find_by(name: skill_set) %>
                   <% sword_skill_level = (sword_skill&.proficiency || 0).to_i %>
-                  <% sword_skill_definitions = SkillCatalog.sword_skills.select { |skill_definition| skill_definition.unlocked?(sword_skill_level) } %>
+                  <% sword_skill_definitions = SkillCatalog.sword_skills(skill_set).select { |skill_definition| skill_definition.unlocked?(sword_skill_level) } %>
                   <% selected_skill = params[:selected_skill].presence %>
                   <% selected_skill = nil unless sword_skill_definitions.any? { |skill_definition| skill_definition.key == selected_skill } %>
-                  <% selected_skill_definition = SkillCatalog.find(selected_skill || sword_skill_definitions.first&.key || "vertical") %>
+                  <% selected_skill_definition = selected_skill.present? ? SkillCatalog.find(selected_skill) : (sword_skill_definitions.first || SkillCatalog.first_for(skill_set)) %>
                   <% selected_skill_definition = sword_skill_definitions.first unless sword_skill_definitions.include?(selected_skill_definition) %>
                   <% selected_skill ||= selected_skill_definition&.key %>
                   <% selected_skill_is_area = selected_skill_definition&.area? %>
-                  <h5>ソードスキル</h5>
+                  <h5><%= skill_set %>ソードスキル</h5>
                   <div class="d-grid gap-2 mb-3">
                     <% sword_skill_definitions.each do |skill_definition| %>
                       <%= link_to skill_definition.name,
@@ -178,3 +185,4 @@
                 <% else %>
                   <p class="mb-0">コマンドを選択してください。</p>
                 <% end %>
+<% end %>

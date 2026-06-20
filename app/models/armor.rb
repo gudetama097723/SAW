@@ -8,9 +8,14 @@ class Armor < ApplicationRecord
     "feet" => "足"
   }.freeze
 
-  belongs_to :player
+  belongs_to :player, optional: true
+  belongs_to :player_base, optional: true
 
   validates :slot, inclusion: { in: EQUIPPABLE_SLOTS }
+
+  def stored?
+    player_base_id.present?
+  end
 
   def slot_name
     self.class.slot_name(slot)
@@ -32,3 +37,4 @@ class Armor < ApplicationRecord
     !equipped? && !favorite? && discardable? && !unique_item?
   end
 end
+

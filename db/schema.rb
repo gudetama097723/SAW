@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_19_094000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_20_134000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -21,7 +21,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_094000) do
     t.boolean "favorite", default: false, null: false
     t.integer "hp_bonus", default: 0, null: false
     t.string "name", null: false
-    t.integer "player_id", null: false
+    t.integer "player_base_id"
+    t.integer "player_id"
     t.boolean "protected_from_death_penalty", default: false, null: false
     t.string "rarity", default: "common", null: false
     t.string "slot", null: false
@@ -30,6 +31,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_094000) do
     t.boolean "unique_item", default: false, null: false
     t.datetime "updated_at", null: false
     t.integer "weight", default: 0, null: false
+    t.index ["player_base_id"], name: "index_armors_on_player_base_id"
     t.index ["player_id"], name: "index_armors_on_player_id"
   end
 
@@ -367,6 +369,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_094000) do
     t.integer "mob_id"
     t.string "name", null: false
     t.integer "part_break_power", default: 100, null: false
+    t.integer "player_base_id"
     t.integer "player_id"
     t.boolean "protected_from_death_penalty", default: false, null: false
     t.string "rarity", default: "common", null: false
@@ -377,9 +380,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_094000) do
     t.string "weapon_type", null: false
     t.decimal "weight", precision: 8, scale: 2, default: "5.0", null: false
     t.index ["mob_id"], name: "index_weapons_on_mob_id"
+    t.index ["player_base_id"], name: "index_weapons_on_player_base_id"
     t.index ["player_id"], name: "index_weapons_on_player_id"
   end
 
+  add_foreign_key "armors", "player_bases", column: "player_base_id"
   add_foreign_key "armors", "players"
   add_foreign_key "battle_enemies", "battles"
   add_foreign_key "battle_enemies", "mobs"
@@ -412,5 +417,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_094000) do
   add_foreign_key "treasure_chests", "field_areas"
   add_foreign_key "treasure_chests", "routes"
   add_foreign_key "weapons", "mobs"
+  add_foreign_key "weapons", "player_bases", column: "player_base_id"
   add_foreign_key "weapons", "players"
 end
