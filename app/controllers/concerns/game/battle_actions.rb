@@ -29,7 +29,8 @@ module Game
         skill_gain: 0,
         stiffness: false,
         hits: 1,
-        sword_skill: false
+        sword_skill: false,
+        attack_attribute: params[:attack_attribute]
       )
       redirect_with_result(result, battle_command: "attack", target_enemy_id: params[:target_enemy_id], attack_attribute: params[:attack_attribute])
     end
@@ -61,7 +62,8 @@ module Game
         stiffness: true,
         hits: skill_config[:hits],
         sword_skill: true,
-        area: skill_config[:area]
+        area: skill_config[:area],
+        attack_attribute: skill_config[:attack_attribute]
       )
       redirect_with_result(
         result,

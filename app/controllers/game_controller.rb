@@ -75,7 +75,8 @@
       durability_cost: skill.durability_cost,
       skill_gain: skill.skill_gain,
       hits: skill.hits,
-      area: skill.area?
+      area: skill.area?,
+      attack_attribute: skill.attack_attribute
     }
   end
 

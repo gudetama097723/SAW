@@ -43,10 +43,23 @@ def formatted_datetime
 end
 
 def advance_time!(minutes)
+  decrease_satiety!(minutes)
   total = current_time.to_i + minutes.to_i
   days = total / 1440
   self.current_time = total % 1440
   days.times { advance_day! }
+end
+
+def max_satiety
+  100
+end
+
+def decrease_satiety!(minutes)
+  elapsed_minutes = minutes.to_i
+  return if elapsed_minutes <= 0
+
+  loss = BigDecimal(max_satiety.to_s) * elapsed_minutes / 360
+  self.satiety = [satiety.to_d - loss, 0.to_d].max
 end
 
 def advance_day!
