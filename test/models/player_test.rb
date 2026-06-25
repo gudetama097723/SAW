@@ -27,4 +27,13 @@ class PlayerTest < ActiveSupport::TestCase
 
     assert_equal 0, player.satiety.to_i
   end
+
+  test "condition labels include injury severity and active statuses" do
+    player = players(:one)
+    player.max_hp = 100
+    player.hp = 25
+    player.status_values = { poison: 3, sleep: 0, custom_status: true }.to_json
+
+    assert_equal ["重症", "毒", "custom_status"], player.condition_labels
+  end
 end

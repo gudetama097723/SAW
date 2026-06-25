@@ -21,6 +21,15 @@ class Player < ApplicationRecord
     [100, 12]
   ].freeze
 
+  STATUS_LABELS = {
+    "poison" => "毒",
+    "paralysis" => "麻痺",
+    "sleep" => "睡眠",
+    "burn" => "火傷",
+    "bleed" => "出血",
+    "stun" => "気絶"
+  }.freeze
+
   has_many :skills, dependent: :destroy
   has_many :items, dependent: :destroy
   has_many :battles, dependent: :destroy
@@ -160,6 +169,40 @@ def status_value_data
   JSON.parse(status_values.presence || "{}")
 rescue JSON::ParserError
   {}
+end
+
+def condition_labels
+  [injury_label, *status_condition_labels].compact
+end
+
+def injury_label
+  case injury_severity
+  when "minor"
+    "軽傷"
+  when "severe"
+    "重症"
+  end
+end
+
+def status_condition_labels
+  status_value_data.filter_map do |key, value|
+    next unless active_status_value?(value)
+
+    STATUS_LABELS.fetch(key.to_s, key.to_s)
+  end
+end
+
+def active_status_value?(value)
+  case value
+  when true
+    true
+  when Numeric
+    value.positive?
+  when String
+    value.present? && value != "0" && value != "false"
+  else
+    value.present?
+  end
 end
 
 def injury_state_data

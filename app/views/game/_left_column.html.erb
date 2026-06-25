@@ -9,7 +9,12 @@
                   <p class="ms-auto">本拠点: <%= @player.home_base.location.name %></p>
                 <% end %>
               </div>
-              <p>HP: <%= @player.hp %> / <%= @player.effective_max_hp %></p>
+              <p>
+                HP: <%= @player.hp %> / <%= @player.effective_max_hp %>
+                <% @player.condition_labels.each do |label| %>
+                  <span class="badge bg-warning text-dark ms-1"><%= label %></span>
+                <% end %>
+              </p>
               <div class="progress mb-2">
                 <div class="progress-bar bg-success" style="width: <%= [[@player.hp.to_i * 100 / [@player.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
               </div>

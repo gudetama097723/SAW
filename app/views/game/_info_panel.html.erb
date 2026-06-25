@@ -69,7 +69,13 @@
   <h5>成長</h5>
   <h6>装備込みステータス</h6>
   <p>レベル: <%= @player.level.to_i %></p>
-  <p>HP: <%= @player.hp.to_i %> / <%= @player.effective_max_hp %>（基礎最大 <%= @player.max_hp.to_i %> / 筋力 +<%= @player.strength_hp_bonus %> / 武器 +<%= @player.weapon_hp_bonus %> / 防具 +<%= @player.armor_hp_bonus %>（<%= @player.armor_hp_bonus_percent %>%））</p>
+  <p>
+    HP: <%= @player.hp.to_i %> / <%= @player.effective_max_hp %>
+    <% @player.condition_labels.each do |label| %>
+      <span class="badge bg-warning text-dark ms-1"><%= label %></span>
+    <% end %>
+    （基礎最大 <%= @player.max_hp.to_i %> / 筋力 +<%= @player.strength_hp_bonus %> / 武器 +<%= @player.weapon_hp_bonus %> / 防具 +<%= @player.armor_hp_bonus %>（<%= @player.armor_hp_bonus_percent %>%））
+  </p>
   <p>筋力: <%= @player.effective_strength %>（基礎 <%= @player.strength.to_i %> / 武器 +<%= @player.weapon_strength_bonus %> / 防具 +<%= @player.armor_strength_bonus %>）</p>
   <p>敏捷: <%= @player.effective_agility %>（基礎 <%= @player.agility.to_i %> / 武器 +<%= @player.weapon_agility_bonus %> / 防具 +<%= @player.armor_agility_bonus %> / 重量 -<%= @player.equipment_weight_penalty %>）</p>
   <p>防御: <%= @player.damage_cut %></p>
