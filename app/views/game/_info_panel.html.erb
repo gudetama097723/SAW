@@ -94,21 +94,21 @@
     <% after_agility = @player.effective_agility %>
     <% @player.strength = original_strength %>
     <% @player.agility = original_agility %>
-    <div class="border border-warning rounded p-2 mb-2">
+    <div id="growth-stat-allocation" class="border border-warning rounded p-2 mb-2">
       <p class="mb-1">最大<%= allocatable_points %>ポイントをまとめて振り分けます。</p>
       <p class="mb-2">残り: <%= allocatable_points - strength_points - agility_points %> pt</p>
       <div class="d-grid gap-2 mb-2">
         <div class="d-flex align-items-center gap-2">
           <span class="flex-fill">筋力 +<%= strength_points %></span>
-          <%= link_to "－", game_path(panel: "growth", strength_points: [strength_points - 1, 0].max, agility_points: agility_points), class: "btn btn-outline-light btn-sm" %>
+          <%= link_to "－", game_path(panel: "growth", strength_points: [strength_points - 1, 0].max, agility_points: agility_points, anchor: "growth-stat-allocation"), class: "btn btn-outline-light btn-sm" %>
           <% next_strength = strength_points + agility_points < allocatable_points ? strength_points + 1 : strength_points %>
-          <%= link_to "＋", game_path(panel: "growth", strength_points: next_strength, agility_points: agility_points), class: "btn btn-outline-warning btn-sm" %>
+          <%= link_to "＋", game_path(panel: "growth", strength_points: next_strength, agility_points: agility_points, anchor: "growth-stat-allocation"), class: "btn btn-outline-warning btn-sm" %>
         </div>
         <div class="d-flex align-items-center gap-2">
           <span class="flex-fill">敏捷 +<%= agility_points %></span>
-          <%= link_to "－", game_path(panel: "growth", strength_points: strength_points, agility_points: [agility_points - 1, 0].max), class: "btn btn-outline-light btn-sm" %>
+          <%= link_to "－", game_path(panel: "growth", strength_points: strength_points, agility_points: [agility_points - 1, 0].max, anchor: "growth-stat-allocation"), class: "btn btn-outline-light btn-sm" %>
           <% next_agility = strength_points + agility_points < allocatable_points ? agility_points + 1 : agility_points %>
-          <%= link_to "＋", game_path(panel: "growth", strength_points: strength_points, agility_points: next_agility), class: "btn btn-outline-warning btn-sm" %>
+          <%= link_to "＋", game_path(panel: "growth", strength_points: strength_points, agility_points: next_agility, anchor: "growth-stat-allocation"), class: "btn btn-outline-warning btn-sm" %>
         </div>
       </div>
       <%= form_with url: allocate_stats_path, method: :post, class: "d-grid gap-2" do %>

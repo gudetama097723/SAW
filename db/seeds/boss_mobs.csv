@@ -1,3 +1,3 @@
 route,field_area,name,boss_type,hp,atk,rarity,level,agility,durability,exp_reward,col_min,col_max,reward_data
 はじまりの草原,獣道・狼の縄張り,群狼の王,area_boss,240,34,boss,8,12,22,500,160,260,"{""col"":220,""items"":[{""name"":""狼王の牙"",""quantity"":1,""category"":""drop""},{""name"":""ポーション"",""quantity"":2,""category"":""healing""}]}"
-はじまりの草原,,蒼狼フェンリル,field_boss,720,58,boss,14,18,38,1500,700,1200,"{""col"":1000,""items"":[{""name"":""蒼狼の剣"",""quantity"":1,""category"":""drop""},{""name"":""狼王の牙"",""quantity"":2,""category"":""drop""}]}"
+はじまりの草原,,蒼狼フェンリル,field_boss,720,58,boss,14,18,38,1500,700,1200,"{""col"":1000,""items"":[{""name"":""蒼狼の牙"",""quantity"":1,""category"":""drop""},{""name"":""狼王の牙"",""quantity"":2,""category"":""drop""}]}"

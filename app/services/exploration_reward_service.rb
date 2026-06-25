@@ -51,6 +51,7 @@ def self.start_boss_battle!(player, mob)
     state = player.player_boss_kills.find_or_create_by!(mob: mob)
     return Result.new(status: :error, message: "そのボスはまだ発見していません。") unless state.found?
     return Result.new(status: :error, message: "#{mob.name}はすでに討伐済みです。") if state.defeated?
+    return Result.new(status: :error, message: "この場所からは#{mob.name}に挑めません。") unless boss_challengeable_here?(player, mob)
 
     battle = FieldService.create_battle!(player, [mob], ambush: true)
     Result.new(status: :ok, message: "#{mob.name}に挑んだ！", battle: battle)
@@ -71,7 +72,10 @@ def self.start_boss_battle!(player, mob)
   end
 
   def self.discovered_bosses(player)
-    player.player_boss_kills.includes(:mob).where(found: true, defeated: false).map(&:mob)
+    sync_discovered_bosses!(player)
+    player.player_boss_kills.includes(:mob).where(found: true, defeated: false).map(&:mob).select do |mob|
+      boss_challengeable_here?(player, mob)
+    end
   end
 
   def self.discover_fixed_treasure!(player, area)
@@ -96,7 +100,7 @@ def self.start_boss_battle!(player, mob)
 
   def self.discover_area_boss!(player, area, mapping_before, mapping_after)
     return unless area
-    return unless mapping_before.to_i < 100 && mapping_after.to_i >= 100
+    return unless mapping_after.to_i >= 100
 
     boss = Mob.find_by(field_area: area, boss_type: "area_boss")
     mark_boss_found!(player, boss, "#{area.name}の探索率が100%に到達した。")
@@ -109,6 +113,34 @@ def self.start_boss_battle!(player, mob)
 
     boss = Mob.find_by(route: route, boss_type: "field_boss")
     mark_boss_found!(player, boss, "#{route.name}のマッピング率が100%に到達した。")
+  end
+
+  def self.sync_discovered_bosses!(player)
+    area = FieldService.current_area_for(player)
+    if area && player.progress_for_area(area).mapping_progress.to_i >= 100
+      boss = Mob.find_by(field_area: area, boss_type: "area_boss")
+      mark_boss_found!(player, boss, "#{area.name}の探索率が100%に到達した。")
+    end
+
+    discover_field_boss!(player)
+  end
+
+  def self.boss_challengeable_here?(player, mob)
+    return false unless mob&.boss?
+
+    case mob.boss_type
+    when "area_boss"
+      area = FieldService.current_area_for(player)
+      area.present? &&
+        mob.field_area_id == area.id &&
+        player.progress_for_area(area).mapping_progress.to_i >= 100
+    when "field_boss"
+      player.field_route.present? &&
+        mob.route_id == player.field_route_id &&
+        player.field_route_mapping_progress >= 100
+    else
+      false
+    end
   end
 
   def self.mark_treasure_found!(player, chest)
