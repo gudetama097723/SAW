@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_25_220000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_26_001000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -150,11 +150,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_220000) do
     t.index ["route_id"], name: "index_mobs_on_route_id"
   end
 
+  create_table "npc_discoveries", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "currently_available", default: false, null: false
+    t.integer "discovered_count", default: 0, null: false
+    t.datetime "first_discovered_at"
+    t.datetime "last_discovered_at"
+    t.datetime "last_spoken_at"
+    t.integer "npc_id", null: false
+    t.integer "player_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["npc_id"], name: "index_npc_discoveries_on_npc_id"
+    t.index ["player_id", "currently_available"], name: "index_npc_discoveries_on_player_id_and_currently_available"
+    t.index ["player_id", "npc_id"], name: "index_npc_discoveries_on_player_id_and_npc_id", unique: true
+    t.index ["player_id"], name: "index_npc_discoveries_on_player_id"
+  end
+
   create_table "npcs", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.string "code", null: false
     t.datetime "created_at", null: false
     t.text "description"
+    t.text "discovery_conditions_json", default: "{}", null: false
+    t.integer "discovery_rate", default: 100, null: false
     t.string "dungeon_key"
     t.string "facility_key"
     t.integer "field_area_id"
@@ -164,6 +182,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_220000) do
     t.string "npc_type", default: "general", null: false
     t.string "placement_type", null: false
     t.string "position_key"
+    t.boolean "repeat_discovery_required", default: false, null: false
     t.integer "sort_order", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["code"], name: "index_npcs_on_code", unique: true
@@ -439,6 +458,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_220000) do
   add_foreign_key "mob_parts", "mobs"
   add_foreign_key "mobs", "field_areas"
   add_foreign_key "mobs", "routes"
+  add_foreign_key "npc_discoveries", "npcs"
+  add_foreign_key "npc_discoveries", "players"
   add_foreign_key "npcs", "field_areas"
   add_foreign_key "npcs", "locations"
   add_foreign_key "player_bases", "locations"

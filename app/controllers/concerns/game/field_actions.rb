@@ -11,26 +11,28 @@ module Game
       result = rand(100)
       player.advance_time!(10)
       discovery = player.town_discovery_for
+      npc_discovery = NpcDiscoveryService.discover_during_stroll!(player)
 
       if !discovery.found_inn? && result < 30
         discovery.found_inn = true
         ActiveRecord::Base.transaction { discovery.save!; player.save! }
-        redirect_to game_path, notice: "広場の近くで宿屋を見つけた！"
+        redirect_to game_path, notice: append_npc_discovery_message("広場の近くで宿屋を見つけた！", npc_discovery)
       elsif !discovery.found_item_shop? && result < 60
         discovery.found_item_shop = true
         ActiveRecord::Base.transaction { discovery.save!; player.save! }
-        redirect_to game_path, notice: "街を散策していると、道具屋を見つけた！"
+        redirect_to game_path, notice: append_npc_discovery_message("街を散策していると、道具屋を見つけた！", npc_discovery)
       elsif !discovery.found_blacksmith? && result < 85
         discovery.found_blacksmith = true
         ActiveRecord::Base.transaction { discovery.save!; player.save! }
-        redirect_to game_path, notice: "路地裏で鍛冶屋を見つけた！"
+        redirect_to game_path, notice: append_npc_discovery_message("路地裏で鍛冶屋を見つけた！", npc_discovery)
       elsif discovery.has_attribute?(:found_restaurant) && !discovery.found_restaurant? && result < 95
         discovery.found_restaurant = true
         ActiveRecord::Base.transaction { discovery.save!; player.save! }
-        redirect_to game_path, notice: "漂ってきた香りをたどって、飲食店を見つけた！"
+        redirect_to game_path, notice: append_npc_discovery_message("漂ってきた香りをたどって、飲食店を見つけた！", npc_discovery)
       else
         player.save!
-        redirect_to game_path, notice: "街を散策した。特に新しい発見はなかった。"
+        message = npc_discovery.discovered? ? "街を散策した。" : "街を散策した。特に新しい発見はなかった。"
+        redirect_to game_path, notice: append_npc_discovery_message(message, npc_discovery)
       end
     end
 
@@ -234,6 +236,14 @@ module Game
         end
 
       redirect_to game_path, notice: message
+    end
+
+    private
+
+    def append_npc_discovery_message(message, npc_discovery)
+      return message unless npc_discovery&.discovered?
+
+      "#{message} #{npc_discovery.message}"
     end
   end
 end

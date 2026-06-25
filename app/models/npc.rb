@@ -3,6 +3,8 @@ class Npc < ApplicationRecord
 
   belongs_to :location, optional: true
   belongs_to :field_area, optional: true
+  has_many :npc_discoveries, dependent: :destroy
+  has_many :discovering_players, through: :npc_discoveries, source: :player
 
   scope :active, -> { where(active: true) }
   scope :ordered, -> { order(:sort_order, :id) }
@@ -12,12 +14,23 @@ class Npc < ApplicationRecord
   validates :name, presence: true
   validates :npc_type, presence: true
   validates :placement_type, inclusion: { in: PLACEMENT_TYPES }
+  validates :discovery_rate, numericality: { only_integer: true, greater_than_or_equal_to: 0, less_than_or_equal_to: 100 }
   validate :placement_target_is_consistent
 
   def metadata
     JSON.parse(metadata_json.presence || "{}")
   rescue JSON::ParserError
     {}
+  end
+
+  def discovery_conditions
+    JSON.parse(discovery_conditions_json.presence || "{}")
+  rescue JSON::ParserError
+    {}
+  end
+
+  def effective_discovery_rate
+    discovery_rate.to_i.clamp(0, 100)
   end
 
   private

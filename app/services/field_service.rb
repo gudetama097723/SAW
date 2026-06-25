@@ -74,6 +74,8 @@ class FieldService
     end
 
     message += ExplorationRewardService.discoveries_after_explore!(player, area, mapping_before, mapping_after)
+    npc_discovery = NpcDiscoveryService.discover_during_explore!(player, current_area)
+    message += " #{npc_discovery.message}" if npc_discovery.discovered?
 
     player.save!
     Result.new(status: :ok, message: message, battle: battle)

@@ -42,7 +42,10 @@ class NpcCsvImporter
       sort_order: integer(row["sort_order"]) || 0,
       active: boolean(row["active"], default: true),
       description: row["description"].presence,
-      metadata_json: row["metadata_json"].presence || "{}"
+      metadata_json: row["metadata_json"].presence || "{}",
+      discovery_rate: integer(row["discovery_rate"]) || 100,
+      repeat_discovery_required: boolean(row["repeat_discovery_required"], default: false),
+      discovery_conditions_json: row["discovery_conditions_json"].presence || "{}"
     }
   end
 
