@@ -51,7 +51,10 @@
     return "" unless encounter.status == :encounter
 
     enemy_result = BattleService.apply_enemy_attack!(player, encounter.battle, prefix: "アイテム使用中の不意打ち！")
-    return enemy_result.message if enemy_result.status == :defeated
+    if enemy_result.status == :defeated
+      redirect_to game_path(panel: "inn"), alert: enemy_result.message
+      return ""
+    end
 
     "#{encounter.message}#{enemy_result.message}"
   end
@@ -60,6 +63,8 @@
     path_options.compact!
     if result.status == :error
       redirect_to game_path(path_options), alert: result.message
+    elsif result.status == :defeated
+      redirect_to game_path(panel: "inn"), alert: result.message
     else
       redirect_to game_path(path_options), notice: result.message
     end

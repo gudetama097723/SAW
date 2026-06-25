@@ -1,0 +1,29 @@
+          <h6>アイテム収納</h6>
+          <% if current_base %>
+            <p class="small text-info mb-2">収納種類: <%= current_base.storage_type_count %> / <%= current_base.storage_limit %>（あと <%= current_base.remaining_storage_slots %> 種類）</p>
+          <% end %>
+          <% if current_base %>
+            <% storage_tab = params[:storage_tab].presence || "store" %>
+            <% item_category = params[:item_category].presence %>
+            <% category_buttons = [[nil, "全部"], ["weapons", "武器"], ["armors", "防具"], ["healing", "回復"], ["gathered", "採取"], ["drop", "ドロップ"]] %>
+            <ul class="nav nav-tabs mb-2">
+              <li class="nav-item"><%= link_to "預ける", game_path(panel: "inn", inn_menu: "storage", storage_tab: "store", item_category: item_category), class: "nav-link #{storage_tab == 'store' ? 'active' : ''}" %></li>
+              <li class="nav-item"><%= link_to "取り出す", game_path(panel: "inn", inn_menu: "storage", storage_tab: "withdraw", item_category: item_category), class: "nav-link #{storage_tab == 'withdraw' ? 'active' : ''}" %></li>
+              <li class="nav-item"><%= link_to "輸送", game_path(panel: "inn", inn_menu: "storage", storage_tab: "transfer", item_category: item_category), class: "nav-link #{storage_tab == 'transfer' ? 'active' : ''}" %></li>
+            </ul>
+            <div class="d-flex gap-2 mb-3 flex-wrap">
+              <% category_buttons.each do |category, label| %>
+                <%= link_to label, game_path(panel: "inn", inn_menu: "storage", storage_tab: storage_tab, item_category: category), class: "btn btn-sm #{item_category == category ? 'btn-info' : 'btn-outline-light'}" %>
+              <% end %>
+            </div>
+
+            <% if storage_tab == "store" %>
+              <%= render "game/world_panel/inn/storage_store", item_category: item_category %>
+            <% elsif storage_tab == "withdraw" %>
+              <%= render "game/world_panel/inn/storage_withdraw", current_base: current_base, item_category: item_category %>
+            <% elsif storage_tab == "transfer" %>
+              <%= render "game/world_panel/inn/storage_transfer", current_base: current_base, item_category: item_category %>
+            <% end %>
+          <% else %>
+            <p class="text-secondary small mb-0">この宿屋を拠点にすると、アイテム収納を使えます。</p>
+          <% end %>

@@ -18,6 +18,7 @@ Rails.application.routes.draw do
   post "sword_skill", to: "game#sword_skill"
   post "use_battle_item", to: "game#use_battle_item"
   post "use_item", to: "game#use_item"
+  post "eat_item", to: "game#eat_item"
   post "escape", to: "game#escape"
   post "start_rest", to: "game#start_rest"
   post "use_rest_skill", to: "game#use_rest_skill"

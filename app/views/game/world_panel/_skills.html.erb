@@ -1,0 +1,37 @@
+      <div class="card-header">スキル詳細</div>
+      <div class="card-body">
+        <% skill = @player.skills.find_by(name: params[:skill_set]) %>
+        <% if skill %>
+          <p>
+            熟練度:
+            <%= skill.proficiency.to_i %> / 1000
+          </p>
+          <div class="progress mb-3">
+            <div class="progress-bar"
+                style="width:<%= skill.proficiency.to_i / 10 %>%">
+            </div>
+          </div>
+          <% learned_sword_skills = SkillCatalog.sword_skills(skill.name).select { |s| skill.proficiency.to_i >= s.required_proficiency } %>
+          <% selected_sword_skill = learned_sword_skills.find { |s| s.key == params[:sword_skill] } %>
+          <% if learned_sword_skills.any? %>
+            <h6>習得済みソードスキル</h6>
+            <div class="d-grid gap-2 mb-3">
+              <% learned_sword_skills.each do |s| %>
+                <div>
+                  <%= link_to s.name,
+                      game_path(panel: "skills", skill_set: skill.name, sword_skill: s.key),
+                      class: "btn #{selected_sword_skill&.key == s.key ? 'btn-info' : 'btn-outline-light'} w-100" %>
+                  <% if selected_sword_skill&.key == s.key %>
+                    <div class="border rounded p-2 mt-2">
+                      <p class="mb-1">威力倍率: <%= s.damage_multiplier %>%</p>
+                      <p class="mb-1">ヒット数: <%= s.hits %></p>
+                      <p class="mb-1">種別: <%= s.target_label %></p>
+                      <p class="mb-0"><%= s.description %></p>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        <% end %>
+      </div>

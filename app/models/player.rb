@@ -71,6 +71,20 @@ def decrease_satiety!(minutes)
   self.satiety = [satiety.to_d - loss, 0.to_d].max
 end
 
+def increase_satiety!(amount)
+  self.satiety = [satiety.to_d + amount.to_i, max_satiety.to_d].min
+end
+
+def can_eat_unappetizing_food?
+  skills.exists?(name: ["悪食", "サバイバル食"])
+end
+
+def apply_status_effect!(key, value)
+  data = status_value_data
+  data[key.to_s] = value
+  self.status_values = data.to_json
+end
+
 def advance_day!
   self.current_day = current_day.to_i + 1
   return if current_day <= 30
@@ -99,6 +113,10 @@ end
 
 def home_base
   player_bases.find_by(base_type: "home", active: true)
+end
+
+def death_respawn_location
+  home_base&.location || Location.find_by(name: "はじまりの街") || location
 end
 
 def carried_item_weight

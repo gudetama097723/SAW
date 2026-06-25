@@ -1,4 +1,4 @@
-location,weapon_name,required_col,required_materials_data
+﻿location,weapon_name,required_col,required_materials_data
 はじまりの街,ブロンズソード,60,"{""硬い甲殻"":1}"
 はじまりの街,ブロンズレイピア,70,"{""薄羽蜂の針"":1}"
 はじまりの街,ウッドメイス,55,"{""蟹の脚殻"":1}"

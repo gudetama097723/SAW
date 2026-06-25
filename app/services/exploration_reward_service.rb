@@ -64,7 +64,7 @@ def self.start_boss_battle!(player, mob)
     return "" if state.defeated?
 
     state.update!(found: true, defeated: true, defeated_at: Time.current)
-    " #{mob.name}を討伐した！#{apply_reward!(player, mob.reward)}"
+    " #{mob.name}を討伐した！#{apply_reward!(player, mob.reward, unique_drops: true)}"
   end
 
   def self.discovered_treasures(player)
@@ -163,7 +163,7 @@ def self.start_boss_battle!(player, mob)
     " #{prefix}#{boss.boss_type == "field_boss" ? "フィールドボス" : "エリア中ボス"}「#{boss.name}」を発見した！"
   end
 
-  def self.apply_reward!(player, reward)
+  def self.apply_reward!(player, reward, unique_drops: false)
     messages = []
     col = reward["col"].to_i
     if col.positive?
@@ -172,7 +172,9 @@ def self.start_boss_battle!(player, mob)
     end
 
     Array(reward["items"]).each do |item_reward|
-      item = ItemService.add_item!(player, item_reward["name"], item_reward["category"].presence || "drop", item_reward["quantity"].presence || 1)
+      category = item_reward["category"].presence || "drop"
+      unique = item_reward["unique_item"] == true || item_reward["unique_item"].to_s.downcase == "true" || (unique_drops && category == "drop")
+      item = ItemService.add_item!(player, item_reward["name"], category, item_reward["quantity"].presence || 1, unique: unique)
       item.save!
       messages << "#{item_reward["name"]}を#{item_reward["quantity"].presence || 1}個入手した。"
     end

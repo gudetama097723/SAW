@@ -22,39 +22,50 @@
                     <%= link_to "戻る", game_path, class: "btn btn-outline-light w-100" %>
                   </div>
                 <% elsif battle_command == "attack" %>
+                  <% selected_attack_group = params[:attack_group].presence %>
                   <% selected_attack_attribute = AttackAttribute.normalize(params[:attack_attribute].presence || equipped_weapon&.primary_attack_attribute || "斬撃") %>
-                  <h5>攻撃種別</h5>
-                  <div class="d-grid gap-2 mb-3">
-                    <% AttackAttribute.normal_attack_options.each do |label, attribute| %>
-                      <%= link_to label,
-                          game_path(battle_command: "attack", target_enemy_id: selected_enemy&.id, attack_attribute: attribute),
-                          class: selected_attack_attribute == attribute ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
+                  <% if selected_attack_group.blank? %>
+                    <h5>使用可能攻撃</h5>
+                    <div class="d-grid gap-2">
+                      <div class="btn btn-outline-secondary disabled w-100">素手</div>
+                      <%= link_to "武器攻撃",
+                          game_path(battle_command: "attack", attack_group: "weapon_attack"),
+                          class: "btn btn-outline-warning w-100" %>
+                    </div>
+                  <% else %>
+                    <h5>武器攻撃</h5>
+                    <div class="d-grid gap-2 mb-3">
+                      <% AttackAttribute.normal_attack_options.each do |label, attribute| %>
+                        <%= link_to label,
+                            game_path(battle_command: "attack", attack_group: "weapon_attack", target_enemy_id: selected_enemy&.id, attack_attribute: attribute),
+                            class: selected_attack_attribute == attribute ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
+                      <% end %>
+                    </div>
+                    <% if battle_enemies.many? %>
+                      <h5>攻撃対象</h5>
+                      <div class="d-grid gap-2">
+                        <% battle_enemies.each do |enemy| %>
+                          <%= link_to "#{enemy.position}. #{enemy.mob.name} Lv#{enemy.effective_level} HP #{enemy.enemy_hp}/#{enemy.effective_max_hp}",
+                              game_path(battle_command: "attack", attack_group: "weapon_attack", target_enemy_id: enemy.id, attack_attribute: selected_attack_attribute),
+                              class: enemy == selected_enemy ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
+                        <% end %>
+                      </div>
                     <% end %>
-                  </div>
-                  <% if battle_enemies.many? %>
-                    <h5>攻撃対象</h5>
-                    <div class="d-grid gap-2">
-                      <% battle_enemies.each do |enemy| %>
-                        <%= link_to "#{enemy.position}. #{enemy.mob.name} Lv#{enemy.effective_level} HP #{enemy.enemy_hp}/#{enemy.effective_max_hp}",
-                            game_path(battle_command: "attack", target_enemy_id: enemy.id, attack_attribute: selected_attack_attribute),
-                            class: enemy == selected_enemy ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
-                      <% end %>
-                    </div>
+                    <% if selected_enemy %>
+                      <h5 class="<%= battle_enemies.many? ? 'mt-3' : '' %>"><%= selected_enemy.mob.name %>の攻撃部位</h5>
+                      <div class="d-grid gap-2">
+                        <% selected_parts.each do |part| %>
+                          <% state = selected_part_states[part.id.to_s] || {} %>
+                          <% part_label = state["broken"] ? "#{part.name}（破壊済み）" : part.name %>
+                          <%= button_to part_label,
+                              attack_path(target_enemy_id: selected_enemy.id, mob_part_id: part.id, attack_attribute: selected_attack_attribute, attack_group: selected_attack_group),
+                              method: :post,
+                              class: "btn btn-outline-warning w-100" %>
+                        <% end %>
+                      </div>
+                    <% end %>
                   <% end %>
-                  <% if selected_enemy %>
-                    <h5 class="<%= battle_enemies.many? ? 'mt-3' : '' %>"><%= selected_enemy.mob.name %>の攻撃部位</h5>
-                    <div class="d-grid gap-2">
-                      <% selected_parts.each do |part| %>
-                        <% state = selected_part_states[part.id.to_s] || {} %>
-                        <% part_label = state["broken"] ? "#{part.name}（破壊済み）" : part.name %>
-                        <%= button_to part_label,
-                            attack_path(target_enemy_id: selected_enemy.id, mob_part_id: part.id, attack_attribute: selected_attack_attribute),
-                            method: :post,
-                            class: "btn btn-outline-warning w-100" %>
-                      <% end %>
-                    </div>
-                  <% end %>
-                  <%= link_to "戻る", game_path(battle_command: "battle"), class: "btn btn-outline-light w-100 mt-3" %>
+                  <%= link_to "戻る", selected_attack_group.present? ? game_path(battle_command: "attack") : game_path(battle_command: "battle"), class: "btn btn-outline-light w-100 mt-3" %>
                 <% elsif battle_command == "sword_skill" %>
                   <% if !equipped_weapon %>
                     <p class="mb-0">武器を装備していないため、ソードスキルは使用できません。</p>
@@ -181,7 +192,7 @@
                           <% if weapon.effective_part_break_power > 100 %>
                             <p class="mb-1">特性: 部位破壊率が高い</p>
                           <% end %>
-                          <p class="mb-2">補正: HP +<%= weapon.hp_bonus %> / 筋力 +<%= weapon.strength_bonus %> / 敏捷 +<%= weapon.agility_bonus %></p>
+                          <p class="mb-2">補正: HP <%= signed_bonus(weapon.hp_bonus) %> / 筋力 <%= signed_bonus(weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(weapon.agility_bonus) %></p>
                           <%= button_to "装備する", equip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-info w-100" %>
                         </div>
                       <% end %>

@@ -88,10 +88,10 @@ class FieldService
       battle = create_battle!(player, encounter_mobs_for(player))
       message = "採取中に#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}と遭遇した！"
     elsif event < 75
-      item_name = gatherable_items_for(player).sample
-      item = ItemService.add_item!(player, item_name, "gathered")
+      gathered = GatheringCatalog.roll_item(player)
+      item = ItemService.add_item!(player, gathered.item_name, gathered.category)
       item.save!
-      message = "#{item_name}を 1 個採取した。現在の所持数：#{item.quantity} 個"
+      message = "#{gathered.item_name}を 1 個採取した。現在の所持数：#{item.quantity} 個"
     else
       message = "採取を試みたが、何も見つからなかった。"
     end
@@ -287,13 +287,8 @@ class FieldService
   end
 
   def self.gatherable_items_for(context)
-    case field_name_for(context)
-    when "はじまりの草原"
-      ["薬草"]
-    when "静寂の森"
-      ["薬草", "しなる枝"]
-    else
-      ["薬草"]
+    GatheringCatalog.definitions_for(context).flat_map do |definition|
+      [definition.item_name] * [definition.weight.to_i, 1].max
     end
   end
 

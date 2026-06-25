@@ -1,0 +1,92 @@
+      <% shop_menu = params[:shop_menu].presence %>
+      <div class="card-header">道具屋</div>
+      <div class="card-body">
+        <% if shop_menu == "buy" %>
+          <% shop_items = ShopCatalog.item_shop_items(@player.location) %>
+          <% selected_shop_item = shop_items.find { |shop_item| shop_item.item_name == params[:item_name] } %>
+          <% if selected_shop_item %>
+            <%= link_to "販売一覧に戻る", game_path(panel: "item_shop", shop_menu: "buy"), class: "btn btn-outline-light w-100 mb-3" %>
+            <h6><%= selected_shop_item.item_name %></h6>
+            <p class="mb-1">価格: <%= selected_shop_item.price %>コル</p>
+            <p class="mb-1">種別: <%= selected_shop_item.category %></p>
+            <p class="mb-1">重さ: <%= Item.new(name: selected_shop_item.item_name, category: selected_shop_item.category).weight %></p>
+            <% if selected_shop_item.item_name == "ポーション" %>
+              <p class="mb-2">効果: HPを100回復</p>
+            <% else %>
+              <p class="mb-2">効果: 使用効果なし</p>
+            <% end %>
+            <%= button_to "購入する", item_shop_path(item_name: selected_shop_item.item_name), method: :post, class: "btn btn-warning w-100" %>
+          <% elsif shop_items.any? %>
+            <div class="d-grid gap-2">
+              <% shop_items.each do |shop_item| %>
+                <%= link_to "#{shop_item.item_name} / #{shop_item.price}コル / #{shop_item.category}",
+                    game_path(panel: "item_shop", shop_menu: "buy", item_name: shop_item.item_name),
+                    class: "btn btn-outline-warning w-100" %>
+              <% end %>
+            </div>
+          <% else %>
+            <p class="mb-0">この町の道具屋には販売品がありません。</p>
+          <% end %>
+        <% elsif shop_menu == "produce" %>
+          <% herb = @player.items.find_by(name: "薬草", category: "gathered") || @player.items.find_by(name: "薬草") %>
+          <%= link_to "道具屋メニューに戻る", game_path(panel: "item_shop"), class: "btn btn-outline-light w-100 mb-3" %>
+          <h6>ポーション</h6>
+          <p class="mb-1">必要素材: 薬草 10個</p>
+          <p class="mb-1">費用: 20コル</p>
+          <p class="mb-2">所持薬草: <%= (herb&.quantity || 0).to_i %></p>
+          <%= button_to "ポーションを生産する", produce_item_path, method: :post, class: "btn btn-outline-warning w-100" %>
+        <% elsif shop_menu == "sell" %>
+          <% sellable_items = @player.items.select { |item| item.quantity.to_i.positive? && (item.sellable_by_player? || item.unique_item?) } %>
+          <% selected_sell_item = sellable_items.find { |item| item.id == params[:item_id].to_i } %>
+          <% sell_category = params[:item_category].presence %>
+          <% listed_sell_items = sell_category.present? ? sellable_items.select { |item| item.category == sell_category } : sellable_items %>
+          <% if selected_sell_item %>
+            <%= link_to "売却一覧に戻る", game_path(panel: "item_shop", shop_menu: "sell", item_category: sell_category), class: "btn btn-outline-light w-100 mb-3" %>
+            <div class="border rounded p-2">
+              <h6><%= selected_sell_item.name %></h6>
+              <p class="mb-1">所持数: <%= selected_sell_item.quantity %></p>
+              <p class="mb-1">種別: <%= selected_sell_item.category %></p>
+              <p class="mb-2">売却価格: 1個 <%= selected_sell_item.sell_price %>コル</p>
+              <% if selected_sell_item.unique_item? && params[:confirm_item_id].to_i != selected_sell_item.id %>
+                <%= link_to "売却確認へ", game_path(panel: "item_shop", shop_menu: "sell", item_id: selected_sell_item.id, confirm_item_id: selected_sell_item.id, item_category: sell_category), class: "btn btn-outline-danger w-100" %>
+              <% else %>
+                <% if selected_sell_item.unique_item? %>
+                  <p class="text-danger small mb-2">このアイテムは二度と手には入らないかもしれません。本当に売却しますか？</p>
+                <% end %>
+                <%= form_with url: sell_item_path, method: :post, class: "d-grid gap-2 mb-2" do %>
+                  <%= hidden_field_tag :item_name, selected_sell_item.name %>
+                  <%= hidden_field_tag :confirm_unique, "1" if selected_sell_item.unique_item? %>
+                  <%= number_field_tag :quantity, 1, min: 1, max: selected_sell_item.quantity, class: "form-control form-control-sm" %>
+                  <%= submit_tag "選択数を売却する", class: "btn btn-outline-warning w-100" %>
+                <% end %>
+                <%= button_to "すべて売却する",
+                    sell_item_path(item_name: selected_sell_item.name, sell_all: "1", confirm_unique: selected_sell_item.unique_item? ? "1" : nil),
+                    method: :post,
+                    class: "btn btn-warning w-100" %>
+              <% end %>
+            </div>
+          <% elsif sellable_items.any? %>
+            <div class="d-flex gap-2 mb-3 flex-wrap">
+              <%= link_to "全部", game_path(panel: "item_shop", shop_menu: "sell"), class: "btn btn-sm #{sell_category.blank? ? 'btn-warning' : 'btn-outline-light'}" %>
+              <%= link_to "回復", game_path(panel: "item_shop", shop_menu: "sell", item_category: "healing"), class: "btn btn-sm #{sell_category == 'healing' ? 'btn-warning' : 'btn-outline-light'}" %>
+              <%= link_to "採取", game_path(panel: "item_shop", shop_menu: "sell", item_category: "gathered"), class: "btn btn-sm #{sell_category == 'gathered' ? 'btn-warning' : 'btn-outline-light'}" %>
+              <%= link_to "ドロップ", game_path(panel: "item_shop", shop_menu: "sell", item_category: "drop"), class: "btn btn-sm #{sell_category == 'drop' ? 'btn-warning' : 'btn-outline-light'}" %>
+            </div>
+            <% if listed_sell_items.any? %>
+              <div class="d-grid gap-2">
+                <% listed_sell_items.each do |item| %>
+                  <%= link_to "#{item.name} × #{item.quantity} / 1個 #{item.sell_price}コル",
+                      game_path(panel: "item_shop", shop_menu: "sell", item_id: item.id, item_category: sell_category),
+                      class: "btn btn-outline-warning w-100" %>
+                <% end %>
+              </div>
+            <% else %>
+              <p class="mb-0">この種類で売却できるアイテムはありません。</p>
+            <% end %>
+          <% else %>
+            <p class="mb-0">売却できるアイテムがありません。</p>
+          <% end %>
+        <% else %>
+          <p class="mb-0">左のメニューから行動を選択してください。</p>
+        <% end %>
+      </div>

@@ -32,7 +32,7 @@ module Game
         sword_skill: false,
         attack_attribute: params[:attack_attribute]
       )
-      redirect_with_result(result, battle_command: "attack", target_enemy_id: params[:target_enemy_id], attack_attribute: params[:attack_attribute])
+      redirect_with_result(result, battle_command: "attack", attack_group: params[:attack_group], target_enemy_id: params[:target_enemy_id], attack_attribute: params[:attack_attribute])
     end
 
     def sword_skill
@@ -96,7 +96,11 @@ module Game
 
       enemy_result = BattleService.apply_enemy_attack!(player, battle)
 
-      redirect_to game_path(battle_command: "item"), notice: "#{item_result.message}#{enemy_result.message}"
+      if enemy_result.status == :defeated
+        redirect_to game_path(panel: "inn"), alert: "#{item_result.message}#{enemy_result.message}"
+      else
+        redirect_to game_path(battle_command: "item"), notice: "#{item_result.message}#{enemy_result.message}"
+      end
     end
 
     def use_item
@@ -127,6 +131,28 @@ module Game
       redirect_to game_path(panel: "items", item_category: "healing"), notice: "#{item_result.message}#{surprise_message}"
     end
 
+    def eat_item
+      player = current_player
+      item = player.items.find_by(id: params[:item_id]) || player.items.find_by(name: params[:item_name])
+      item_category = item&.category || params[:item_category].presence || "gathered"
+
+      if current_player.battles.exists?
+        redirect_to game_path(battle_command: "item"), alert: "戦闘中は食べられません。"
+        return
+      end
+
+      item_result = ItemService.eat_item!(player, item)
+      unless item_result.status == :ok
+        redirect_to game_path(panel: "items", item_category: item_category), alert: item_result.message
+        return
+      end
+
+      surprise_message = check_item_use_surprise_encounter!(player)
+      return if performed?
+
+      redirect_to game_path(panel: "items", item_category: item_category), notice: "#{item_result.message}#{surprise_message}"
+    end
+
     def escape
       battle = current_battle
       player = current_player
@@ -148,7 +174,11 @@ module Game
       else
         enemy_result = BattleService.apply_enemy_attack!(player, battle)
 
-        redirect_to game_path(battle_command: params[:battle_command].presence), alert: "逃走に失敗した。#{enemy_result.message}"
+        if enemy_result.status == :defeated
+          redirect_to game_path(panel: "inn"), alert: "逃走に失敗した。#{enemy_result.message}"
+        else
+          redirect_to game_path(battle_command: params[:battle_command].presence), alert: "逃走に失敗した。#{enemy_result.message}"
+        end
       end
     end
   end

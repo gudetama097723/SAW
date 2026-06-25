@@ -1,0 +1,27 @@
+<%#
+  Inn panel partial index:
+  - rest: 休憩
+  - base: 本拠点 / 仮拠点
+  - col: 所持金管理
+  - storage: アイテム収納
+%>
+<% inn_menu = params[:inn_menu].presence || "rest" %>
+<% inn_cost = @player.location&.name == "ホルンカの村" ? 50 : 0 %>
+<% temporary_only = @player.location&.name == "ホルンカの村" %>
+<% current_base = @player.player_bases.find_by(location: @player.location, base_type: temporary_only ? "temporary" : "home", active: true) %>
+<% current_home_base = temporary_only ? nil : current_base %>
+<% base_label = temporary_only ? "仮拠点" : "本拠点" %>
+<% inn_cost = current_base ? 0 : inn_cost %>
+
+<div class="card-header">宿屋</div>
+<div class="card-body">
+  <% if inn_menu == "rest" %>
+    <%= render "game/world_panel/inn/rest", inn_cost: inn_cost %>
+  <% elsif inn_menu == "base" %>
+    <%= render "game/world_panel/inn/base", temporary_only: temporary_only, current_base: current_base, base_label: base_label %>
+  <% elsif inn_menu == "col" %>
+    <%= render "game/world_panel/inn/col", current_home_base: current_home_base %>
+  <% elsif inn_menu == "storage" %>
+    <%= render "game/world_panel/inn/storage", current_base: current_base %>
+  <% end %>
+</div>

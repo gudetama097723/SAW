@@ -11,7 +11,7 @@
         <% if weapon.effective_part_break_power > 100 %>
           <p class="mb-1">特性: 部位破壊率が高い</p>
         <% end %>
-        <p class="mb-0">補正: HP +<%= weapon.hp_bonus %> / 筋力 +<%= weapon.strength_bonus %> / 敏捷 +<%= weapon.agility_bonus %></p>
+        <p class="mb-0">補正: HP <%= signed_bonus(weapon.hp_bonus) %> / 筋力 <%= signed_bonus(weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(weapon.agility_bonus) %></p>
         <%= button_to "取り外す", unequip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
       </div>
     <% end %>
@@ -74,10 +74,10 @@
     <% @player.condition_labels.each do |label| %>
       <span class="badge bg-warning text-dark ms-1"><%= label %></span>
     <% end %>
-    （基礎最大 <%= @player.max_hp.to_i %> / 筋力 +<%= @player.strength_hp_bonus %> / 武器 +<%= @player.weapon_hp_bonus %> / 防具 +<%= @player.armor_hp_bonus %>（<%= @player.armor_hp_bonus_percent %>%））
+    （基礎最大 <%= @player.max_hp.to_i %> / 筋力 <%= signed_bonus(@player.strength_hp_bonus) %> / 武器 <%= signed_bonus(@player.weapon_hp_bonus) %> / 防具 <%= signed_bonus(@player.armor_hp_bonus) %>（<%= signed_bonus(@player.armor_hp_bonus_percent) %>%））
   </p>
-  <p>筋力: <%= @player.effective_strength %>（基礎 <%= @player.strength.to_i %> / 武器 +<%= @player.weapon_strength_bonus %> / 防具 +<%= @player.armor_strength_bonus %>）</p>
-  <p>敏捷: <%= @player.effective_agility %>（基礎 <%= @player.agility.to_i %> / 武器 +<%= @player.weapon_agility_bonus %> / 防具 +<%= @player.armor_agility_bonus %> / 重量 -<%= @player.equipment_weight_penalty %>）</p>
+  <p>筋力: <%= @player.effective_strength %>（基礎 <%= @player.strength.to_i %> / 武器 <%= signed_bonus(@player.weapon_strength_bonus) %> / 防具 <%= signed_bonus(@player.armor_strength_bonus) %>）</p>
+  <p>敏捷: <%= @player.effective_agility %>（基礎 <%= @player.agility.to_i %> / 武器 <%= signed_bonus(@player.weapon_agility_bonus) %> / 防具 <%= signed_bonus(@player.armor_agility_bonus) %> / 重量 <%= signed_bonus(-@player.equipment_weight_penalty) %>）</p>
   <p>防御: <%= @player.damage_cut %></p>
   <p>装備重量: <%= @player.equipment_weight %></p>
   <p>経験値: <%= @player.exp.to_i %> / <%= @player.exp_to_next_level %></p>
@@ -136,12 +136,21 @@
   <% end %>
   <% learnable_skills = SkillUnlockService.available_for(@player) %>
   <% if learnable_skills.any? %>
+    <% confirm_skill_name = params[:confirm_skill_name].presence %>
     <h6 class="mt-3">習得可能スキル</h6>
     <div class="d-grid gap-2">
       <% learnable_skills.each do |skill_definition| %>
         <div class="border rounded p-2">
           <p class="mb-2"><%= skill_definition.name %></p>
-          <%= button_to "習得する", learn_skill_path(skill_name: skill_definition.name), method: :post, class: "btn btn-outline-info w-100" %>
+          <% if confirm_skill_name == skill_definition.name %>
+            <p class="mb-2"><%= skill_definition.name %>スキルを取得しますか？</p>
+            <div class="d-flex gap-2">
+              <%= button_to "はい", learn_skill_path(skill_name: skill_definition.name), method: :post, form: { class: "flex-fill" }, class: "btn btn-outline-info w-100" %>
+              <%= link_to "いいえ", game_path(panel: "growth"), class: "btn btn-outline-light flex-fill" %>
+            </div>
+          <% else %>
+            <%= link_to "習得する", game_path(panel: "growth", confirm_skill_name: skill_definition.name), class: "btn btn-outline-info w-100" %>
+          <% end %>
         </div>
       <% end %>
     </div>

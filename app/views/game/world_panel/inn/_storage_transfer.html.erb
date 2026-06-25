@@ -1,0 +1,50 @@
+              <% destination_bases = @player.player_bases.where(active: true).where.not(id: current_base.id).includes(:location).to_a %>
+              <% storage_items = current_base.storage_items.where("quantity > 0").order(:category, :name) %>
+              <% storage_items = StorageItem.none if %w[weapons armors].include?(item_category.to_s) %>
+              <% storage_items = storage_items.where(category: item_category) if item_category.present? && !%w[weapons armors].include?(item_category) %>
+              <% stored_weapons = item_category.blank? || item_category == "weapons" ? current_base.stored_weapons.order(:name) : [] %>
+              <% stored_armors = item_category.blank? || item_category == "armors" ? current_base.stored_armors.order(:slot, :name) : [] %>
+              <% if params[:confirm_transfer] == "1" %>
+                <% destination_base = destination_bases.find { |base| base.id == params[:destination_base_id].to_i } %>
+                <div class="border border-info rounded p-2 mb-3">
+                  <p class="mb-1"><%= params[:transfer_labels] %></p>
+                  <p class="mb-1"><%= destination_base&.location_name || "輸送先" %> に <%= params[:transfer_cost] %>コルで輸送します。</p>
+                  <p class="small text-secondary mb-2">総重量: <%= params[:transfer_weight] %></p>
+                  <div class="d-flex gap-2">
+                    <%= form_with url: transfer_base_item_path, method: :post, class: "flex-fill" do %>
+                      <%= hidden_field_tag :confirm, "1" %>
+                      <%= hidden_field_tag :destination_base_id, params[:destination_base_id] %>
+                      <% Array(params[:storage_item_ids]).each do |id| %>
+                        <%= hidden_field_tag "storage_item_ids[]", id %>
+                      <% end %>
+                      <% Array(params[:weapon_ids]).each do |id| %>
+                        <%= hidden_field_tag "weapon_ids[]", id %>
+                      <% end %>
+                      <% Array(params[:armor_ids]).each do |id| %>
+                        <%= hidden_field_tag "armor_ids[]", id %>
+                      <% end %>
+                      <%= submit_tag "はい", class: "btn btn-info w-100" %>
+                    <% end %>
+                    <%= link_to "いいえ", game_path(panel: "inn", inn_menu: "storage", storage_tab: "transfer", item_category: item_category), class: "btn btn-outline-light flex-fill" %>
+                  </div>
+                </div>
+              <% elsif destination_bases.any? && (storage_items.any? || stored_weapons.any? || stored_armors.any?) %>
+                <p class="small text-warning mb-2">輸送にはコルが必要です。最低輸送費は道中危険度で変動し、重量10までは最低費用内、それ以上は重いほど加算されます。</p>
+                <%= form_with url: transfer_base_item_path, method: :post, class: "d-grid gap-2" do %>
+                  <%= select_tag :destination_base_id, options_from_collection_for_select(destination_bases, :id, :location_name, params[:destination_base_id]), class: "form-select form-select-sm" %>
+                  <% storage_items.each do |storage_item| %>
+                    <label class="border rounded p-2"><%= check_box_tag "storage_item_ids[]", storage_item.id, Array(params[:storage_item_ids]).map(&:to_s).include?(storage_item.id.to_s) %> <%= storage_item.name %> × <%= storage_item.quantity %></label>
+                  <% end %>
+                  <% stored_weapons.each do |weapon| %>
+                    <label class="border rounded p-2"><%= check_box_tag "weapon_ids[]", weapon.id, Array(params[:weapon_ids]).map(&:to_s).include?(weapon.id.to_s) %> <%= weapon.display_name %>（武器 / 重さ <%= weapon.weight %>）</label>
+                  <% end %>
+                  <% stored_armors.each do |armor| %>
+                    <label class="border rounded p-2"><%= check_box_tag "armor_ids[]", armor.id, Array(params[:armor_ids]).map(&:to_s).include?(armor.id.to_s) %> <%= armor.name %>（防具 / 重さ <%= armor.weight %>）</label>
+                  <% end %>
+                  <%= submit_tag "輸送内容を確認する", class: "btn btn-outline-info w-100" %>
+                <% end %>
+              <% elsif destination_bases.empty? %>
+                <p class="text-secondary small mb-0">輸送先の拠点がありません。</p>
+              <% else %>
+                <p class="text-secondary small mb-0">輸送できるものがありません。</p>
+              <% end %>

@@ -35,7 +35,7 @@ module Game
       item = player.items.find_by(name: params[:item_name])
       if item&.unique_item? && params[:confirm_unique] != "1"
         redirect_to game_path(panel: "item_shop", shop_menu: "sell", confirm_item_id: item.id),
-                    alert: "このアイテムは二度と手に入らないかもしれません。本当に売却しますか？"
+                    alert: "このアイテムは二度と手には入らないかもしれません。本当に売却しますか？"
         return
       end
 
@@ -252,7 +252,7 @@ module Game
       end
       if weapon.unique_item? && params[:confirm_unique] != "1"
         redirect_to game_path(panel: "blacksmith", blacksmith_menu: "sell", confirm_weapon_id: weapon.id),
-                    alert: "この武器は二度と手に入らないかもしれません。本当に売却しますか？"
+                    alert: "この武器は二度と手には入らないかもしれません。本当に売却しますか？"
         return
       end
 
@@ -292,7 +292,7 @@ module Game
       if battle
         enemy_result = BattleService.apply_enemy_attack!(player, battle)
         if enemy_result.status == :defeated
-          redirect_to game_path, alert: "#{weapon.name}を装備した。#{enemy_result.message}"
+          redirect_to game_path(panel: "inn"), alert: "#{weapon.name}を装備した。#{enemy_result.message}"
         else
           redirect_to game_path(battle_command: "attack"), notice: "#{weapon.name}を装備した。#{enemy_result.message}"
         end

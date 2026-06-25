@@ -126,16 +126,19 @@
       player.hp = player.hp.to_i - enemy_damage
 
       if player.hp <= 0
-        town = Location.find_by(name: "はじまりの街")
+        respawn_location = player.death_respawn_location
         player.hp = player.effective_max_hp
-        player.floor = 1
+        player.floor = respawn_location&.floor || 1
         player.col = 0
-        player.location = town if town
+        player.location = respawn_location if respawn_location
+        player.field_route = nil
+        player.field_position = 0
         lost_message = apply_death_item_penalty!(player)
         battle.destroy!
         player.save!
 
-        return Result.new(status: :defeated, message: "#{enemy_message("#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。はじまりの街へ戻された。#{lost_message}")
+        respawn_name = respawn_location ? "#{respawn_location.name}の宿" : "本拠地の宿"
+        return Result.new(status: :defeated, message: "#{enemy_message("#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。#{respawn_name}へ戻された。#{lost_message}")
       end
 
       messages << enemy_message("#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")
@@ -409,7 +412,7 @@ end
       drop = MobDropCatalog.roll_defeat_drop(battle_enemy.mob)
       next unless drop
 
-      item = ItemService.add_item!(player, drop.item_name, drop.category)
+      item = ItemService.add_item!(player, drop.item_name, drop.category, 1, unique: battle_enemy.mob.boss?)
       item.save!
       "#{drop.item_name}を入手した！"
     end
@@ -426,7 +429,7 @@ end
         item_name = MobDropCatalog.roll_part_drop(part)
         next unless item_name
 
-        item = ItemService.add_item!(player, item_name, "drop")
+        item = ItemService.add_item!(player, item_name, "drop", 1, unique: battle_enemy.mob.boss?)
         item.save!
         "#{part.name}から#{item_name}を入手した！"
       end

@@ -1,0 +1,31 @@
+          <h6><%= base_label %></h6>
+          <% if temporary_only %>
+            <% if current_base&.temporary? %>
+              <p>現在の仮拠点です。</p>
+            <% else %>
+              <p>この宿屋は仮拠点にできます。</p>
+            <% end %>
+          <% elsif @player.home_base %>
+            <p>現在の本拠点: <%= @player.home_base.location.name %></p>
+          <% else %>
+            <p>本拠点は未設定です。</p>
+          <% end %>
+
+          <% if current_base.blank? %>
+            <% if params[:confirm_home_base] == "1" %>
+              <div class="border border-info rounded p-2">
+                <p class="mb-2">ここを<%= base_label %>にしますか？</p>
+                <div class="d-flex gap-2">
+                  <%= button_to "はい", set_home_base_path(confirm: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-info w-100" %>
+                  <%= link_to "いいえ", game_path(panel: "inn", inn_menu: "base"), class: "btn btn-outline-light flex-fill" %>
+                </div>
+              </div>
+            <% else %>
+              <%= link_to "この宿屋を#{base_label}にする", game_path(panel: "inn", inn_menu: "base", confirm_home_base: "1"), class: "btn btn-outline-info w-100" %>
+            <% end %>
+          <% else %>
+            <div class="text-info small text-center">現在の<%= base_label %>です</div>
+            <% if current_base&.temporary? %>
+              <%= button_to "仮拠点を解除する", remove_temporary_base_path, method: :post, class: "btn btn-outline-danger w-100 mt-2" %>
+            <% end %>
+          <% end %>

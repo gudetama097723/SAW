@@ -1,0 +1,153 @@
+      <div class="card-header">所持品一覧</div>
+      <div class="card-body">
+
+        <% if params[:item_category] == "weapons" %>
+
+          <% @player.weapons.order(:name).each do |weapon| %>
+            <div class="border rounded mb-2">
+              <button class="btn btn-dark w-100 text-start"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#weapon-item-<%= weapon.id %>">
+
+                <%= weapon.display_name %>
+                <% if weapon.equipped? %>（装備中）<% end %>
+
+              </button>
+
+              <div class="collapse p-2"
+                  id="weapon-item-<%= weapon.id %>">
+
+                <p class="mb-1">種別: <%= weapon.weapon_type %></p>
+                <p class="mb-1">レアリティ: <%= weapon.rarity %></p>
+                <p class="mb-1">攻撃力: <%= weapon.attack_power %>（強化込み <%= weapon.effective_attack_power %>）</p>
+                <p class="mb-1">強化: +<%= weapon.enhancement_level.to_i %> / <%= Weapon::MAX_ENHANCEMENT_LEVEL %></p>
+                <p class="mb-1">耐久力: <%= weapon.durability %>/<%= weapon.max_durability %></p>
+                <p class="mb-1">攻撃属性: <%= weapon.attack_attribute_list.join(" / ") %></p>
+                <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
+                <p class="mb-1">部位破壊力: <%= weapon.effective_part_break_power %>%</p>
+                <p class="mb-1">重量: <%= weapon.weight %></p>
+                <p class="mb-1">能力反映: 筋力 <%= weapon.strength_ratio %>% / 敏捷 <%= weapon.agility_ratio %>%</p>
+                <p class="mb-1">補正: HP <%= signed_bonus(weapon.hp_bonus) %> / 筋力 <%= signed_bonus(weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(weapon.agility_bonus) %></p>
+                <p class="mb-1">売却価格: <%= weapon.sell_price %>コル</p>
+                <p class="mb-1">保護: <%= weapon.protected_item? ? "対象" : "なし" %></p>
+                <% if weapon.description.present? %>
+                  <p class="mb-2"><%= weapon.description %></p>
+                <% end %>
+
+                <% unless weapon.equipped? %>
+                  <%= button_to "装備する",
+                      equip_weapon_path(weapon_id: weapon.id),
+                      method: :post,
+                      class: "btn btn-outline-warning w-100" %>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+
+        <% elsif params[:item_category] == "armors" %>
+
+          <% @player.armors.order(:slot, :name).each do |armor| %>
+
+            <div class="border rounded mb-2">
+              <button class="btn btn-dark w-100 text-start"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#armor-item-<%= armor.id %>">
+
+                <%= armor.name %>
+                <% if armor.equipped? %>（装備中）<% end %>
+
+              </button>
+
+              <div class="collapse p-2"
+                  id="armor-item-<%= armor.id %>">
+
+                <p class="mb-1">部位: <%= armor.slot_name %></p>
+                <p class="mb-1">種別: <%= armor.armor_type %></p>
+                <p class="mb-1">レアリティ: <%= armor.rarity %></p>
+                <p class="mb-1">防御力: <%= armor.defense %></p>
+                <p class="mb-1">重量: <%= armor.weight %></p>
+                <p class="mb-1">補正: HP <%= signed_bonus(armor.hp_bonus) %>% / 筋力 <%= signed_bonus(armor.strength_bonus) %> / 敏捷 <%= signed_bonus(armor.agility_bonus) %></p>
+                <p class="mb-1">保護: <%= armor.protected_item? ? "対象" : "なし" %></p>
+
+                <% if armor.equipped? %>
+                  <%= button_to "取り外す", unequip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
+                <% else %>
+                  <%= button_to "装備する", equip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-info w-100 mt-2" %>
+                <% end %>
+
+              </div>
+            </div>
+
+          <% end %>
+
+        <% elsif params[:item_category].in?(%w[healing gathered drop]) %>
+
+          <% items = @player.items.where(category: params[:item_category])
+                                  .where("quantity > 0")
+                                  .order(:name) %>
+
+          <% items.each do |item| %>
+
+            <div class="border rounded mb-2">
+
+              <button class="btn btn-dark w-100 text-start"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#item-right-<%= item.id %>">
+
+                <%= item.name %> × <%= item.quantity %>
+
+              </button>
+
+              <div class="collapse p-2"
+                  id="item-right-<%= item.id %>">
+
+                <p class="mb-1">分類: <%= item.category_name %></p>
+                <p class="mb-1">数量: <%= item.quantity.to_i %></p>
+                <p class="mb-1">単体重量: <%= item.weight %></p>
+                <p class="mb-1">合計重量: <%= item.total_weight %></p>
+                <p class="mb-1">売却価格: <%= item.sell_price %>コル / 個</p>
+                <p class="mb-1">売却合計: <%= item.sell_price * item.quantity.to_i %>コル</p>
+                <% if item.food? %>
+                  <p class="mb-1">食材: おいしさ <%= item.effective_tastiness %> / 満腹度 +<%= item.effective_satiety_restore %></p>
+                <% end %>
+                <% if item.description.present? %>
+                  <p class="mb-2"><%= item.description %></p>
+                <% end %>
+                <p class="mb-2">保護: <%= item.protected_item? ? "対象" : "なし" %></p>
+
+                <% if item.category == "healing" %>
+                  <%= button_to "使う",
+                      use_item_path(item_name: item.name),
+                      method: :post,
+                       class: "btn btn-outline-success w-100 mb-2" %>
+                <% end %>
+
+                <% if item.edible_by?(@player) %>
+                  <%= button_to "食べる",
+                      eat_item_path(item_id: item.id, item_category: item.category),
+                      method: :post,
+                      class: "btn btn-outline-success w-100 mb-2" %>
+                <% end %>
+
+                <% if item.discardable_by_player? %>
+                  <%= button_to "全部捨てる",
+                      discard_item_path(
+                        item_id: item.id,
+                        quantity: item.quantity
+                      ),
+                      method: :post,
+                      class: "btn btn-outline-danger w-100" %>
+                <% end %>
+
+              </div>
+
+            </div>
+
+          <% end %>
+
+        <% end %>
+
+      </div>

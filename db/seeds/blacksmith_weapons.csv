@@ -1,4 +1,4 @@
-location,name,weapon_type,rarity,price,attack_power,durability,max_durability,hp_bonus,strength_bonus,agility_bonus,critical_rate,part_break_power,attack_attributes,enhancement_level,weight,strength_ratio,agility_ratio,description,production_only
+﻿location,name,weapon_type,rarity,price,attack_power,durability,max_durability,hp_bonus,strength_bonus,agility_bonus,critical_rate,part_break_power,attack_attributes,enhancement_level,weight,strength_ratio,agility_ratio,description,production_only
 はじまりの街,ブロンズソード,片手直剣,common,100,9,1200,1200,0,2,0,7,100,斬撃,0,4.5,70,30,扱いやすい片手直剣。斬撃に向く。,FALSE
 はじまりの街,ブロンズレイピア,細剣,common,120,8,1000,1000,0,0,2,10,90,刺突,0,3.2,30,70,敏捷を活かす刺突武器。,FALSE
 はじまりの街,ウッドメイス,棍,common,90,7,1400,1400,0,1,-1,5,125,打撃,0,5.8,90,10,硬い敵に強い打撃武器。,FALSE

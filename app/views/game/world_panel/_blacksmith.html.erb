@@ -1,0 +1,131 @@
+      <% blacksmith_menu = params[:blacksmith_menu].presence %>
+      <div class="card-header">鍛冶屋</div>
+      <div class="card-body">
+      <% if blacksmith_menu == "buy" %>
+        <% shop_weapons = ShopCatalog.blacksmith_weapons(@player.location) %>
+        <% selected_shop_weapon = shop_weapons.find { |weapon| weapon.name == params[:weapon_name] } %>
+        <% if selected_shop_weapon %>
+          <%= link_to "販売一覧に戻る", game_path(panel: "blacksmith", blacksmith_menu: "buy"), class: "btn btn-outline-light w-100 mb-3" %>
+          <h6><%= selected_shop_weapon.name %></h6>
+          <p class="mb-1">価格: <%= selected_shop_weapon.price %>コル</p>
+          <p class="mb-1">武器種: <%= selected_shop_weapon.weapon_type %></p>
+          <p class="mb-1">攻撃力: <%= selected_shop_weapon.attack_power %></p>
+          <p class="mb-1">攻撃属性: <%= selected_shop_weapon.attack_attributes %></p>
+          <p class="mb-1">耐久力: <%= selected_shop_weapon.durability %> / <%= selected_shop_weapon.max_durability %></p>
+          <p class="mb-1">重さ: <%= selected_shop_weapon.weight %></p>
+          <p class="mb-1">参照ステータス: 筋力<%= selected_shop_weapon.strength_ratio %>% / 敏捷<%= selected_shop_weapon.agility_ratio %>%</p>
+          <p class="mb-1">補正: HP <%= signed_bonus(selected_shop_weapon.hp_bonus) %> / 筋力 <%= signed_bonus(selected_shop_weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(selected_shop_weapon.agility_bonus) %></p>
+          <% if selected_shop_weapon.description.present? %>
+            <p class="mb-2"><%= selected_shop_weapon.description %></p>
+          <% end %>
+          <%= button_to "購入する", buy_bronze_sword_path(weapon_name: selected_shop_weapon.name), method: :post, class: "btn btn-warning w-100" %>
+        <% elsif shop_weapons.any? %>
+          <div class="d-grid gap-2">
+            <% shop_weapons.each do |weapon| %>
+              <%= link_to "#{weapon.name} / #{weapon.price}コル / #{weapon.weapon_type}", game_path(panel: "blacksmith", blacksmith_menu: "buy", weapon_name: weapon.name), class: "btn btn-outline-warning w-100" %>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="mb-0">この町の鍛冶屋には販売武器がありません。</p>
+        <% end %>
+      <% elsif blacksmith_menu == "produce" %>
+        <% production_recipes = WeaponProductionService.recipes_for(@player.location) %>
+        <% selected_recipe = production_recipes.find { |recipe| recipe.weapon_name == params[:weapon_name] } %>
+        <% selected_production_weapon = selected_recipe && ShopCatalog.blacksmith_production_weapon(@player.location, selected_recipe.weapon_name) %>
+        <% if selected_recipe && selected_production_weapon %>
+          <%= link_to "生産一覧に戻る", game_path(panel: "blacksmith", blacksmith_menu: "produce"), class: "btn btn-outline-light w-100 mb-3" %>
+          <h6><%= selected_production_weapon.name %></h6>
+          <p class="mb-1">必要素材: <%= selected_recipe.required_materials.map { |name, count| "#{name} ×#{count}" }.join("、") %></p>
+          <p class="mb-1">必要コル: <%= selected_recipe.required_col %></p>
+          <p class="mb-1">武器種: <%= selected_production_weapon.weapon_type %></p>
+          <p class="mb-1">攻撃力: <%= selected_production_weapon.attack_power %></p>
+          <p class="mb-1">攻撃属性: <%= selected_production_weapon.attack_attributes %></p>
+          <p class="mb-1">耐久力: <%= selected_production_weapon.durability %> / <%= selected_production_weapon.max_durability %></p>
+          <p class="mb-1">重さ: <%= selected_production_weapon.weight %></p>
+          <p class="mb-2">補正: HP <%= signed_bonus(selected_production_weapon.hp_bonus) %> / 筋力 <%= signed_bonus(selected_production_weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(selected_production_weapon.agility_bonus) %></p>
+          <%= button_to "生産する", produce_weapon_path(weapon_name: selected_production_weapon.name), method: :post, class: "btn btn-outline-warning w-100" %>
+        <% elsif production_recipes.any? %>
+          <div class="d-grid gap-2">
+            <% production_recipes.each do |recipe| %>
+              <% weapon = ShopCatalog.blacksmith_production_weapon(@player.location, recipe.weapon_name) %>
+              <% next unless weapon %>
+              <%= link_to "#{weapon.name} / #{recipe.required_col}コル / #{recipe.required_materials.map { |name, count| "#{name} ×#{count}" }.join("、")}", game_path(panel: "blacksmith", blacksmith_menu: "produce", weapon_name: weapon.name), class: "btn btn-outline-warning w-100" %>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="mb-0">この町の鍛冶屋には生産できる武器がありません。</p>
+        <% end %>
+      <% elsif blacksmith_menu == "repair" %>
+        <% if equipped_weapon %>
+          <p class="mb-1">対象: <%= equipped_weapon.display_name %></p>
+          <p class="mb-1">耐久力: <%= equipped_weapon.durability %> / <%= equipped_weapon.max_durability %></p>
+          <p class="mb-2">費用: <%= equipped_weapon.repair_cost %>コル</p>
+          <%= button_to "整備する", blacksmith_path, method: :post, class: "btn btn-outline-warning w-100" %>
+        <% else %>
+          <p class="mb-0">整備できる装備中の武器がありません。</p>
+        <% end %>
+      <% elsif blacksmith_menu == "upgrade" %>
+        <% selected_weapon = @player.weapons.find_by(id: params[:weapon_id]) %>
+        <% if selected_weapon %>
+          <%= link_to "強化する武器一覧に戻る", game_path(panel: "blacksmith", blacksmith_menu: "upgrade"), class: "btn btn-outline-light w-100 mb-3" %>
+          <% upgrade_recipe = WeaponUpgradeService.recipe_for(selected_weapon) %>
+          <h6><%= selected_weapon.display_name %></h6>
+          <p class="mb-1">現在攻撃力: <%= selected_weapon.effective_attack_power %></p>
+          <p class="mb-1">強化後: +<%= selected_weapon.enhancement_level.to_i + 1 %></p>
+          <p class="mb-1">必要素材: <%= upgrade_recipe&.required_materials&.map { |name, count| "#{name} ×#{count}" }&.join("、") || "硬い甲殻 ×1" %></p>
+          <p class="mb-2">必要コル: <%= upgrade_recipe&.required_col.to_i %></p>
+          <%= button_to "強化する", upgrade_weapon_path(weapon_id: selected_weapon.id), method: :post, class: "btn btn-outline-warning w-100" %>
+        <% elsif @player.weapons.any? %>
+          <div class="d-grid gap-2">
+            <% @player.weapons.each do |weapon| %>
+              <%= link_to "#{weapon.display_name} / 攻撃力 #{weapon.effective_attack_power}", game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: weapon.id), class: "btn btn-outline-warning w-100" %>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="mb-0">強化できる武器がありません。</p>
+        <% end %>
+      <% elsif blacksmith_menu == "evolve" %>
+        <% selected_weapon = @player.weapons.find_by(id: params[:weapon_id]) %>
+        <% rule = WeaponEvolutionRule.find_by(source_weapon_name: selected_weapon&.name) %>
+        <% if selected_weapon && rule %>
+          <%= link_to "進化する武器一覧に戻る", game_path(panel: "blacksmith", blacksmith_menu: "evolve"), class: "btn btn-outline-light w-100 mb-3" %>
+          <h6><%= selected_weapon.display_name %></h6>
+          <p class="mb-1">進化先: <%= rule.target_weapon_name %></p>
+          <p class="mb-1">必要強化値: +<%= rule.required_enhancement_level %></p>
+          <p class="mb-2">必要Lv: <%= rule.required_player_level %></p>
+          <%= button_to "進化する", evolve_weapon_path(weapon_id: selected_weapon.id), method: :post, class: "btn btn-outline-warning w-100" %>
+        <% else %>
+          <div class="d-grid gap-2">
+            <% @player.weapons.each do |weapon| %>
+              <% next unless WeaponEvolutionRule.exists?(source_weapon_name: weapon.name) %>
+              <%= link_to weapon.display_name, game_path(panel: "blacksmith", blacksmith_menu: "evolve", weapon_id: weapon.id), class: "btn btn-outline-warning w-100" %>
+            <% end %>
+          </div>
+        <% end %>
+      <% elsif blacksmith_menu == "sell" %>
+        <% sellable_weapons = @player.weapons.select(&:sellable_by_player?) %>
+        <% if sellable_weapons.any? %>
+          <div class="d-grid gap-2">
+            <% sellable_weapons.each do |weapon| %>
+              <div class="border rounded p-2">
+                <p class="mb-1"><%= weapon.display_name %></p>
+                <p class="mb-1">攻撃力: <%= weapon.effective_attack_power %> / 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                <p class="mb-2">売却額: <%= weapon.sell_price %>コル</p>
+                <% if weapon.unique_item? && params[:confirm_weapon_id].to_i != weapon.id %>
+                  <%= link_to "売却確認へ", game_path(panel: "blacksmith", blacksmith_menu: "sell", confirm_weapon_id: weapon.id), class: "btn btn-outline-danger w-100" %>
+                <% else %>
+                  <% if weapon.unique_item? %>
+                    <p class="text-danger small mb-2">この武器は二度と手には入らないかもしれません。本当に売却しますか？</p>
+                  <% end %>
+                  <%= button_to "売却する", sell_weapon_path(weapon_id: weapon.id, confirm_unique: weapon.unique_item? ? "1" : nil), method: :post, class: "btn btn-outline-warning w-100" %>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="mb-0">売却できる武器がありません。</p>
+        <% end %>
+      <% else %>
+        <p class="mb-0">左のメニューから行動を選択してください。</p>
+      <% end %>
+      </div>

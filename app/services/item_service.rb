@@ -6,11 +6,18 @@ class ItemService
 
   Result = Struct.new(:status, :message, :item, keyword_init: true)
 
-  def self.add_item!(player, name, category, quantity = 1)
+  def self.add_item!(player, name, category, quantity = 1, unique: false)
     item = player.items.find_or_create_by!(name: name, category: category) do |new_item|
       new_item.quantity = 0
+      new_item.apply_food_defaults
     end
     item.quantity = item.quantity.to_i + quantity.to_i
+    item.apply_food_defaults if item.food_definition.present?
+    if unique
+      item.unique_item = true
+      item.discardable = false
+      item.protected_from_death_penalty = true
+    end
     item
   end
 
@@ -90,5 +97,39 @@ class ItemService
     end
 
     Result.new(status: :ok, message: "ポーションを使った。HPが#{POTION_HEAL}回復した。")
+  end
+
+  def self.eat_item!(player, item)
+    return Result.new(status: :error, message: "そのアイテムは所持していません。") unless item&.quantity.to_i.positive?
+    return Result.new(status: :error, message: "それは食べられません。") unless item.food?
+    return Result.new(status: :error, message: "それは食べられそうにありません。") unless item.edible_by?(player)
+
+    satiety_restore = item.effective_satiety_restore
+    if player.satiety.to_d + satiety_restore > player.max_satiety
+      return Result.new(status: :error, message: "これ以上は食べられそうにない。")
+    end
+
+    effect_data = item.effective_eat_effect_data
+    hp_restore = effect_data["hp"].to_i
+    status_effects = effect_data["statuses"].is_a?(Hash) ? effect_data["statuses"] : {}
+
+    item.quantity -= 1
+    player.hp = [player.hp.to_i + hp_restore, player.effective_max_hp].min if hp_restore.positive?
+    player.increase_satiety!(satiety_restore)
+    status_effects.each { |key, value| player.apply_status_effect!(key, value) }
+
+    ActiveRecord::Base.transaction do
+      item.quantity.to_i <= 0 ? item.destroy! : item.save!
+      player.save!
+    end
+
+    messages = ["#{item.name}を食べた。"]
+    messages << "HPが#{hp_restore}回復した。" if hp_restore.positive?
+    messages << "満腹度が#{satiety_restore}上がった。" if satiety_restore.positive?
+    status_effects.each_key do |key|
+      messages << "#{Player::STATUS_LABELS.fetch(key.to_s, key.to_s)}状態になった。"
+    end
+
+    Result.new(status: :ok, message: messages.join, item: item)
   end
 end

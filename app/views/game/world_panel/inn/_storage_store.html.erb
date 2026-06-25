@@ -1,0 +1,71 @@
+              <%= button_to "表示中の種類をすべて預ける", bulk_store_items_path(item_category: item_category), method: :post, class: "btn btn-outline-info w-100 mb-3" %>
+              <% carried_items = @player.items.where("quantity > 0").order(:category, :name) %>
+              <% carried_items = carried_items.where(category: item_category) if item_category.present? && !%w[weapons armors].include?(item_category) %>
+              <% carried_weapons = item_category.blank? || item_category == "weapons" ? @player.weapons.where(equipped: false, favorite: false).order(:name) : [] %>
+              <% carried_armors = item_category.blank? || item_category == "armors" ? @player.armors.where(equipped: false, favorite: false).order(:slot, :name) : [] %>
+
+              <% if carried_weapons.any? %>
+                <h6 class="mt-2">武器</h6>
+                <div class="d-grid gap-2 mb-2">
+                  <% carried_weapons.each do |weapon| %>
+                    <div class="border rounded p-2">
+                      <p class="mb-1"><%= weapon.display_name %> / 耐久 <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                      <%= button_to "預ける", store_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-light btn-sm w-100" %>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+
+              <% if carried_armors.any? %>
+                <h6 class="mt-2">防具</h6>
+                <div class="d-grid gap-2 mb-2">
+                  <% carried_armors.each do |armor| %>
+                    <div class="border rounded p-2">
+                      <p class="mb-1"><%= armor.name %> / <%= armor.slot_name %></p>
+                      <%= button_to "預ける", store_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-light btn-sm w-100" %>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+
+              <% if item_category == "drop" %>
+                <% drop_groups = carried_items.group_by { |item| item.name.to_s.split("の").first } %>
+                <% if drop_groups.any? %>
+                  <h6 class="mt-2">ドロップアイテム</h6>
+                  <div class="d-grid gap-2">
+                    <% drop_groups.each do |group_name, items| %>
+                      <div class="border rounded">
+                        <button class="btn btn-dark w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#store-drop-<%= group_name.hash.abs %>"><%= group_name %>関連（<%= items.size %>種類）</button>
+                        <div class="collapse p-2" id="store-drop-<%= group_name.hash.abs %>">
+                          <% items.each do |item| %>
+                            <%= form_with url: store_item_path(item_id: item.id), method: :post, class: "d-flex gap-2 mb-2" do %>
+                              <span class="flex-fill"><%= item.name %> × <%= item.quantity %></span>
+                              <%= number_field_tag :quantity, item.quantity, min: 1, max: item.quantity, class: "form-control form-control-sm", style: "max-width: 90px;" %>
+                              <%= submit_tag "預ける", class: "btn btn-outline-light btn-sm" %>
+                            <% end %>
+                          <% end %>
+                        </div>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+              <% elsif !%w[weapons armors].include?(item_category.to_s) %>
+                <% if carried_items.any? %>
+                  <h6 class="mt-2">アイテム</h6>
+                  <div class="d-grid gap-2">
+                    <% carried_items.each do |item| %>
+                      <div class="border rounded p-2">
+                        <%= form_with url: store_item_path(item_id: item.id), method: :post, class: "d-flex gap-2" do %>
+                          <span class="flex-fill"><%= item.name %> × <%= item.quantity %></span>
+                          <%= number_field_tag :quantity, item.quantity, min: 1, max: item.quantity, class: "form-control form-control-sm", style: "max-width: 90px;" %>
+                          <%= submit_tag "預ける", class: "btn btn-outline-light btn-sm" %>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+              <% end %>
+
+              <% if carried_items.empty? && carried_weapons.empty? && carried_armors.empty? %>
+                <p class="text-secondary small mb-0">預けられる所持品はありません。</p>
+              <% end %>
