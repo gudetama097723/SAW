@@ -51,6 +51,41 @@ class PlayerTest < ActiveSupport::TestCase
     assert_operator player.status_value_data["poison"], :<, 100
   end
 
+  test "sleep value rises after fifteen awake hours" do
+    player = players(:one)
+    player.update!(awake_minutes_since_sleep: 15 * 60)
+
+    player.advance_time!(60)
+
+    assert_equal 10, player.status_value_data["sleep"]
+  end
+
+  test "sleep value reaches cap and activates sleep" do
+    player = players(:one)
+    player.update!(awake_minutes_since_sleep: 15 * 60, status_values: { sleep: 90 }.to_json)
+
+    player.advance_time!(60)
+
+    assert StatusEffectService.active?(player, "sleep")
+    assert_equal "限界だ……", player.sleepiness_warning_message
+  end
+
+  test "rest recovery reduces recoverable status values by ten percent and clears low values" do
+    player = players(:one)
+    player.status_values = { poison: 50, burn: 4, curse: 50 }.to_json
+    StatusEffectService.activate!(player, "poison")
+    StatusEffectService.activate!(player, "burn")
+    StatusEffectService.activate!(player, "curse")
+
+    StatusEffectService.rest_recover_values!(player)
+
+    assert_equal 45, player.status_value_data["poison"]
+    assert_nil player.status_value_data["burn"]
+    assert_equal 50, player.status_value_data["curse"]
+    assert_not StatusEffectService.active?(player, "burn")
+    assert StatusEffectService.active?(player, "curse")
+  end
+
   test "curse reduces effective max hp" do
     player = players(:one)
     player.max_hp = 100
@@ -105,6 +140,7 @@ class PlayerTest < ActiveSupport::TestCase
   test "sleep in field forces encounter while staying asleep" do
     player = players(:one)
     player.rests.destroy_all
+    routes(:one).update!(danger_level: 100)
     player.update!(field_route: routes(:one), field_position: 0)
     StatusEffectService.activate!(player, "sleep")
 
@@ -114,5 +150,37 @@ class PlayerTest < ActiveSupport::TestCase
     assert result.battle
     assert StatusEffectService.active?(player, "sleep")
     assert_not player.rests.exists?
+  end
+
+  test "time buff directly modifies player stats and expires by time" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
+    before_hp = player.effective_max_hp
+
+    BuffEffectService.apply_time_buff!(player, "test_food", { hp: 20, strength: 3, agility: 2, accuracy: 10 }, duration_minutes: 5)
+
+    assert_equal before_hp + 20, player.effective_max_hp
+    assert_equal 13, player.effective_strength
+    assert_equal 12, player.effective_agility
+    assert_equal 10, BuffEffectService.accuracy_modifier(player)
+
+    player.advance_time!(5)
+
+    assert_empty BuffEffectService.time_effects(player)
+  end
+
+  test "battle effect modifies battle enemy stats and expires by turns" do
+    battle = battles(:one)
+    enemy = battle.battle_enemies.create!(mob: mobs(:one), enemy_hp: 100, enemy_max_hp: 100, enemy_level: 1, position: 1)
+    enemy.mob.update!(atk: 10, agility: 10)
+
+    BuffEffectService.apply_battle_effect!(enemy, "rage", { attack_percent: 50, agility_percent: -20 }, turns: 1)
+
+    assert_equal 15, enemy.effective_atk
+    assert_equal 8, enemy.effective_agility
+
+    BuffEffectService.tick_battle_turn!(enemy)
+
+    assert_empty BuffEffectService.battle_effects(enemy)
   end
 end

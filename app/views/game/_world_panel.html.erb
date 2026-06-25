@@ -6,9 +6,10 @@
   - inn: 宿屋 / 拠点 / 収納
   - item_shop: 道具屋
   - blacksmith: 鍛冶屋
+  - restaurant: 飲食店
   - default_actions: 通常行動 / 移動
 %>
-<% facility_panel_open = selected_panel.in?(%w[inn item_shop blacksmith equipment items skills]) && @player.location&.safe_area? %>
+<% facility_panel_open = selected_panel.in?(%w[inn item_shop blacksmith restaurant equipment items skills]) && @player.location&.safe_area? %>
 
 <% if facility_panel_open %>
   <div class="card bg-secondary text-light mb-3">
@@ -21,9 +22,50 @@
     <% elsif selected_panel == "inn" %>
       <%= render "game/world_panel/inn" %>
     <% elsif selected_panel == "item_shop" %>
-      <%= render "game/world_panel/item_shop" %>
+      <% if !@player.town_discovery_for&.found_item_shop? %>
+        <div class="card-header">道具屋</div>
+        <div class="card-body">
+          <p class="mb-0">道具屋はまだ見つけていません。</p>
+        </div>
+      <% elsif FacilityHoursService.open?("item_shop", @player) %>
+        <%= render "game/world_panel/item_shop" %>
+      <% else %>
+        <div class="card-header">道具屋</div>
+        <div class="card-body">
+          <p class="mb-2"><%= FacilityHoursService.closed_message("item_shop", @player) %></p>
+          <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
+        </div>
+      <% end %>
     <% elsif selected_panel == "blacksmith" %>
-      <%= render "game/world_panel/blacksmith", equipped_weapon: equipped_weapon %>
+      <% if !@player.town_discovery_for&.found_blacksmith? %>
+        <div class="card-header">鍛冶屋</div>
+        <div class="card-body">
+          <p class="mb-0">鍛冶屋はまだ見つけていません。</p>
+        </div>
+      <% elsif FacilityHoursService.open?("blacksmith", @player) %>
+        <%= render "game/world_panel/blacksmith", equipped_weapon: equipped_weapon %>
+      <% else %>
+        <div class="card-header">鍛冶屋</div>
+        <div class="card-body">
+          <p class="mb-2"><%= FacilityHoursService.closed_message("blacksmith", @player) %></p>
+          <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
+        </div>
+      <% end %>
+    <% elsif selected_panel == "restaurant" %>
+      <% if !@player.town_discovery_for&.found_restaurant? %>
+        <div class="card-header">飲食店</div>
+        <div class="card-body">
+          <p class="mb-0">飲食店はまだ見つけていません。</p>
+        </div>
+      <% elsif FacilityHoursService.open?("restaurant", @player) %>
+        <%= render "game/world_panel/restaurant" %>
+      <% else %>
+        <div class="card-header">飲食店</div>
+        <div class="card-body">
+          <p class="mb-2"><%= FacilityHoursService.closed_message("restaurant", @player) %></p>
+          <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
+        </div>
+      <% end %>
     <% end %>
   </div>
 <% else %>

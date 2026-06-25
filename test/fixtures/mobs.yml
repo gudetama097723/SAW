@@ -9,6 +9,7 @@ one:
   agility: 1
   durability: 1
   exp_reward: 1
+  flee_rate: 0
 
 two:
   name: MyString
@@ -19,3 +20,4 @@ two:
   agility: 1
   durability: 1
   exp_reward: 1
+  flee_rate: 0

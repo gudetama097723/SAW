@@ -34,12 +34,16 @@ class BattleEnemy < ApplicationRecord
     mob.status_accumulation_limit(status)
   end
 
+  def battle_effect_data
+    BuffEffectService.battle_effects(self)
+  end
+
   def effective_atk
-    scaled_value(mob.atk)
+    (scaled_value(mob.atk) * BuffEffectService.attack_multiplier(self)).round
   end
 
   def effective_agility
-    scaled_value(mob.agility)
+    (scaled_value(mob.agility) * BuffEffectService.agility_multiplier(self)).round
   end
 
   def effective_durability

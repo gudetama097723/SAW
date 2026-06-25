@@ -1,0 +1,54 @@
+<% restaurant_name = RestaurantCatalog.restaurant_name(@player.location) %>
+<% menu_items = RestaurantCatalog.menu_items(@player.location) %>
+<% available_menu_items = RestaurantCatalog.available_menu_items(@player) %>
+<% selected_menu = RestaurantCatalog.menu_item(@player.location, params[:menu_name].presence) %>
+<div class="card-header"><%= restaurant_name %></div>
+<div class="card-body">
+  <% if selected_menu %>
+    <% ingredient = RestaurantCatalog.ingredient_for(@player, selected_menu) %>
+    <% buff_parts = [] %>
+    <% buff_parts << "最大HP #{signed_bonus(selected_menu.hp_bonus)}" if selected_menu.hp_bonus.to_i != 0 %>
+    <% buff_parts << "筋力 #{signed_bonus(selected_menu.strength_bonus)}" if selected_menu.strength_bonus.to_i != 0 %>
+    <% buff_parts << "敏捷 #{signed_bonus(selected_menu.agility_bonus)}" if selected_menu.agility_bonus.to_i != 0 %>
+    <% buff_parts << "命中 #{signed_bonus(selected_menu.accuracy_bonus)}" if selected_menu.accuracy_bonus.to_i != 0 %>
+    <%= link_to "メニューに戻る", game_path(panel: "restaurant"), class: "btn btn-outline-light w-100 mb-3" %>
+    <h5><%= selected_menu.menu_name %></h5>
+    <p class="mb-1">価格: <%= selected_menu.price %>コル</p>
+    <p class="mb-1">満腹度: +<%= selected_menu.satiety_restore %></p>
+    <p class="mb-1">効果時間: <%= selected_menu.duration_minutes %>分</p>
+    <p class="mb-1">調理時間: <%= selected_menu.preparation_minutes %>分</p>
+    <% if buff_parts.any? %>
+      <p class="mb-1">効果: <%= buff_parts.join(" / ") %></p>
+    <% end %>
+    <% if selected_menu.description.present? %>
+      <p class="mb-2"><%= selected_menu.description %></p>
+    <% end %>
+    <% if selected_menu.special? %>
+      <p class="mb-2">必要食材: <%= selected_menu.required_item_name %> ×<%= selected_menu.required_item_quantity %>（所持: <%= ingredient&.quantity.to_i %>）</p>
+    <% end %>
+    <% if params[:confirm_order] == "1" %>
+      <p class="mb-2 text-warning">この料理を注文しますか？</p>
+      <div class="d-flex gap-2">
+        <%= button_to "はい", restaurant_path(menu_name: selected_menu.menu_name, confirm_order: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-outline-warning w-100" %>
+        <%= link_to "いいえ", game_path(panel: "restaurant", menu_name: selected_menu.menu_name), class: "btn btn-outline-light flex-fill" %>
+      </div>
+    <% else %>
+      <%= link_to "注文確認へ", game_path(panel: "restaurant", menu_name: selected_menu.menu_name, confirm_order: "1"), class: "btn btn-outline-warning w-100" %>
+    <% end %>
+  <% elsif menu_items.any? %>
+    <div class="d-grid gap-2">
+      <% available_menu_items.each do |menu_item| %>
+        <% label = "#{menu_item.menu_name} / #{menu_item.price}コル / 満腹度+#{menu_item.satiety_restore}" %>
+        <% label = "特別: #{label}" if menu_item.special? %>
+        <%= link_to label, game_path(panel: "restaurant", menu_name: menu_item.menu_name), class: "btn btn-outline-warning w-100" %>
+      <% end %>
+      <% if available_menu_items.none? %>
+        <p class="mb-0">今注文できる料理はありません。</p>
+      <% end %>
+      <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
+    </div>
+  <% else %>
+    <p class="mb-2">この町の飲食店にはまだメニューがありません。</p>
+    <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
+  <% end %>
+</div>

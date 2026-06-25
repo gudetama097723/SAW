@@ -33,6 +33,9 @@
               <% if @player.overweight? %>
                 <p class="text-warning mb-0">重量オーバー：移動速度と回避率が低下しています</p>
               <% end %>
+              <% if @player.sleepiness_warning_message.present? %>
+                <p class="text-warning mb-0"><%= @player.sleepiness_warning_message %></p>
+              <% end %>
             </div>
           </div>
 

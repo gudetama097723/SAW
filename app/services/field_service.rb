@@ -132,8 +132,10 @@ class FieldService
     return Result.new(status: :none) if mobs.empty?
 
     player.rests.destroy_all
+    destroyed_tent = destroy_best_portable_tent!(player)
     battle = create_battle!(player, mobs)
-    Result.new(status: :encounter, message: "休憩中に#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に見つかった！", battle: battle)
+    tent_message = destroyed_tent ? "#{destroyed_tent.name}を壊された！" : ""
+    Result.new(status: :encounter, message: "休憩中に#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に見つかった！#{tent_message}", battle: battle)
   end
 
   def self.item_use_surprise_encounter!(player)
@@ -175,11 +177,26 @@ class FieldService
     end
 
     if StatusEffectService.active?(player, "sleep")
+      player.rests.destroy_all
+      heal = [(player.effective_max_hp * 0.01).ceil, 1].max
+      player.hp = [player.hp.to_i + heal, player.effective_max_hp].min
+      player.advance_time!(5)
+      StatusEffectService.recover_values_percent!(player, 0.10)
+      player.save!
+
+      chance = [[field_danger_level(player), 0].max, 100].min
+      if rand(100) >= chance
+        StatusEffectService.cure!(player, "sleep")
+        player.reset_sleep_deprivation!
+        player.save!
+        return Result.new(status: :ok, message: "その場で眠った。HPが#{heal}回復した。")
+      end
+
       mobs = encounter_mobs_for(player)
       return Result.new(status: :none) if mobs.empty?
 
       battle = create_battle!(player, mobs, ambush: true)
-      return Result.new(status: :encounter, message: "眠っているところを#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に見つかった！", battle: battle)
+      return Result.new(status: :encounter, message: "眠っているところを#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に襲われた！", battle: battle)
     end
 
     nil
@@ -191,6 +208,8 @@ class FieldService
     return unless first_mob
 
     player.battles.destroy_all
+    BuffEffectService.clear_battle_effects!(player)
+    player.save!
     battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp, ambush: ambush)
     mobs.first(5).each.with_index(1) do |mob, position|
       enemy_level = enemy_level_for(player.field_route, mob)
@@ -343,7 +362,38 @@ class FieldService
     route.field_areas.ordered.find { |area| area.include_distance?(distance) }
   end
 
+  def self.field_rest_available?(player)
+    return false unless player&.field_route.present?
+    return true if base_rest_encounter_chance(player) <= 0
+
+    best_portable_tent(player).present?
+  end
+
+  def self.best_portable_tent(player)
+    player.items.select { |item| item.portable_tent? && item.quantity.to_i.positive? }.max_by do |item|
+      -item.tent_encounter_multiplier
+    end
+  end
+
+  def self.destroy_best_portable_tent!(player)
+    tent = best_portable_tent(player)
+    return unless tent&.quantity.to_i&.positive?
+
+    tent.quantity = tent.quantity.to_i - 1
+    tent.quantity.to_i <= 0 ? tent.destroy! : tent.save!
+    tent
+  end
+
   def self.rest_encounter_chance(player)
+    base_chance = base_rest_encounter_chance(player)
+    return base_chance if base_chance <= 0
+
+    tent = best_portable_tent(player)
+    multiplier = tent&.tent_encounter_multiplier || 1.0
+    (base_chance * multiplier).ceil.clamp(0, 100)
+  end
+
+  def self.base_rest_encounter_chance(player)
     area = current_area_for(player)
     return [[field_danger_level(player) / 3, 0].max, 100].min unless area
 

@@ -63,6 +63,7 @@
 
     blocked_message = StatusEffectService.action_blocked_message!(player)
     if blocked_message
+      BuffEffectService.tick_battle_turn!(player)
       player.save!
       enemy_result = apply_enemy_attack!(player, battle)
       return enemy_result if enemy_result.status == :defeated
@@ -105,6 +106,7 @@
 
     skill_message = sword_skill ? gain_sword_skill_use!(player, weapon, skill_key, skill_gain) : ""
 
+    BuffEffectService.tick_battle_turn!(player)
     player.save!
     battle.save!
     broken_message = destroy_weapon_if_broken!(weapon)
@@ -126,6 +128,8 @@
   end
 
   def self.apply_enemy_attack!(player, battle, prefix: "", allow_evasion: true)
+    return Result.new(status: :ok, message: "") if battle.destroyed?
+
     ensure_battle_enemies!(battle)
     messages = []
 
@@ -133,12 +137,22 @@
       mob_name = battle_enemy.mob.name
       blocked_message = StatusEffectService.action_blocked_message!(battle_enemy)
       if blocked_message
+        BuffEffectService.tick_battle_turn!(battle_enemy)
         battle_enemy.save!
         messages << enemy_message("#{prefix}#{blocked_message}")
         next
       end
 
+      if enemy_flees?(battle_enemy)
+        BuffEffectService.tick_battle_turn!(battle_enemy)
+        battle_enemy.destroy!
+        messages << enemy_message("#{prefix}#{mob_name}は逃走した！")
+        next
+      end
+
       if allow_evasion && evaded_enemy_attack?(player, battle_enemy)
+        BuffEffectService.tick_battle_turn!(battle_enemy)
+        battle_enemy.save!
         messages << enemy_message("#{prefix}#{mob_name}の攻撃を回避した！")
         next
       end
@@ -147,6 +161,7 @@
       enemy_damage = [raw_damage - player.damage_cut, 1].max
       enemy_damage = (enemy_damage * StatusEffectService.damage_dealt_multiplier(battle_enemy)).ceil
       enemy_damage = (enemy_damage * StatusEffectService.damage_taken_multiplier(player)).ceil
+      enemy_damage = (enemy_damage * BuffEffectService.defense_damage_taken_multiplier(player)).ceil
       critical = StatusEffectService.sleeping_critical!(player)
       enemy_damage *= 2 if critical
       player.hp = player.hp.to_i - enemy_damage
@@ -158,10 +173,17 @@
       end
 
       critical_message = critical ? "クリティカル！" : ""
+      BuffEffectService.tick_battle_turn!(battle_enemy)
+      battle_enemy.save!
       messages << enemy_message("#{prefix}#{mob_name}の攻撃！#{critical_message}#{enemy_damage}ダメージを受けた！")
     end
 
     player.save!
+    if battle.alive_enemies.reload.empty?
+      battle.destroy!
+      messages << "敵はいなくなった。"
+    end
+
     Result.new(status: :ok, message: messages.join)
   end
 
@@ -270,10 +292,12 @@ def self.calculate_player_damage(player, weapon, battle_enemy, part, attack_attr
   attack_power = (stat_power * 0.7) + (weapon_power * 1.3)
   attack_power *= attribute_multiplier(weapon, battle_enemy.mob, part, attack_attribute)
   attack_power *= weapon_proficiency_attack_bonus(player, weapon)
+  attack_power *= BuffEffectService.attack_multiplier(player)
   defense_rate = 100.0 / (100 + [battle_enemy.effective_durability, 0].max)
   base_damage = attack_power * defense_rate
   base_damage *= StatusEffectService.damage_dealt_multiplier(player)
   base_damage *= StatusEffectService.damage_taken_multiplier(battle_enemy)
+  base_damage *= BuffEffectService.defense_damage_taken_multiplier(battle_enemy)
   [(base_damage * part.damage_multiplier.to_i / 100.0).ceil, 1].max
 end
 
@@ -300,11 +324,16 @@ end
 end
 
   def self.player_attack_hit?(player, battle_enemy, part)
-    agility_gap = player.effective_agility - mob_effective_agility(battle_enemy)
+    player_agility = (player.effective_agility * BuffEffectService.agility_multiplier(player)).round
+    agility_gap = player_agility - mob_effective_agility(battle_enemy)
     part_modifier = part.weakness? ? -10 : 0
     ambush_bonus = battle_enemy.battle.ambush? ? 15 : 0
 
+    return true if BuffEffectService.sure_hit?(player)
+
     chance = 85 + (agility_gap * 3) + part_modifier + ambush_bonus
+    chance += BuffEffectService.accuracy_modifier(player)
+    chance -= BuffEffectService.accuracy_modifier(battle_enemy)
     chance = chance.clamp(55, 98)
 
     rand(100) < chance
@@ -342,6 +371,7 @@ end
     player.location = respawn_location if respawn_location
     player.field_route = nil
     player.field_position = 0
+    BuffEffectService.clear_battle_effects!(player)
     lost_message = apply_death_item_penalty!(player)
     battle.destroy!
     player.save!
@@ -384,6 +414,8 @@ end
     boss_reward_message = defeated_enemies.map { |enemy| ExplorationRewardService.boss_victory_message!(player, enemy.mob) }.join
     exp_message = gain_exp_message(player, defeated_enemies)
     skill_message = gain_weapon_skill_for_victory!(player, weapon, defeated_enemies.count, skill_gain, sword_skill, skill_key)
+    BuffEffectService.clear_battle_effects!(player)
+    player.save!
     battle.destroy!
 
     broken_message = destroy_weapon_if_broken!(weapon)
@@ -519,10 +551,16 @@ end
   end
 
   def self.evaded_enemy_attack?(player, battle_enemy)
-    agility_gap = player.effective_agility - mob_effective_agility(battle_enemy)
+    player_agility = (player.effective_agility * BuffEffectService.agility_multiplier(player)).round
+    agility_gap = player_agility - mob_effective_agility(battle_enemy)
     weight_penalty = player.overweight? ? (player.overweight_amount * 2).ceil : 0
     chance = [[10 + (agility_gap * 5) - weight_penalty, 5].max, 75].min
     rand(100) < chance
+  end
+
+  def self.enemy_flees?(battle_enemy)
+    rate = battle_enemy.mob.effective_flee_rate
+    rate.positive? && rand(100) < rate
   end
 
   def self.gain_exp_message(player, defeated_enemies)

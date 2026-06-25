@@ -1,13 +1,38 @@
-﻿<div class="card bg-info text-dark mb-3">
+<div class="card bg-info text-dark mb-3">
   <div class="card-header">休憩中</div>
   <div class="card-body">
-    <p>安全を確保して休憩している。</p>
+    <% tent = FieldService.best_portable_tent(@player) %>
+    <% encounter_chance = FieldService.rest_encounter_chance(@player) %>
+    <% recovery_needed = @player.hp.to_i < @player.effective_max_hp || StatusEffectService.recoverable_value_total(@player).positive? %>
 
-    <% if @player.skills.exists?(name: "昼寝") %>
-      <%= button_to "昼寝する", use_rest_skill_path, method: :post, class: "btn btn-success w-100 mb-2" %>
+    <p class="mb-2">安全を確保して休憩している。</p>
+    <p class="small mb-3">
+      <% if tent %>
+        使用中: <%= tent.name %> / 遭遇率 <%= encounter_chance %>%
+      <% else %>
+        遭遇率 <%= encounter_chance %>%
+      <% end %>
+    </p>
+
+    <h6>アイテムを使う</h6>
+    <%= button_to "ポーションを使う", use_rest_item_path, method: :post, class: "btn btn-outline-success w-100 mb-3" %>
+
+    <h6>眠る</h6>
+    <%= form_with url: sleep_rest_path, method: :post, class: "mb-3" do %>
+      <% unless recovery_needed %>
+        <div class="input-group mb-2">
+          <%= number_field_tag :sleep_minutes, 30, min: 5, step: 5, class: "form-control" %>
+          <span class="input-group-text">分</span>
+        </div>
+      <% end %>
+      <%= submit_tag "眠る", class: "btn btn-success w-100" %>
     <% end %>
 
-    <%= button_to "ポーションを使う", use_rest_item_path, method: :post, class: "btn btn-outline-success w-100 mb-2" %>
+    <% if @player.skills.exists?(name: "昼寝") %>
+      <h6>スキル</h6>
+      <%= button_to "昼寝する", use_rest_skill_path, method: :post, class: "btn btn-outline-primary w-100 mb-3" %>
+    <% end %>
+
     <%= button_to "休憩を終える", end_rest_path, method: :post, class: "btn btn-outline-dark w-100" %>
   </div>
 </div>

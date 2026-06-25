@@ -25,12 +25,30 @@ class Item < ApplicationRecord
     }
   }.freeze
 
+  TENT_DEFINITIONS = {
+    "持ち運びテント" => { encounter_multiplier: 0.7, weight: 8.to_d, price: 120 },
+    "上等な持ち運びテント" => { encounter_multiplier: 0.5, weight: 10.to_d, price: 280 },
+    "高級持ち運びテント" => { encounter_multiplier: 0.3, weight: 12.to_d, price: 600 }
+  }.freeze
+
   def category_name
     CATEGORIES.fetch(category, "その他")
   end
 
   def food_definition
     FOOD_DEFINITIONS[name] || {}
+  end
+
+  def tent_definition
+    TENT_DEFINITIONS[name] || {}
+  end
+
+  def portable_tent?
+    tent_definition.present?
+  end
+
+  def tent_encounter_multiplier
+    tent_definition.fetch(:encounter_multiplier, 1.0).to_f
   end
 
   def food?
@@ -71,6 +89,14 @@ class Item < ApplicationRecord
     self.description = food_definition[:description] if has_attribute?(:description) && food_definition[:description].present?
   end
 
+  def apply_item_defaults
+    apply_food_defaults
+    return unless tent_definition.present?
+
+    self.category = "misc" if category.blank?
+    self.weight = tent_definition[:weight] if has_attribute?(:weight)
+  end
+
 def total_weight
   weight.to_d * quantity.to_i
 end
@@ -97,6 +123,9 @@ def sell_price
       "ポーション" => 15,
       "解毒ポーション" => 20,
       "火傷治し" => 20,
+      "持ち運びテント" => 60,
+      "上等な持ち運びテント" => 140,
+      "高級持ち運びテント" => 300,
       "スライムの核" => 8,
       "ホーンラビットの角" => 12,
       "変異スライムの核" => 25,

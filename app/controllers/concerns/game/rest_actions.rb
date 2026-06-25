@@ -1,5 +1,10 @@
 module Game
   module RestActions
+    REST_SLEEP_TICK_MINUTES = 5
+    REST_SLEEP_MAX_TICKS = 288
+    INN_SLEEP_HP_RECOVERY_RATE = 0.02
+    INN_SLEEP_STATUS_RECOVERY = 2
+
     def start_rest
       player = current_player
 
@@ -13,15 +18,14 @@ module Game
         return
       end
 
-      danger = FieldService.field_danger_level(player)
-
-      if rand(100) < danger
-        redirect_to game_path, notice: "周囲に敵の気配があり、休憩できなかった。"
-      else
-        current_player.rests.destroy_all
-        Rest.create!(player: player)
-        redirect_to game_path, notice: "休憩を開始した。"
+      unless FieldService.field_rest_available?(player)
+        redirect_to game_path, notice: "休憩には持ち運びテントが必要です。"
+        return
       end
+
+      current_player.rests.destroy_all
+      Rest.create!(player: player)
+      redirect_to game_path, notice: "休憩を開始した。"
     end
 
     def use_rest_skill
@@ -77,6 +81,43 @@ module Game
       redirect_to game_path, notice: item_result.message
     end
 
+    def sleep_rest
+      player = current_player
+      rest = current_rest
+
+      unless rest
+        redirect_to game_path, alert: "休憩中ではありません。"
+        return
+      end
+
+      ticks = rest_sleep_ticks_for(player)
+      elapsed_minutes = 0
+      hp_before = player.hp.to_i
+      StatusEffectService.activate!(player, "sleep")
+
+      ticks.times do
+        player.advance_time!(REST_SLEEP_TICK_MINUTES)
+        recover_rest_tick!(player)
+        player.save!
+        elapsed_minutes += REST_SLEEP_TICK_MINUTES
+
+        check_rest_encounter!(player)
+        return if performed?
+
+        break if rest_recovery_complete?(player) && requested_rest_sleep_minutes <= 0
+      end
+
+      StatusEffectService.cure!(player, "sleep") if rest_recovery_complete?(player)
+      player.increment_skill_counter!("field_sleep_count")
+      player.save!
+
+      hp_recovered = player.hp.to_i - hp_before
+      message = "眠って#{elapsed_minutes}分経過した。"
+      message += "HPが#{hp_recovered}回復した。" if hp_recovered.positive?
+      message += "状態異常値が少し回復した。"
+      redirect_to game_path, notice: message
+    end
+
     def end_rest
       current_player.rests.destroy_all
       redirect_to game_path, notice: "休憩を終えた。"
@@ -108,15 +149,101 @@ module Game
         return
       end
 
+      requested_minutes = requested_inn_sleep_minutes
+      if rest_recovery_complete?(player) && requested_minutes <= 0
+        redirect_to game_path(panel: "inn"), alert: "HPと状態異常値は回復済みです。眠る時間を5分以上で入力してください。"
+        return
+      end
+
       current_player.rests.destroy_all
       player.col = player.col.to_i - cost
-      player.hp = player.effective_max_hp
-      StatusEffectService.cure_recoverable!(player)
-      player.advance_time!(60)
+      ticks = inn_sleep_ticks_for(player, requested_minutes)
+      elapsed_minutes = 0
+      hp_before = player.hp.to_i
+      status_before = StatusEffectService.recoverable_value_total(player)
+
+      ticks.times do
+        advance_inn_sleep_time!(player, REST_SLEEP_TICK_MINUTES)
+        recover_inn_sleep_tick!(player)
+        elapsed_minutes += REST_SLEEP_TICK_MINUTES
+
+        break if requested_minutes <= 0 && rest_recovery_complete?(player)
+      end
+
+      StatusEffectService.cure_recoverable!(player) if rest_recovery_complete?(player)
+      player.reset_sleep_deprivation!
       player.save!
 
       payment_message = cost.positive? ? "#{cost}コル支払った。" : ""
-      redirect_to game_path(panel: "inn"), notice: "宿屋で休憩した。#{payment_message}HPと呪い以外の状態異常が回復した。"
+      hp_recovered = player.hp.to_i - hp_before
+      status_recovered = [status_before - StatusEffectService.recoverable_value_total(player), 0].max
+      recovery_message = []
+      recovery_message << "HPが#{hp_recovered}回復した" if hp_recovered.positive?
+      recovery_message << "状態異常値が#{status_recovered.round(2)}回復した" if status_recovered.positive?
+      recovery_message = recovery_message.present? ? "#{recovery_message.join('、')}。" : ""
+      redirect_to game_path(panel: "inn"), notice: "宿屋で眠った。#{payment_message}#{elapsed_minutes}分経過した。#{recovery_message}"
+    end
+
+    private
+
+    def rest_sleep_ticks_for(player)
+      requested_minutes = requested_rest_sleep_minutes
+      return (requested_minutes / REST_SLEEP_TICK_MINUTES.to_f).ceil.clamp(1, REST_SLEEP_MAX_TICKS) if requested_minutes.positive?
+
+      missing_hp = [player.effective_max_hp - player.hp.to_i, 0].max
+      status_total = StatusEffectService.recoverable_value_total(player)
+      hp_ticks = (missing_hp.to_f / [(player.effective_max_hp * 0.01).ceil, 1].max).ceil
+      status_ticks = status_total.positive? ? REST_SLEEP_MAX_TICKS : 0
+      [hp_ticks, status_ticks, 1].max.clamp(1, REST_SLEEP_MAX_TICKS)
+    end
+
+    def requested_rest_sleep_minutes
+      minutes = params[:sleep_minutes].to_i
+      return 0 if minutes <= 0
+
+      (minutes / REST_SLEEP_TICK_MINUTES.to_f).ceil * REST_SLEEP_TICK_MINUTES
+    end
+
+    def requested_inn_sleep_minutes
+      minutes = params[:sleep_minutes].to_i
+      return 0 if minutes <= 0
+
+      (minutes / REST_SLEEP_TICK_MINUTES.to_f).ceil * REST_SLEEP_TICK_MINUTES
+    end
+
+    def recover_rest_tick!(player)
+      hp_recover = [(player.effective_max_hp * 0.01).ceil, 1].max
+      player.hp = [player.hp.to_i + hp_recover, player.effective_max_hp].min
+      StatusEffectService.rest_recover_values!(player)
+    end
+
+    def rest_recovery_complete?(player)
+      player.hp.to_i >= player.effective_max_hp &&
+        StatusEffectService.recoverable_value_total(player) <= 0
+    end
+
+    def inn_sleep_ticks_for(player, requested_minutes)
+      return (requested_minutes / REST_SLEEP_TICK_MINUTES.to_f).ceil.clamp(1, REST_SLEEP_MAX_TICKS) if requested_minutes.positive?
+
+      missing_hp = [player.effective_max_hp - player.hp.to_i, 0].max
+      hp_recovery = [(player.effective_max_hp * INN_SLEEP_HP_RECOVERY_RATE).ceil, 1].max
+      hp_ticks = (missing_hp.to_f / hp_recovery).ceil
+      status_ticks = (StatusEffectService.recoverable_value_total(player) / INN_SLEEP_STATUS_RECOVERY).ceil
+      [hp_ticks, status_ticks, 1].max.clamp(1, REST_SLEEP_MAX_TICKS)
+    end
+
+    def advance_inn_sleep_time!(player, minutes)
+      player.decrease_satiety!(minutes)
+      total = player.current_time.to_i + minutes.to_i
+      days = total / 1440
+      player.current_time = total % 1440
+      days.times { player.advance_day! }
+    end
+
+    def recover_inn_sleep_tick!(player)
+      hp_recover = [(player.effective_max_hp * INN_SLEEP_HP_RECOVERY_RATE).ceil, 1].max
+      player.hp = [player.hp.to_i + hp_recover, player.effective_max_hp].min
+      StatusEffectService.recover_values_by!(player, INN_SLEEP_STATUS_RECOVERY)
     end
   end
 end

@@ -13,10 +13,10 @@ class ItemService
   def self.add_item!(player, name, category, quantity = 1, unique: false)
     item = player.items.find_or_create_by!(name: name, category: category) do |new_item|
       new_item.quantity = 0
-      new_item.apply_food_defaults
+      new_item.apply_item_defaults
     end
     item.quantity = item.quantity.to_i + quantity.to_i
-    item.apply_food_defaults if item.food_definition.present?
+    item.apply_item_defaults
     if unique
       item.unique_item = true
       item.discardable = false
@@ -25,41 +25,46 @@ class ItemService
     item
   end
 
-  def self.buy_shop_item!(player, item_name)
+  def self.buy_shop_item!(player, item_name, quantity: 1)
+    quantity = normalized_quantity(quantity)
     shop_item = ShopCatalog.item_shop_item(player.location, item_name)
     return Result.new(status: :error, message: "この町では#{item_name}を購入できません。") unless shop_item
-    return Result.new(status: :error, message: "コルが足りません。#{item_name}は#{shop_item.price}コルです。") if player.col.to_i < shop_item.price
+    total_price = shop_item.price * quantity
+    return Result.new(status: :error, message: "コルが足りません。#{item_name}は#{quantity}個で#{total_price}コルです。") if player.col.to_i < total_price
 
-    player.col = player.col.to_i - shop_item.price
-    player.advance_time!(5)
-    item = add_item!(player, shop_item.item_name, shop_item.category)
+    player.col = player.col.to_i - total_price
+    player.advance_time!(5 * quantity)
+    item = add_item!(player, shop_item.item_name, shop_item.category, quantity)
 
     ActiveRecord::Base.transaction do
       player.save!
       item.save!
     end
 
-    Result.new(status: :ok, message: "道具屋で#{shop_item.item_name}を1つ購入した。#{shop_item.price}コル支払った。", item: item)
+    Result.new(status: :ok, message: "道具屋で#{shop_item.item_name}を#{quantity}個購入した。#{total_price}コル支払った。", item: item)
   end
 
   def self.buy_potion!(player)
     buy_shop_item!(player, "ポーション")
   end
 
-  def self.produce_potion!(player)
+  def self.produce_potion!(player, quantity: 1)
+    quantity = normalized_quantity(quantity)
     herb = player.items.find_by(name: "薬草", category: "gathered") || player.items.find_by(name: "薬草")
-    if (herb&.quantity || 0).to_i < HERBS_PER_POTION
-      return Result.new(status: :error, message: "薬草が足りません。ポーションの生産には薬草#{HERBS_PER_POTION}個が必要です。")
+    required_herbs = HERBS_PER_POTION * quantity
+    total_cost = POTION_PRODUCTION_COST * quantity
+    if (herb&.quantity || 0).to_i < required_herbs
+      return Result.new(status: :error, message: "薬草が足りません。ポーション#{quantity}本の生産には薬草#{required_herbs}個が必要です。")
     end
 
-    if player.col.to_i < POTION_PRODUCTION_COST
-      return Result.new(status: :error, message: "コルが足りません。ポーションの生産には#{POTION_PRODUCTION_COST}コル必要です。")
+    if player.col.to_i < total_cost
+      return Result.new(status: :error, message: "コルが足りません。ポーション#{quantity}本の生産には#{total_cost}コル必要です。")
     end
 
-    herb.quantity -= HERBS_PER_POTION
-    player.col = player.col.to_i - POTION_PRODUCTION_COST
-    player.advance_time!(15)
-    potion = add_item!(player, "ポーション", "healing")
+    herb.quantity -= required_herbs
+    player.col = player.col.to_i - total_cost
+    player.advance_time!(15 * quantity)
+    potion = add_item!(player, "ポーション", "healing", quantity)
 
     ActiveRecord::Base.transaction do
       herb.quantity.to_i <= 0 ? herb.destroy! : herb.save!
@@ -67,7 +72,7 @@ class ItemService
       player.save!
     end
 
-    Result.new(status: :ok, message: "薬草#{HERBS_PER_POTION}個と#{POTION_PRODUCTION_COST}コルでポーションを1本生産した。", item: potion)
+    Result.new(status: :ok, message: "薬草#{required_herbs}個と#{total_cost}コルでポーションを#{quantity}本生産した。", item: potion)
   end
 
   def self.sell_item!(player, item, quantity: 1, confirm_unique: false)
@@ -154,5 +159,9 @@ class ItemService
     end
 
     Result.new(status: :ok, message: messages.join, item: item)
+  end
+
+  def self.normalized_quantity(quantity)
+    [quantity.to_i, 1].max
   end
 end

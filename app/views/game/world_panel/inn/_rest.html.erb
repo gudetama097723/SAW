@@ -1,3 +1,9 @@
-          <h6>休憩</h6>
-          <p>宿屋で休憩してHPを回復します。</p>
-          <%= button_to "休憩する（#{inn_cost}コル）", inn_path, method: :post, class: "btn btn-outline-success w-100" %>
+          <h6>眠る</h6>
+          <p>5分ごとに最大HPの2%と状態異常値2を回復します。</p>
+          <%= form_with url: inn_path, method: :post do %>
+            <div class="mb-2">
+              <%= label_tag :sleep_minutes, "眠る時間（分）", class: "form-label" %>
+              <%= number_field_tag :sleep_minutes, nil, min: 5, step: 5, class: "form-control", placeholder: "回復完了まで眠る" %>
+            </div>
+            <%= submit_tag "眠る（#{inn_cost}コル）", class: "btn btn-outline-success w-100" %>
+          <% end %>

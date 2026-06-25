@@ -169,6 +169,8 @@ module Game
       enemy_count_penalty = [alive_enemies.size - 1, 0].max * 12
       chance = [[50 + agility_gap * 10 - enemy_count_penalty, 5].max, 95].min
       if rand(100) < chance
+        BuffEffectService.clear_battle_effects!(player)
+        player.save!
         battle.destroy
         redirect_to game_path, notice: "逃走に成功した。"
       else

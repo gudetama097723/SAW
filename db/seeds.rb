@@ -136,6 +136,7 @@ seed_rows("mobs.csv") do |row|
     agility: to_int(row["agility"]),
     durability: to_int(row["durability"]),
     exp_reward: to_int(row["exp_reward"]),
+    flee_rate: to_int(row["flee_rate"]) || 0,
     col_min: to_int(row["col_min"]) || 1,
     col_max: to_int(row["col_max"]) || 3
   )
@@ -188,6 +189,7 @@ seed_rows("boss_mobs.csv") do |row|
     agility: to_int(row["agility"]),
     durability: to_int(row["durability"]),
     exp_reward: to_int(row["exp_reward"]),
+    flee_rate: to_int(row["flee_rate"]) || 0,
     col_min: to_int(row["col_min"]) || 1,
     col_max: to_int(row["col_max"]) || 3,
     route: route,

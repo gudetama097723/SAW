@@ -16,6 +16,10 @@
     [agility.to_i, 1].max
   end
 
+  def effective_flee_rate
+    flee_rate.to_i.clamp(0, 100)
+  end
+
   def weak_to_attribute?(attribute)
     weak_attack_attribute.present? && AttackAttribute.normalize(weak_attack_attribute) == AttackAttribute.normalize(attribute)
   end

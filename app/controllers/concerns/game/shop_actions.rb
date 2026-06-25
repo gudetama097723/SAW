@@ -8,7 +8,21 @@ module Game
         return
       end
 
-      result = ItemService.buy_shop_item!(player, params[:item_name].presence || "ポーション")
+      unless facility_open_for?(player, "item_shop")
+        redirect_to game_path, alert: FacilityHoursService.closed_message("item_shop", player)
+        return
+      end
+
+      item_name = params[:item_name].presence || "ポーション"
+      quantity = shop_quantity_param
+
+      unless params[:confirm_purchase] == "1"
+        redirect_to game_path(panel: "item_shop", shop_menu: "buy", item_name: item_name, quantity: quantity, confirm_purchase: "1"),
+                    alert: "購入内容を確認してください。"
+        return
+      end
+
+      result = ItemService.buy_shop_item!(player, item_name, quantity: quantity)
       redirect_to game_path(panel: "item_shop", shop_menu: "buy"), flash_for(result)
     end
 
@@ -20,7 +34,20 @@ module Game
         return
       end
 
-      result = ItemService.produce_potion!(player)
+      unless facility_open_for?(player, "item_shop")
+        redirect_to game_path, alert: FacilityHoursService.closed_message("item_shop", player)
+        return
+      end
+
+      quantity = shop_quantity_param
+
+      unless params[:confirm_production] == "1"
+        redirect_to game_path(panel: "item_shop", shop_menu: "produce", quantity: quantity, confirm_production: "1"),
+                    alert: "生産内容を確認してください。"
+        return
+      end
+
+      result = ItemService.produce_potion!(player, quantity: quantity)
       redirect_to game_path(panel: "item_shop", shop_menu: "produce"), flash_for(result)
     end
 
@@ -29,6 +56,11 @@ module Game
 
       unless player.location&.safe_area? && player.town_discovery_for&.found_item_shop?
         redirect_to game_path, alert: "道具屋はまだ利用できません。"
+        return
+      end
+
+      unless facility_open_for?(player, "item_shop")
+        redirect_to game_path, alert: FacilityHoursService.closed_message("item_shop", player)
         return
       end
 
@@ -42,6 +74,35 @@ module Game
       quantity = params[:sell_all] == "1" ? item&.quantity.to_i : params[:quantity].to_i
       result = ItemService.sell_item!(player, item, quantity: quantity, confirm_unique: params[:confirm_unique] == "1")
       redirect_to game_path(panel: "item_shop", shop_menu: "sell"), flash_for(result)
+    end
+
+    def restaurant
+      player = current_player
+
+      unless player.location&.safe_area? && player.town_discovery_for&.found_restaurant?
+        redirect_to game_path, alert: "飲食店はまだ利用できません。"
+        return
+      end
+
+      unless facility_open_for?(player, "restaurant")
+        redirect_to game_path, alert: FacilityHoursService.closed_message("restaurant", player)
+        return
+      end
+
+      menu_name = params[:menu_name].presence
+      unless menu_name
+        redirect_to game_path(panel: "restaurant"), alert: "料理を選んでください。"
+        return
+      end
+
+      unless params[:confirm_order] == "1"
+        redirect_to game_path(panel: "restaurant", menu_name: menu_name, confirm_order: "1"),
+                    alert: "注文内容を確認してください。"
+        return
+      end
+
+      result = RestaurantService.eat_menu!(player, menu_name)
+      redirect_to game_path(panel: "restaurant"), flash_for(result)
     end
 
   def discard_item
@@ -113,13 +174,37 @@ module Game
   end
 
   def upgrade_weapon
-    weapon = current_player.weapons.find_by(id: params[:weapon_id])
-    result = WeaponUpgradeService.upgrade!(current_player, weapon)
+    player = current_player
+
+    unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
+      redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
+      return
+    end
+
+    unless facility_open_for?(player, "blacksmith")
+      redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
+      return
+    end
+
+    weapon = player.weapons.find_by(id: params[:weapon_id])
+    result = WeaponUpgradeService.upgrade!(player, weapon)
     redirect_to game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: weapon&.id), flash_for(result)
   end
 
   def evolve_weapon
-    weapon = current_player.weapons.find_by(id: params[:weapon_id])
+    player = current_player
+
+    unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
+      redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
+      return
+    end
+
+    unless facility_open_for?(player, "blacksmith")
+      redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
+      return
+    end
+
+    weapon = player.weapons.find_by(id: params[:weapon_id])
     rule = WeaponEvolutionRule.find_by(source_weapon_name: weapon&.name)
     if !weapon || !rule
       redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve"), alert: "進化できる武器ではありません。"
@@ -143,6 +228,11 @@ module Game
 
       unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
         redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
+        return
+      end
+
+      unless facility_open_for?(player, "blacksmith")
+        redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
         return
       end
 
@@ -191,6 +281,11 @@ module Game
         return
       end
 
+      unless facility_open_for?(player, "blacksmith")
+        redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
+        return
+      end
+
       weapon_definition = ShopCatalog.blacksmith_weapon(player.location, params[:weapon_name].presence || "ブロンズソード")
       unless weapon_definition
         redirect_to game_path(panel: "blacksmith", blacksmith_menu: "buy"), alert: "この町ではその武器を購入できません。"
@@ -236,6 +331,11 @@ module Game
         return
       end
 
+      unless facility_open_for?(player, "blacksmith")
+        redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
+        return
+      end
+
       result = WeaponProductionService.produce!(player, params[:weapon_name].to_s)
       redirect_to game_path(panel: "blacksmith", blacksmith_menu: "produce", weapon_name: params[:weapon_name].presence), flash_for(result)
     end
@@ -245,6 +345,11 @@ module Game
 
       unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
         redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
+        return
+      end
+
+      unless facility_open_for?(player, "blacksmith")
+        redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
         return
       end
 
@@ -351,6 +456,16 @@ module Game
 
       armor.update!(equipped: false)
       redirect_to game_path(panel: "equipment"), notice: "#{armor.name}を外した。"
+    end
+
+    private
+
+    def shop_quantity_param
+      [params[:quantity].to_i, 1].max
+    end
+
+    def facility_open_for?(player, facility_key)
+      FacilityHoursService.open?(facility_key, player)
     end
   end
 end

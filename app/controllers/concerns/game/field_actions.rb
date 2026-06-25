@@ -24,6 +24,10 @@ module Game
         discovery.found_blacksmith = true
         ActiveRecord::Base.transaction { discovery.save!; player.save! }
         redirect_to game_path, notice: "路地裏で鍛冶屋を見つけた！"
+      elsif discovery.has_attribute?(:found_restaurant) && !discovery.found_restaurant? && result < 95
+        discovery.found_restaurant = true
+        ActiveRecord::Base.transaction { discovery.save!; player.save! }
+        redirect_to game_path, notice: "漂ってきた香りをたどって、飲食店を見つけた！"
       else
         player.save!
         redirect_to game_path, notice: "街を散策した。特に新しい発見はなかった。"

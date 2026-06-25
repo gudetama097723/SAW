@@ -22,6 +22,9 @@ class Player < ApplicationRecord
   ].freeze
 
   STATUS_LABELS = StatusEffectService::LABELS
+  SLEEP_DEPRIVATION_START_MINUTES = 15 * 60
+  SLEEP_DEPRIVATION_INTERVAL_MINUTES = 60
+  SLEEP_DEPRIVATION_GAIN = 10
 
   has_many :skills, dependent: :destroy
   has_many :items, dependent: :destroy
@@ -47,6 +50,8 @@ end
 def advance_time!(minutes)
   decrease_satiety!(minutes)
   StatusEffectService.apply_time_passage!(self, minutes)
+  BuffEffectService.tick_time!(self, minutes)
+  process_sleep_deprivation!(minutes)
   total = current_time.to_i + minutes.to_i
   days = total / 1440
   self.current_time = total % 1440
@@ -75,6 +80,34 @@ end
 
 def apply_status_effect!(key, value)
   StatusEffectService.accumulate!(self, key, value)
+end
+
+def process_sleep_deprivation!(minutes)
+  elapsed_minutes = minutes.to_i
+  return if elapsed_minutes <= 0
+  return if StatusEffectService.active?(self, "sleep")
+
+  before = awake_minutes_since_sleep.to_i
+  self.awake_minutes_since_sleep = before + elapsed_minutes
+  before_ticks = [[before - SLEEP_DEPRIVATION_START_MINUTES, 0].max / SLEEP_DEPRIVATION_INTERVAL_MINUTES, 0].max
+  after_ticks = [[awake_minutes_since_sleep - SLEEP_DEPRIVATION_START_MINUTES, 0].max / SLEEP_DEPRIVATION_INTERVAL_MINUTES, 0].max
+  gained_ticks = after_ticks - before_ticks
+  return unless gained_ticks.positive?
+
+  StatusEffectService.accumulate!(self, "sleep", gained_ticks * SLEEP_DEPRIVATION_GAIN)
+end
+
+def reset_sleep_deprivation!
+  self.awake_minutes_since_sleep = 0
+end
+
+def sleepiness_warning_message
+  value = status_value_data["sleep"].to_f
+  return "限界だ……" if value >= 100
+  return "このままでは倒れてしまう。" if value >= 95
+  return "激しい眠気に襲われている……" if value >= 90
+
+  nil
 end
 
 def advance_day!
@@ -172,7 +205,7 @@ end
   end
 
   def effective_max_hp
-    ((max_hp_before_armor_hp_bonus + armor_hp_bonus) * StatusEffectService.max_hp_multiplier(self)).round
+    ((max_hp_before_armor_hp_bonus + armor_hp_bonus + BuffEffectService.time_bonus(self, "hp")) * StatusEffectService.max_hp_multiplier(self)).round
   end
 
 def status_value_data
@@ -248,12 +281,16 @@ def injured?
 end
 
   def effective_strength
-    [((strength.to_i + weapon_strength_bonus + armor_strength_bonus) * injury_stat_multiplier).round, 1].max
+    [((strength.to_i + weapon_strength_bonus + armor_strength_bonus + BuffEffectService.time_bonus(self, "strength")) * injury_stat_multiplier).round, 1].max
   end
 
   def effective_agility
-    base_agility = agility.to_i + weapon_agility_bonus + armor_agility_bonus
+    base_agility = agility.to_i + weapon_agility_bonus + armor_agility_bonus + BuffEffectService.time_bonus(self, "agility")
     [((base_agility - equipment_weight_penalty) * injury_stat_multiplier).round, 1].max
+  end
+
+  def battle_effect_data
+    BuffEffectService.battle_effects(self)
   end
 
   def injury_stat_multiplier

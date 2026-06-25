@@ -5,6 +5,8 @@
           <% shop_items = ShopCatalog.item_shop_items(@player.location) %>
           <% selected_shop_item = shop_items.find { |shop_item| shop_item.item_name == params[:item_name] } %>
           <% if selected_shop_item %>
+            <% purchase_quantity = [params[:quantity].to_i, 1].max %>
+            <% purchase_total_price = selected_shop_item.price * purchase_quantity %>
             <%= link_to "販売一覧に戻る", game_path(panel: "item_shop", shop_menu: "buy"), class: "btn btn-outline-light w-100 mb-3" %>
             <h6><%= selected_shop_item.item_name %></h6>
             <p class="mb-1">価格: <%= selected_shop_item.price %>コル</p>
@@ -19,7 +21,33 @@
             <% else %>
               <p class="mb-2">効果: 使用効果なし</p>
             <% end %>
-            <%= button_to "購入する", item_shop_path(item_name: selected_shop_item.item_name), method: :post, class: "btn btn-warning w-100" %>
+            <% if params[:confirm_purchase] == "1" %>
+              <div class="border rounded p-2">
+                <p class="mb-1">購入数: <%= purchase_quantity %>個</p>
+                <p class="mb-2">合計: <%= purchase_total_price %>コル</p>
+                <div class="d-grid gap-2">
+                  <%= form_with url: item_shop_path, method: :post do %>
+                    <%= hidden_field_tag :item_name, selected_shop_item.item_name %>
+                    <%= hidden_field_tag :quantity, purchase_quantity %>
+                    <%= hidden_field_tag :confirm_purchase, "1" %>
+                    <%= submit_tag "はい", class: "btn btn-warning w-100" %>
+                  <% end %>
+                  <%= link_to "いいえ", game_path(panel: "item_shop", shop_menu: "buy", item_name: selected_shop_item.item_name), class: "btn btn-outline-light w-100" %>
+                </div>
+              </div>
+            <% else %>
+              <%= form_with url: game_path, method: :get, class: "d-grid gap-2" do %>
+                <%= hidden_field_tag :panel, "item_shop" %>
+                <%= hidden_field_tag :shop_menu, "buy" %>
+                <%= hidden_field_tag :item_name, selected_shop_item.item_name %>
+                <%= hidden_field_tag :confirm_purchase, "1" %>
+                <div>
+                  <%= label_tag :quantity, "購入数", class: "form-label" %>
+                  <%= number_field_tag :quantity, purchase_quantity, min: 1, class: "form-control" %>
+                </div>
+                <%= submit_tag "購入確認へ", class: "btn btn-warning w-100" %>
+              <% end %>
+            <% end %>
           <% elsif shop_items.any? %>
             <div class="d-grid gap-2">
               <% shop_items.each do |shop_item| %>
@@ -33,12 +61,40 @@
           <% end %>
         <% elsif shop_menu == "produce" %>
           <% herb = @player.items.find_by(name: "薬草", category: "gathered") || @player.items.find_by(name: "薬草") %>
+          <% production_quantity = [params[:quantity].to_i, 1].max %>
+          <% required_herbs = ItemService::HERBS_PER_POTION * production_quantity %>
+          <% production_total_cost = ItemService::POTION_PRODUCTION_COST * production_quantity %>
           <%= link_to "道具屋メニューに戻る", game_path(panel: "item_shop"), class: "btn btn-outline-light w-100 mb-3" %>
           <h6>ポーション</h6>
           <p class="mb-1">必要素材: 薬草 10個</p>
           <p class="mb-1">費用: 20コル</p>
           <p class="mb-2">所持薬草: <%= (herb&.quantity || 0).to_i %></p>
-          <%= button_to "ポーションを生産する", produce_item_path, method: :post, class: "btn btn-outline-warning w-100" %>
+          <% if params[:confirm_production] == "1" %>
+            <div class="border rounded p-2">
+              <p class="mb-1">生産数: <%= production_quantity %>本</p>
+              <p class="mb-1">必要素材: 薬草 <%= required_herbs %>個</p>
+              <p class="mb-2">合計費用: <%= production_total_cost %>コル</p>
+              <div class="d-grid gap-2">
+                <%= form_with url: produce_item_path, method: :post do %>
+                  <%= hidden_field_tag :quantity, production_quantity %>
+                  <%= hidden_field_tag :confirm_production, "1" %>
+                  <%= submit_tag "はい", class: "btn btn-outline-warning w-100" %>
+                <% end %>
+                <%= link_to "いいえ", game_path(panel: "item_shop", shop_menu: "produce"), class: "btn btn-outline-light w-100" %>
+              </div>
+            </div>
+          <% else %>
+            <%= form_with url: game_path, method: :get, class: "d-grid gap-2" do %>
+              <%= hidden_field_tag :panel, "item_shop" %>
+              <%= hidden_field_tag :shop_menu, "produce" %>
+              <%= hidden_field_tag :confirm_production, "1" %>
+              <div>
+                <%= label_tag :quantity, "生産数", class: "form-label" %>
+                <%= number_field_tag :quantity, production_quantity, min: 1, class: "form-control" %>
+              </div>
+              <%= submit_tag "生産確認へ", class: "btn btn-outline-warning w-100" %>
+            <% end %>
+          <% end %>
         <% elsif shop_menu == "sell" %>
           <% sellable_items = @player.items.select { |item| item.quantity.to_i.positive? && (item.sellable_by_player? || item.unique_item?) } %>
           <% selected_sell_item = sellable_items.find { |item| item.id == params[:item_id].to_i } %>

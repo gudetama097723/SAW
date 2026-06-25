@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_25_184000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_25_220000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -36,6 +36,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_184000) do
   end
 
   create_table "battle_enemies", force: :cascade do |t|
+    t.text "battle_effects", default: "{}", null: false
     t.integer "battle_id", null: false
     t.datetime "created_at", null: false
     t.integer "enemy_hp", null: false
@@ -134,6 +135,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_184000) do
     t.integer "durability", default: 0, null: false
     t.integer "exp_reward", default: 10, null: false
     t.integer "field_area_id"
+    t.integer "flee_rate", default: 0, null: false
     t.integer "hp"
     t.integer "level", default: 1, null: false
     t.string "name"
@@ -146,6 +148,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_184000) do
     t.string "weak_attack_attribute"
     t.index ["field_area_id"], name: "index_mobs_on_field_area_id"
     t.index ["route_id"], name: "index_mobs_on_route_id"
+  end
+
+  create_table "npcs", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "dungeon_key"
+    t.string "facility_key"
+    t.integer "field_area_id"
+    t.integer "location_id"
+    t.text "metadata_json", default: "{}", null: false
+    t.string "name", null: false
+    t.string "npc_type", default: "general", null: false
+    t.string "placement_type", null: false
+    t.string "position_key"
+    t.integer "sort_order", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["code"], name: "index_npcs_on_code", unique: true
+    t.index ["field_area_id"], name: "index_npcs_on_field_area_id"
+    t.index ["location_id"], name: "index_npcs_on_location_id"
+    t.index ["placement_type", "dungeon_key"], name: "index_npcs_on_placement_type_and_dungeon_key"
+    t.index ["placement_type", "facility_key"], name: "index_npcs_on_placement_type_and_facility_key"
+    t.index ["placement_type", "field_area_id"], name: "index_npcs_on_placement_type_and_field_area_id"
+    t.index ["placement_type", "location_id"], name: "index_npcs_on_placement_type_and_location_id"
   end
 
   create_table "player_bases", force: :cascade do |t|
@@ -204,6 +231,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_184000) do
     t.boolean "found_blacksmith", default: false, null: false
     t.boolean "found_inn", default: false, null: false
     t.boolean "found_item_shop", default: false, null: false
+    t.boolean "found_restaurant", default: false, null: false
     t.integer "location_id", null: false
     t.integer "player_id", null: false
     t.datetime "updated_at", null: false
@@ -230,7 +258,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_184000) do
 
   create_table "players", force: :cascade do |t|
     t.integer "agility", default: 1, null: false
+    t.integer "awake_minutes_since_sleep", default: 0, null: false
     t.integer "base_col", default: 0, null: false
+    t.text "battle_effects", default: "{}", null: false
+    t.text "buff_effects", default: "{}", null: false
     t.integer "col"
     t.datetime "created_at", null: false
     t.integer "current_day", default: 1, null: false
@@ -243,6 +274,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_184000) do
     t.boolean "found_blacksmith", default: false, null: false
     t.boolean "found_inn", default: false, null: false
     t.boolean "found_item_shop", default: false, null: false
+    t.boolean "found_restaurant", default: false, null: false
     t.integer "hp"
     t.text "injury_states", default: "{}", null: false
     t.integer "level", default: 1, null: false
@@ -407,6 +439,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_184000) do
   add_foreign_key "mob_parts", "mobs"
   add_foreign_key "mobs", "field_areas"
   add_foreign_key "mobs", "routes"
+  add_foreign_key "npcs", "field_areas"
+  add_foreign_key "npcs", "locations"
   add_foreign_key "player_bases", "locations"
   add_foreign_key "player_bases", "players"
   add_foreign_key "player_boss_kills", "mobs"

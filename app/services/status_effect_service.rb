@@ -67,8 +67,19 @@ class StatusEffectService
 
     values = value_data(entity)
     values.keys.each do |key|
+      next if entity.is_a?(Player) && key == "sleep"
+
       values[key] = [values[key].to_f - amount, 0].max
       values.delete(key) if values[key].zero?
+    end
+    write_value_data(entity, values)
+  end
+
+  def self.recover_values_percent!(entity, percent)
+    values = value_data(entity)
+    values.keys.each do |key|
+      values[key] = values[key].to_f * (1.0 - percent.to_f)
+      values.delete(key) if values[key] <= 0
     end
     write_value_data(entity, values)
   end
@@ -76,6 +87,58 @@ class StatusEffectService
   def self.apply_time_passage!(entity, minutes)
     apply_poison_damage!(entity, max_hp_for(entity) * 0.01 * minutes.to_i) if active?(entity, "poison")
     decay_values!(entity, minutes)
+  end
+
+  def self.recoverable_value_total(entity)
+    value_data(entity).sum do |key, value|
+      RECOVERABLE_STATUSES.include?(key.to_s) ? value.to_f : 0
+    end
+  end
+
+  def self.rest_recover_values!(entity)
+    values = value_data(entity)
+    effects = effect_data(entity)
+
+    RECOVERABLE_STATUSES.each do |status|
+      current = values[status].to_f
+      next unless current.positive?
+
+      recovered = current < 5 ? 0 : current * 0.9
+      if recovered <= 0
+        values.delete(status)
+        effects.delete(status)
+      else
+        values[status] = recovered.round(2)
+      end
+    end
+
+    write_value_data(entity, values)
+    write_effect_data(entity, effects)
+  end
+
+  def self.recover_values_by!(entity, amount, statuses: RECOVERABLE_STATUSES)
+    recovery = amount.to_f
+    return if recovery <= 0
+
+    values = value_data(entity)
+    effects = effect_data(entity)
+
+    statuses.each do |status|
+      key = status.to_s
+      current = values[key].to_f
+      next unless current.positive?
+
+      recovered = current - recovery
+      if recovered <= 0
+        values.delete(key)
+        effects.delete(key)
+      else
+        values[key] = recovered.round(2)
+      end
+    end
+
+    write_value_data(entity, values)
+    write_effect_data(entity, effects)
   end
 
   def self.apply_battle_turn_start!(entity)
