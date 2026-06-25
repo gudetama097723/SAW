@@ -1,6 +1,7 @@
 class FieldService
   Result = Struct.new(:status, :message, :battle, keyword_init: true)
   REQUIRED_MAPPING_TO_REACH_DESTINATION = 30
+  ROAMING_AREA_BOSS_ENCOUNTER_RATE = 5
 
   def self.available_routes_for(player)
     location = player&.location
@@ -207,9 +208,26 @@ class FieldService
   end
 
   def self.encounter_mobs_for(player_or_route)
+    if player_or_route.respond_to?(:field_route)
+      roaming_boss = roaming_area_boss_for(player_or_route)
+      return [roaming_boss] if roaming_boss
+    end
+
     context = field_context(player_or_route)
     count = encounter_count_for(context)
     Array.new(count) { weighted_encounter_mob_for(context) }.compact
+  end
+
+  def self.roaming_area_boss_for(player)
+    area = current_area_for(player)
+    return unless area
+    return unless rand(100) < ROAMING_AREA_BOSS_ENCOUNTER_RATE
+
+    boss = Mob.find_by(field_area: area, boss_type: "area_boss")
+    return unless boss
+
+    kill = player.player_boss_kills.find_by(mob: boss)
+    kill&.defeated? ? boss : nil
   end
 
   def self.weighted_encounter_mob_for(context)

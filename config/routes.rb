@@ -32,6 +32,7 @@ Rails.application.routes.draw do
   post "discard_item", to: "game#discard_item"
   post "blacksmith", to: "game#blacksmith"
   post "buy_bronze_sword", to: "game#buy_bronze_sword"
+  post "produce_weapon", to: "game#produce_weapon"
   post "sell_weapon", to: "game#sell_weapon"
   post "discard_weapon", to: "game#discard_weapon"
   post "toggle_weapon_favorite", to: "game#toggle_weapon_favorite"

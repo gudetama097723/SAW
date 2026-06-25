@@ -20,6 +20,7 @@ class ShopCatalog
     :strength_ratio,
     :agility_ratio,
     :description,
+    :production_only,
     keyword_init: true
   )
 
@@ -32,11 +33,19 @@ class ShopCatalog
   end
 
   def self.blacksmith_weapons(location)
-    weapon_definitions.select { |weapon| weapon.location == location&.name }
+    weapon_definitions.select { |weapon| weapon.location == location&.name && !weapon.production_only }
   end
 
   def self.blacksmith_weapon(location, weapon_name)
     blacksmith_weapons(location).find { |weapon| weapon.name == weapon_name }
+  end
+
+  def self.blacksmith_production_weapons(location)
+    weapon_definitions.select { |weapon| weapon.location == location&.name }
+  end
+
+  def self.blacksmith_production_weapon(location, weapon_name)
+    blacksmith_production_weapons(location).find { |weapon| weapon.name == weapon_name }
   end
 
   def self.item_definitions
@@ -85,7 +94,8 @@ class ShopCatalog
         weight: row["weight"].presence&.to_d || 5.to_d,
         strength_ratio: row["strength_ratio"].presence&.to_i || 70,
         agility_ratio: row["agility_ratio"].presence&.to_i || 30,
-        description: row["description"].presence || ""
+        description: row["description"].presence || "",
+        production_only: ActiveModel::Type::Boolean.new.cast(row["production_only"])
       )
     end
   end

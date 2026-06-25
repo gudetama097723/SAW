@@ -3,10 +3,49 @@
 
   def self.ensure_mob_parts!(mob)
     return [] unless mob
+    if mob.boss?
+      ensure_boss_parts!(mob)
+      return mob.mob_parts.to_a
+    end
     return mob.mob_parts.to_a if mob.mob_parts.exists?
 
     mob.mob_parts.create!(name: "本体", damage_multiplier: 100, weakness: true)
     mob.mob_parts.to_a
+  end
+
+  def self.ensure_boss_parts!(mob)
+    boss_part_templates_for(mob).each do |attrs|
+      part = mob.mob_parts.find_or_initialize_by(name: attrs[:name])
+      part.update!(attrs)
+    end
+    mob.mob_parts.where(name: "本体").destroy_all if mob.mob_parts.where.not(name: "本体").exists?
+  end
+
+  def self.boss_part_templates_for(mob)
+    case mob.name
+    when "群狼の王"
+      [
+        { name: "頭", damage_multiplier: 115, weakness: true, max_durability: 42, drop_item_name: "狼王の牙", drop_rate: 35, weak_attack_attribute: "刺突" },
+        { name: "胴体", damage_multiplier: 80, weakness: false, max_durability: 70, weak_attack_attribute: "斬撃" },
+        { name: "前脚", damage_multiplier: 85, weakness: false, max_durability: 38, break_effect: "strength_down", weak_attack_attribute: "打撃" },
+        { name: "後脚", damage_multiplier: 75, weakness: false, max_durability: 34, break_effect: "agility_down", weak_attack_attribute: "刺突" }
+      ]
+    when "蒼狼フェンリル"
+      [
+        { name: "額の蒼角", damage_multiplier: 125, weakness: true, max_durability: 68, drop_item_name: "蒼狼の牙", drop_rate: 30, weak_attack_attribute: "打撃" },
+        { name: "胴体", damage_multiplier: 78, weakness: false, max_durability: 120, weak_attack_attribute: "斬撃" },
+        { name: "前脚", damage_multiplier: 85, weakness: false, max_durability: 72, break_effect: "strength_down", weak_attack_attribute: "打撃" },
+        { name: "後脚", damage_multiplier: 75, weakness: false, max_durability: 64, break_effect: "agility_down", weak_attack_attribute: "刺突" },
+        { name: "尾", damage_multiplier: 70, weakness: false, max_durability: 58, drop_item_name: "狼王の牙", drop_rate: 18, weak_attack_attribute: "斬撃" }
+      ]
+    else
+      [
+        { name: "弱点", damage_multiplier: 115, weakness: true, max_durability: 50 },
+        { name: "胴体", damage_multiplier: 80, weakness: false, max_durability: 80 },
+        { name: "腕", damage_multiplier: 85, weakness: false, max_durability: 45, break_effect: "strength_down" },
+        { name: "脚", damage_multiplier: 75, weakness: false, max_durability: 45, break_effect: "agility_down" }
+      ]
+    end
   end
 
   def self.resolve_player_attack!(battle:, player:, mob_part_id:, target_enemy_id: nil, group_start: nil, label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:, area: false, attack_attribute: nil, skill_key: nil)

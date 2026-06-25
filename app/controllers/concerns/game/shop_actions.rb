@@ -220,6 +220,18 @@ module Game
       redirect_to game_path(panel: "blacksmith", blacksmith_menu: "buy"), notice: "#{weapon_definition.name}を購入した。"
     end
 
+    def produce_weapon
+      player = current_player
+
+      unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
+        redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
+        return
+      end
+
+      result = WeaponProductionService.produce!(player, params[:weapon_name].to_s)
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "produce", weapon_name: params[:weapon_name].presence), flash_for(result)
+    end
+
     def sell_weapon
       player = current_player
 
