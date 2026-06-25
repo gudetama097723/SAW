@@ -55,6 +55,21 @@
     return Result.new(status: :error, message: "武器を装備していないため、ソードスキルは使用できません。") if sword_skill && !weapon
 
     ensure_battle_enemies!(battle)
+    turn_messages = apply_battle_turn_start_effects!(player, battle)
+    return handle_player_defeat!(player, battle, "#{turn_messages.join}あなたは倒れた……。") if player.hp.to_i <= 0
+    if battle.alive_enemies.reload.empty?
+      return finish_battle_victory!(player, battle, weapon, label, turn_messages.join, skill_gain, sword_skill, skill_key)
+    end
+
+    blocked_message = StatusEffectService.action_blocked_message!(player)
+    if blocked_message
+      player.save!
+      enemy_result = apply_enemy_attack!(player, battle)
+      return enemy_result if enemy_result.status == :defeated
+
+      return Result.new(status: :ok, message: "#{turn_messages.join}#{blocked_message}#{enemy_result.message}")
+    end
+
     target_enemies = target_enemies_for(battle, target_enemy_id, group_start, area)
     return Result.new(status: :error, message: "攻撃対象がいません。") if target_enemies.empty?
 
@@ -106,7 +121,7 @@
 
     Result.new(
       status: :ok,
-      message: "#{label}！#{hit_messages.join(' / ')}！#{enemy_result.message}#{stiffness_message}#{broken_message}#{skill_message}"
+      message: "#{turn_messages.join}#{label}！#{hit_messages.join(' / ')}！#{enemy_result.message}#{stiffness_message}#{broken_message}#{skill_message}"
     )
   end
 
@@ -116,6 +131,13 @@
 
     battle.alive_enemies.each do |battle_enemy|
       mob_name = battle_enemy.mob.name
+      blocked_message = StatusEffectService.action_blocked_message!(battle_enemy)
+      if blocked_message
+        battle_enemy.save!
+        messages << enemy_message("#{prefix}#{blocked_message}")
+        next
+      end
+
       if allow_evasion && evaded_enemy_attack?(player, battle_enemy)
         messages << enemy_message("#{prefix}#{mob_name}の攻撃を回避した！")
         next
@@ -123,25 +145,20 @@
 
       raw_damage = rand(1..mob_effective_atk(battle_enemy))
       enemy_damage = [raw_damage - player.damage_cut, 1].max
+      enemy_damage = (enemy_damage * StatusEffectService.damage_dealt_multiplier(battle_enemy)).ceil
+      enemy_damage = (enemy_damage * StatusEffectService.damage_taken_multiplier(player)).ceil
+      critical = StatusEffectService.sleeping_critical!(player)
+      enemy_damage *= 2 if critical
       player.hp = player.hp.to_i - enemy_damage
+      apply_mob_status_attacks!(player, battle_enemy)
 
       if player.hp <= 0
-        respawn_location = player.death_respawn_location
-        player.hp = player.effective_max_hp
-        player.floor = respawn_location&.floor || 1
-        player.col = 0
-        player.location = respawn_location if respawn_location
-        player.field_route = nil
-        player.field_position = 0
-        lost_message = apply_death_item_penalty!(player)
-        battle.destroy!
-        player.save!
-
-        respawn_name = respawn_location ? "#{respawn_location.name}の宿" : "本拠地の宿"
-        return Result.new(status: :defeated, message: "#{enemy_message("#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。#{respawn_name}へ戻された。#{lost_message}")
+        critical_message = critical ? "クリティカル！" : ""
+        return handle_player_defeat!(player, battle, "#{enemy_message("#{prefix}#{mob_name}の攻撃！#{critical_message}#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。")
       end
 
-      messages << enemy_message("#{prefix}#{mob_name}の攻撃！#{enemy_damage}ダメージを受けた！")
+      critical_message = critical ? "クリティカル！" : ""
+      messages << enemy_message("#{prefix}#{mob_name}の攻撃！#{critical_message}#{enemy_damage}ダメージを受けた！")
     end
 
     player.save!
@@ -221,7 +238,7 @@
     base_hit_damage = (calculate_player_damage(player, weapon, battle_enemy, actual_part, attack_attribute) * damage_multiplier / 100.0).ceil
     varied_damage = apply_player_damage_variance(base_hit_damage)
     part_damage = calculate_part_damage(varied_damage, weapon, actual_part)
-    critical = critical_hit?(player, weapon, battle_enemy, actual_part, part_damage)
+    critical = StatusEffectService.sleeping_critical!(battle_enemy) || critical_hit?(player, weapon, battle_enemy, actual_part, part_damage)
     hit_damage = critical ? varied_damage * 2 : varied_damage
     battle_enemy.enemy_hp = [battle_enemy.enemy_hp.to_i - hit_damage, 0].max
     break_message = apply_part_damage!(player, battle_enemy, actual_part, part_damage)
@@ -255,6 +272,8 @@ def self.calculate_player_damage(player, weapon, battle_enemy, part, attack_attr
   attack_power *= weapon_proficiency_attack_bonus(player, weapon)
   defense_rate = 100.0 / (100 + [battle_enemy.effective_durability, 0].max)
   base_damage = attack_power * defense_rate
+  base_damage *= StatusEffectService.damage_dealt_multiplier(player)
+  base_damage *= StatusEffectService.damage_taken_multiplier(battle_enemy)
   [(base_damage * part.damage_multiplier.to_i / 100.0).ceil, 1].max
 end
 
@@ -313,6 +332,45 @@ end
       item.quantity.zero? ? item.destroy! : item.save!
     end
     " 所持アイテムを#{lost_count}個失った。"
+  end
+
+  def self.handle_player_defeat!(player, battle, prefix_message)
+    respawn_location = player.death_respawn_location
+    player.hp = player.effective_max_hp
+    player.floor = respawn_location&.floor || 1
+    player.col = 0
+    player.location = respawn_location if respawn_location
+    player.field_route = nil
+    player.field_position = 0
+    lost_message = apply_death_item_penalty!(player)
+    battle.destroy!
+    player.save!
+
+    respawn_name = respawn_location ? "#{respawn_location.name}の宿" : "本拠地の宿"
+    Result.new(status: :defeated, message: "#{prefix_message}#{respawn_name}へ戻された。#{lost_message}")
+  end
+
+  def self.apply_battle_turn_start_effects!(player, battle)
+    messages = []
+    message = StatusEffectService.apply_battle_turn_start!(player)
+    messages << message if message.present?
+
+    battle.alive_enemies.each do |battle_enemy|
+      message = StatusEffectService.apply_battle_turn_start!(battle_enemy)
+      next if message.blank?
+
+      battle_enemy.enemy_hp = 0 if battle_enemy.enemy_hp.to_i <= 0
+      battle_enemy.save!
+      messages << message
+    end
+
+    messages
+  end
+
+  def self.apply_mob_status_attacks!(player, battle_enemy)
+    battle_enemy.mob.status_attacks.each do |status, amount|
+      StatusEffectService.accumulate!(player, status, amount)
+    end
   end
 
   def self.finish_battle_victory!(player, battle, weapon, label, damage_message, skill_gain, sword_skill, skill_key)

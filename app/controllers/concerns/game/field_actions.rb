@@ -89,6 +89,12 @@ module Game
         return
       end
 
+      interruption = FieldService.field_status_interruption!(player)
+      if interruption
+        redirect_with_result(interruption)
+        return
+      end
+
       # まだフィールド上にいない場合：町/村からフィールドに出る
       if player.field_route.blank?
         player.field_route = route

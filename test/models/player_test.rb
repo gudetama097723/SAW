@@ -32,9 +32,32 @@ class PlayerTest < ActiveSupport::TestCase
     player = players(:one)
     player.max_hp = 100
     player.hp = 25
-    player.status_values = { poison: 3, sleep: 0, custom_status: true }.to_json
+    StatusEffectService.activate!(player, "poison")
 
-    assert_equal ["重症", "毒", "custom_status"], player.condition_labels
+    assert_equal ["重症", "毒"], player.condition_labels
+  end
+
+  test "status accumulation activates status and time passage decays values" do
+    player = players(:one)
+    player.hp = 100
+    player.max_hp = 100
+
+    StatusEffectService.accumulate!(player, "poison", 100)
+    assert StatusEffectService.active?(player, "poison")
+
+    player.advance_time!(10)
+
+    assert_equal 90, player.hp
+    assert_operator player.status_value_data["poison"], :<, 100
+  end
+
+  test "curse reduces effective max hp" do
+    player = players(:one)
+    player.max_hp = 100
+
+    StatusEffectService.activate!(player, "curse")
+
+    assert_equal 70, player.effective_max_hp
   end
 
   test "death returns player to active home base inn" do
@@ -67,5 +90,29 @@ class PlayerTest < ActiveSupport::TestCase
 
     assert_equal 1, normal_item.reload.quantity
     assert_equal 1, unique_item.reload.quantity
+  end
+
+  test "battle enemy can be affected by statuses" do
+    battle = battles(:one)
+    enemy = battle.battle_enemies.create!(mob: mobs(:one), enemy_hp: 100, enemy_max_hp: 100, enemy_level: 1, position: 1)
+
+    StatusEffectService.accumulate!(enemy, "burn", 100)
+
+    assert StatusEffectService.active?(enemy, "burn")
+    assert_equal ["火傷"], enemy.condition_labels
+  end
+
+  test "sleep in field forces encounter while staying asleep" do
+    player = players(:one)
+    player.rests.destroy_all
+    player.update!(field_route: routes(:one), field_position: 0)
+    StatusEffectService.activate!(player, "sleep")
+
+    result = FieldService.field_status_interruption!(player)
+
+    assert_equal :encounter, result.status
+    assert result.battle
+    assert StatusEffectService.active?(player, "sleep")
+    assert_not player.rests.exists?
   end
 end

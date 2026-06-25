@@ -15,7 +15,23 @@ class BattleEnemy < ApplicationRecord
 
   def effective_max_hp
     value = has_attribute?(:enemy_max_hp) ? enemy_max_hp : nil
-    value.presence || scaled_value(mob.hp)
+    ((value.presence || scaled_value(mob.hp)) * StatusEffectService.max_hp_multiplier(self)).round
+  end
+
+  def status_value_data
+    StatusEffectService.value_data(self)
+  end
+
+  def status_effect_data
+    StatusEffectService.effect_data(self)
+  end
+
+  def condition_labels
+    StatusEffectService.labels_for(self)
+  end
+
+  def status_accumulation_limit(status)
+    mob.status_accumulation_limit(status)
   end
 
   def effective_atk

@@ -34,6 +34,17 @@ class ItemTest < ActiveSupport::TestCase
     assert_not potion.unique_item?
   end
 
+  test "status cure item cures matching status" do
+    player = players(:one)
+    player.items.create!(name: "解毒ポーション", category: "healing", quantity: 1)
+    StatusEffectService.activate!(player, "poison")
+
+    result = ItemService.consume_status_cure!(player, "解毒ポーション")
+
+    assert_equal :ok, result.status
+    assert_not StatusEffectService.active?(player, "poison")
+  end
+
   test "herb is food and restores hp and satiety when eaten" do
     player = players(:one)
     player.update!(hp: 1, max_hp: 100, satiety: 50)

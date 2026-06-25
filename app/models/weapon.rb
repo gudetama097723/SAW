@@ -98,6 +98,16 @@ def sell_price
     {}
   end
 
+  def status_resistance
+    JSON.parse(status_resistance_data.presence || "{}")
+  rescue JSON::ParserError
+    {}
+  end
+
+  def status_resistance_bonus(status)
+    status_resistance[status.to_s].to_i
+  end
+
   def effective_critical_rate
     [[critical_rate.to_i, 0].max, 100].min
   end

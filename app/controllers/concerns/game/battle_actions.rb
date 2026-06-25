@@ -83,12 +83,12 @@ module Game
         return
       end
 
-      unless params[:item_name] == "ポーション"
+      unless params[:item_name].in?(["ポーション", *ItemService::STATUS_CURE_ITEMS.keys])
         redirect_to game_path(battle_command: "item"), alert: "そのアイテムはまだ使用できません。"
         return
       end
 
-      item_result = ItemService.consume_healing_potion!(player)
+      item_result = params[:item_name] == "ポーション" ? ItemService.consume_healing_potion!(player) : ItemService.consume_status_cure!(player, params[:item_name])
       unless item_result.status == :ok
         redirect_to game_path(battle_command: "item"), alert: item_result.message
         return
@@ -111,12 +111,12 @@ module Game
         return
       end
 
-      unless params[:item_name] == "ポーション"
+      unless params[:item_name].in?(["ポーション", *ItemService::STATUS_CURE_ITEMS.keys])
         redirect_to game_path(panel: "items", item_category: "healing"), alert: "そのアイテムはまだ使用できません。"
         return
       end
 
-      item_result = ItemService.consume_healing_potion!(player)
+      item_result = params[:item_name] == "ポーション" ? ItemService.consume_healing_potion!(player) : ItemService.consume_status_cure!(player, params[:item_name])
       unless item_result.status == :ok
         redirect_to game_path(panel: "items", item_category: "healing"), alert: item_result.message
         return

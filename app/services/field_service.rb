@@ -16,6 +16,8 @@ class FieldService
   def self.explore!(player)
     route = player.field_route
     return Result.new(status: :error, message: "街中では探索できません。フィールドへ出てください。") unless route
+    interruption = field_status_interruption!(player)
+    return interruption if interruption
 
     area = current_area_for(player)
     area_progress = player.progress_for_area(area)
@@ -80,6 +82,8 @@ class FieldService
   def self.gather!(player)
     route = player.field_route
     return Result.new(status: :error, message: "街中では採取できません。フィールドへ出てください。") unless route
+    interruption = field_status_interruption!(player)
+    return interruption if interruption
 
     player.advance_time!(10)
     event = rand(100)
@@ -103,6 +107,8 @@ class FieldService
   def self.hunt!(player)
     route = player.field_route
     return Result.new(status: :error, message: "街中では狩りはできません。フィールドへ出てください。") unless route
+    interruption = field_status_interruption!(player)
+    return interruption if interruption
 
     player.advance_time!(15)
 
@@ -152,6 +158,31 @@ class FieldService
 
     battle = create_battle!(player, mobs)
     Result.new(status: :encounter, message: "移動中に#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}と遭遇した！", battle: battle)
+  end
+
+  def self.field_status_interruption!(player)
+    return unless player.field_route.present?
+
+    if StatusEffectService.active?(player, "paralysis")
+      mobs = encounter_mobs_for(player)
+      return Result.new(status: :none) if mobs.empty?
+
+      battle = create_battle!(player, mobs, ambush: true)
+      enemy_result = BattleService.apply_enemy_attack!(player, battle, prefix: "麻痺で動けないところを襲われた！", allow_evasion: false)
+      return Result.new(status: :defeated, message: enemy_result.message, battle: battle) if enemy_result.status == :defeated
+
+      return Result.new(status: :encounter, message: "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に襲われた！#{enemy_result.message}", battle: battle)
+    end
+
+    if StatusEffectService.active?(player, "sleep")
+      mobs = encounter_mobs_for(player)
+      return Result.new(status: :none) if mobs.empty?
+
+      battle = create_battle!(player, mobs, ambush: true)
+      return Result.new(status: :encounter, message: "眠っているところを#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に見つかった！", battle: battle)
+    end
+
+    nil
   end
 
   def self.create_battle!(player, mobs, ambush: false)

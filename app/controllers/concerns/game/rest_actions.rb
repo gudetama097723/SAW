@@ -111,11 +111,12 @@ module Game
       current_player.rests.destroy_all
       player.col = player.col.to_i - cost
       player.hp = player.effective_max_hp
+      StatusEffectService.cure_recoverable!(player)
       player.advance_time!(60)
       player.save!
 
       payment_message = cost.positive? ? "#{cost}コル支払った。" : ""
-      redirect_to game_path(panel: "inn"), notice: "宿屋で休憩した。#{payment_message}HPが全快した。"
+      redirect_to game_path(panel: "inn"), notice: "宿屋で休憩した。#{payment_message}HPと呪い以外の状態異常が回復した。"
     end
   end
 end

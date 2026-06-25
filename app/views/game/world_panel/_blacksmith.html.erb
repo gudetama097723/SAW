@@ -56,13 +56,44 @@
           <p class="mb-0">この町の鍛冶屋には生産できる武器がありません。</p>
         <% end %>
       <% elsif blacksmith_menu == "repair" %>
-        <% if equipped_weapon %>
-          <p class="mb-1">対象: <%= equipped_weapon.display_name %></p>
-          <p class="mb-1">耐久力: <%= equipped_weapon.durability %> / <%= equipped_weapon.max_durability %></p>
-          <p class="mb-2">費用: <%= equipped_weapon.repair_cost %>コル</p>
-          <%= button_to "整備する", blacksmith_path, method: :post, class: "btn btn-outline-warning w-100" %>
+        <% damaged_weapons = @player.weapons.select { |weapon| weapon.repair_cost.positive? } %>
+        <% selected_repair_weapon = damaged_weapons.find { |weapon| weapon.id.to_s == params[:weapon_id].to_s } %>
+        <% total_repair_cost = damaged_weapons.sum(&:repair_cost) %>
+        <% if params[:confirm_repair_all] == "1" && damaged_weapons.any? %>
+          <%= link_to "整備一覧に戻る", game_path(panel: "blacksmith", blacksmith_menu: "repair"), class: "btn btn-outline-light w-100 mb-3" %>
+          <h6>すべて整備しますか？</h6>
+          <p class="mb-1">対象: <%= damaged_weapons.size %>本</p>
+          <p class="mb-2">費用: <%= total_repair_cost %>コル</p>
+          <div class="d-flex gap-2">
+            <%= button_to "はい", blacksmith_path(repair_all: "1", confirm_repair: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-outline-warning w-100" %>
+            <%= link_to "いいえ", game_path(panel: "blacksmith", blacksmith_menu: "repair"), class: "btn btn-outline-light flex-fill" %>
+          </div>
+        <% elsif selected_repair_weapon && params[:confirm_repair_id].to_s == selected_repair_weapon.id.to_s %>
+          <%= link_to "詳細に戻る", game_path(panel: "blacksmith", blacksmith_menu: "repair", weapon_id: selected_repair_weapon.id), class: "btn btn-outline-light w-100 mb-3" %>
+          <h6><%= selected_repair_weapon.display_name %>を整備しますか？</h6>
+          <p class="mb-1">耐久力: <%= selected_repair_weapon.durability %> / <%= selected_repair_weapon.max_durability %></p>
+          <p class="mb-2">費用: <%= selected_repair_weapon.repair_cost %>コル</p>
+          <div class="d-flex gap-2">
+            <%= button_to "はい", blacksmith_path(weapon_id: selected_repair_weapon.id, confirm_repair: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-outline-warning w-100" %>
+            <%= link_to "いいえ", game_path(panel: "blacksmith", blacksmith_menu: "repair", weapon_id: selected_repair_weapon.id), class: "btn btn-outline-light flex-fill" %>
+          </div>
+        <% elsif selected_repair_weapon %>
+          <%= link_to "整備一覧に戻る", game_path(panel: "blacksmith", blacksmith_menu: "repair"), class: "btn btn-outline-light w-100 mb-3" %>
+          <h6><%= selected_repair_weapon.display_name %></h6>
+          <p class="mb-1">武器種: <%= selected_repair_weapon.weapon_type %></p>
+          <p class="mb-1">攻撃力: <%= selected_repair_weapon.attack_power %>（強化込み <%= selected_repair_weapon.effective_attack_power %>）</p>
+          <p class="mb-1">耐久力: <%= selected_repair_weapon.durability %> / <%= selected_repair_weapon.max_durability %></p>
+          <p class="mb-2">費用: <%= selected_repair_weapon.repair_cost %>コル</p>
+          <%= link_to "整備する", game_path(panel: "blacksmith", blacksmith_menu: "repair", weapon_id: selected_repair_weapon.id, confirm_repair_id: selected_repair_weapon.id), class: "btn btn-outline-warning w-100" %>
+        <% elsif damaged_weapons.any? %>
+          <div class="d-grid gap-2 overflow-auto" style="max-height: 420px;">
+            <%= link_to "すべて整備する / #{total_repair_cost}コル", game_path(panel: "blacksmith", blacksmith_menu: "repair", confirm_repair_all: "1"), class: "btn btn-warning w-100" %>
+            <% damaged_weapons.each do |weapon| %>
+              <%= link_to "#{weapon.display_name} / 耐久 #{weapon.durability} / #{weapon.max_durability} / #{weapon.repair_cost}コル", game_path(panel: "blacksmith", blacksmith_menu: "repair", weapon_id: weapon.id), class: "btn btn-outline-warning btn-sm w-100" %>
+            <% end %>
+          </div>
         <% else %>
-          <p class="mb-0">整備できる装備中の武器がありません。</p>
+          <p class="mb-0">整備できる武器がありません。</p>
         <% end %>
       <% elsif blacksmith_menu == "upgrade" %>
         <% selected_weapon = @player.weapons.find_by(id: params[:weapon_id]) %>

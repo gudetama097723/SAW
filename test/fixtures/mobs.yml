@@ -5,9 +5,17 @@ one:
   hp: 1
   atk: 1
   rarity: MyString
+  level: 1
+  agility: 1
+  durability: 1
+  exp_reward: 1
 
 two:
   name: MyString
   hp: 1
   atk: 1
   rarity: MyString
+  level: 1
+  agility: 1
+  durability: 1
+  exp_reward: 1

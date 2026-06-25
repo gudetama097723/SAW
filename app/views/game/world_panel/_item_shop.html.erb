@@ -12,6 +12,10 @@
             <p class="mb-1">重さ: <%= Item.new(name: selected_shop_item.item_name, category: selected_shop_item.category).weight %></p>
             <% if selected_shop_item.item_name == "ポーション" %>
               <p class="mb-2">効果: HPを100回復</p>
+            <% elsif selected_shop_item.item_name == "解毒ポーション" %>
+              <p class="mb-2">効果: 毒を治療</p>
+            <% elsif selected_shop_item.item_name == "火傷治し" %>
+              <p class="mb-2">効果: 火傷を治療</p>
             <% else %>
               <p class="mb-2">効果: 使用効果なし</p>
             <% end %>

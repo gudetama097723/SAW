@@ -6,7 +6,12 @@
       <% battle_enemies.each do |enemy| %>
         <div class="border rounded p-2 flex-fill" style="min-width: 140px;">
           <h5 class="mb-2"><%= enemy.position %>. <%= enemy.mob.name %> Lv<%= enemy.effective_level %></h5>
-          <p class="mb-1">HP: <%= enemy.enemy_hp %> / <%= enemy.effective_max_hp %></p>
+          <p class="mb-1">
+            HP: <%= enemy.enemy_hp %> / <%= enemy.effective_max_hp %>
+            <% enemy.condition_labels.each do |label| %>
+              <span class="badge bg-warning text-dark ms-1"><%= label %></span>
+            <% end %>
+          </p>
           <div class="progress mb-0">
             <div class="progress-bar bg-warning" style="width: <%= [[enemy.enemy_hp.to_i * 100 / [enemy.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
           </div>

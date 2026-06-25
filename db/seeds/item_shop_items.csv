@@ -1,3 +1,7 @@
 ﻿location,item_name,category,price
 はじまりの街,ポーション,healing,50
+はじまりの街,解毒ポーション,healing,70
+はじまりの街,火傷治し,healing,70
 ホルンカの村,ポーション,healing,45
+ホルンカの村,解毒ポーション,healing,65
+ホルンカの村,火傷治し,healing,65

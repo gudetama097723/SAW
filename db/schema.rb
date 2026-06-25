@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_25_183000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_25_184000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -44,6 +44,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_183000) do
     t.integer "mob_id", null: false
     t.text "part_states", default: "{}", null: false
     t.integer "position", default: 1, null: false
+    t.text "status_effects", default: "{}", null: false
+    t.text "status_values", default: "{}", null: false
     t.datetime "updated_at", null: false
     t.index ["battle_id"], name: "index_battle_enemies_on_battle_id"
     t.index ["mob_id"], name: "index_battle_enemies_on_mob_id"
@@ -138,6 +140,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_183000) do
     t.string "rarity"
     t.text "reward_data", default: "{}", null: false
     t.integer "route_id"
+    t.text "status_attack_data", default: "{}", null: false
+    t.text "status_threshold_data", default: "{}", null: false
     t.datetime "updated_at", null: false
     t.string "weak_attack_attribute"
     t.index ["field_area_id"], name: "index_mobs_on_field_area_id"
@@ -251,6 +255,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_183000) do
     t.integer "skill_slots", default: 3, null: false
     t.boolean "skip_stat_allocate_confirm", default: false, null: false
     t.integer "stat_points", default: 0, null: false
+    t.text "status_effects", default: "{}", null: false
     t.text "status_values", default: "{}", null: false
     t.integer "strength", default: 1, null: false
     t.datetime "updated_at", null: false
@@ -379,6 +384,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_183000) do
     t.integer "player_id"
     t.boolean "protected_from_death_penalty", default: false, null: false
     t.string "rarity", default: "common", null: false
+    t.text "status_resistance_data", default: "{}", null: false
     t.integer "strength_bonus", default: 0, null: false
     t.integer "strength_ratio", default: 70, null: false
     t.boolean "unique_item", default: false, null: false

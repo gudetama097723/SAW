@@ -21,14 +21,7 @@ class Player < ApplicationRecord
     [100, 12]
   ].freeze
 
-  STATUS_LABELS = {
-    "poison" => "毒",
-    "paralysis" => "麻痺",
-    "sleep" => "睡眠",
-    "burn" => "火傷",
-    "bleed" => "出血",
-    "stun" => "気絶"
-  }.freeze
+  STATUS_LABELS = StatusEffectService::LABELS
 
   has_many :skills, dependent: :destroy
   has_many :items, dependent: :destroy
@@ -53,6 +46,7 @@ end
 
 def advance_time!(minutes)
   decrease_satiety!(minutes)
+  StatusEffectService.apply_time_passage!(self, minutes)
   total = current_time.to_i + minutes.to_i
   days = total / 1440
   self.current_time = total % 1440
@@ -80,9 +74,7 @@ def can_eat_unappetizing_food?
 end
 
 def apply_status_effect!(key, value)
-  data = status_value_data
-  data[key.to_s] = value
-  self.status_values = data.to_json
+  StatusEffectService.accumulate!(self, key, value)
 end
 
 def advance_day!
@@ -180,13 +172,15 @@ end
   end
 
   def effective_max_hp
-    max_hp_before_armor_hp_bonus + armor_hp_bonus
+    ((max_hp_before_armor_hp_bonus + armor_hp_bonus) * StatusEffectService.max_hp_multiplier(self)).round
   end
 
 def status_value_data
-  JSON.parse(status_values.presence || "{}")
-rescue JSON::ParserError
-  {}
+  StatusEffectService.value_data(self)
+end
+
+def status_effect_data
+  StatusEffectService.effect_data(self)
 end
 
 def condition_labels
@@ -203,11 +197,7 @@ def injury_label
 end
 
 def status_condition_labels
-  status_value_data.filter_map do |key, value|
-    next unless active_status_value?(value)
-
-    STATUS_LABELS.fetch(key.to_s, key.to_s)
-  end
+  StatusEffectService.labels_for(self)
 end
 
 def active_status_value?(value)
@@ -258,12 +248,32 @@ def injured?
 end
 
   def effective_strength
-    strength.to_i + weapon_strength_bonus + armor_strength_bonus
+    [((strength.to_i + weapon_strength_bonus + armor_strength_bonus) * injury_stat_multiplier).round, 1].max
   end
 
   def effective_agility
     base_agility = agility.to_i + weapon_agility_bonus + armor_agility_bonus
-    [base_agility - equipment_weight_penalty, 1].max
+    [((base_agility - equipment_weight_penalty) * injury_stat_multiplier).round, 1].max
+  end
+
+  def injury_stat_multiplier
+    case injury_severity
+    when "severe"
+      0.5
+    when "minor"
+      0.85
+    else
+      1.0
+    end
+  end
+
+  def status_accumulation_limit(status)
+    100 + equipment_status_resistance_bonus(status)
+  end
+
+  def equipment_status_resistance_bonus(status)
+    equipped_weapons.sum { |weapon| weapon.status_resistance_bonus(status) } +
+      equipped_armors.sum { |armor| armor.status_resistance_bonus(status) }
   end
 
   def weapon_hp_bonus

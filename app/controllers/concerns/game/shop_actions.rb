@@ -146,33 +146,41 @@ module Game
         return
       end
 
-      weapon = player.equipped_weapon
-      unless weapon
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "手入れする武器がありません。"
+      unless params[:confirm_repair] == "1"
+        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "整備する内容を確認してください。"
         return
       end
 
-      price = weapon.repair_cost
-      if price <= 0
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), notice: "#{weapon.name}は十分に手入れされています。"
+      weapons = if params[:repair_all] == "1"
+                  player.weapons.select { |owned_weapon| owned_weapon.repair_cost.positive? }
+                else
+                  weapon = player.weapons.find_by(id: params[:weapon_id]) || player.equipped_weapon
+                  weapon && weapon.repair_cost.to_i.positive? ? [weapon] : []
+                end
+
+      if weapons.empty?
+        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "整備できる武器がありません。"
         return
       end
 
-      if player.col.to_i < price
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "コルが足りません。#{weapon.name}の手入れには#{price}コル必要です。"
+      total_price = weapons.sum(&:repair_cost)
+      if player.col.to_i < total_price
+        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "コルが足りません。整備には#{total_price}コル必要です。"
         return
       end
-
-      player.col = player.col.to_i - price
-      player.advance_time!(20)
-      weapon.durability = weapon.max_durability
 
       ActiveRecord::Base.transaction do
+        player.col = player.col.to_i - total_price
+        player.advance_time!(20 * weapons.size)
+        weapons.each do |weapon|
+          weapon.durability = weapon.max_durability
+          weapon.save!
+        end
         player.save!
-        weapon.save!
       end
 
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), notice: "鍛冶屋で#{weapon.name}を手入れした。耐久力が全回復した。#{price}コル支払った。"
+      repaired_names = weapons.map(&:display_name).join("、")
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), notice: "鍛冶屋で#{repaired_names}を整備した。#{total_price}コル支払った。"
     end
 
     def buy_bronze_sword

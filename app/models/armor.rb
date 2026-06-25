@@ -36,5 +36,15 @@ class Armor < ApplicationRecord
   def discardable_by_player?
     !equipped? && !favorite? && discardable? && !unique_item?
   end
+
+  def status_resistance
+    JSON.parse(status_resistance_data.presence || "{}")
+  rescue JSON::ParserError
+    {}
+  end
+
+  def status_resistance_bonus(status)
+    status_resistance[status.to_s].to_i
+  end
 end
 

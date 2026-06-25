@@ -3,6 +3,10 @@ class ItemService
   POTION_PRODUCTION_COST = 20
   POTION_HEAL = 100
   HERBS_PER_POTION = 10
+  STATUS_CURE_ITEMS = {
+    "解毒ポーション" => "poison",
+    "火傷治し" => "burn"
+  }.freeze
 
   Result = Struct.new(:status, :message, :item, keyword_init: true)
 
@@ -97,6 +101,25 @@ class ItemService
     end
 
     Result.new(status: :ok, message: "ポーションを使った。HPが#{POTION_HEAL}回復した。")
+  end
+
+  def self.consume_status_cure!(player, item_name)
+    status = STATUS_CURE_ITEMS[item_name.to_s]
+    return Result.new(status: :error, message: "そのアイテムはまだ使用できません。") unless status
+
+    item = player.items.find_by(name: item_name)
+    return Result.new(status: :error, message: "#{item_name}を持っていません。") unless item&.quantity.to_i.positive?
+    return Result.new(status: :error, message: "その状態異常にはかかっていません。") unless StatusEffectService.active?(player, status)
+
+    item.quantity -= 1
+    StatusEffectService.cure!(player, status)
+
+    ActiveRecord::Base.transaction do
+      item.quantity.to_i <= 0 ? item.destroy! : item.save!
+      player.save!
+    end
+
+    Result.new(status: :ok, message: "#{item_name}を使った。#{StatusEffectService::LABELS[status]}が治った。")
   end
 
   def self.eat_item!(player, item)
