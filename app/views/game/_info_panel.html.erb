@@ -180,7 +180,7 @@
 <% elsif selected_panel == "item_shop" %>
   <% shop_menu = params[:shop_menu].presence %>
   <h5>道具屋</h5>
-  <% unless @player.town_discovery_for&.found_item_shop? %>
+  <% if !@player.town_discovery_for&.found_item_shop? %>
     <p class="mb-0">道具屋はまだ見つけていません。</p>
   <% elsif !FacilityHoursService.open?("item_shop", @player) %>
     <p class="mb-2"><%= FacilityHoursService.closed_message("item_shop", @player) %></p>
@@ -195,7 +195,7 @@
   <% end %>
 <% elsif selected_panel == "restaurant" %>
   <h5><%= RestaurantCatalog.restaurant_name(@player.location) %></h5>
-  <% unless @player.town_discovery_for&.found_restaurant? %>
+  <% if !@player.town_discovery_for&.found_restaurant? %>
     <p class="mb-0">飲食店はまだ見つけていません。</p>
   <% elsif !FacilityHoursService.open?("restaurant", @player) %>
     <p class="mb-2"><%= FacilityHoursService.closed_message("restaurant", @player) %></p>
@@ -209,7 +209,7 @@
 <% elsif selected_panel == "blacksmith" %>
   <% blacksmith_menu = params[:blacksmith_menu].presence %>
   <h5>鍛冶屋</h5>
-  <% unless @player.town_discovery_for&.found_blacksmith? %>
+  <% if !@player.town_discovery_for&.found_blacksmith? %>
     <p class="mb-0">鍛冶屋はまだ見つけていません。</p>
   <% elsif !FacilityHoursService.open?("blacksmith", @player) %>
     <p class="mb-2"><%= FacilityHoursService.closed_message("blacksmith", @player) %></p>
