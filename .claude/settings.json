@@ -1,0 +1,11 @@
+{
+  "ignorePatterns": [
+    "log/**",
+    "tmp/**",
+    "storage/**",
+    "vendor/**",
+    "public/assets/**",
+    "*.log",
+    "Gemfile.lock"
+  ]
+}
