@@ -9,7 +9,17 @@ class NpcDiscoveryService
     return none unless player&.location
 
     candidates = Npc.active
-      .where(location: player.location, placement_type: %w[town facility])
+      .where(location: player.location, placement_type: "town")
+      .ordered
+
+    discover_from_candidates!(player, candidates)
+  end
+
+  def self.discover_during_facility_visit!(player, facility_key)
+    return none unless player&.location && facility_key.present?
+
+    candidates = Npc.active
+      .where(location: player.location, placement_type: "facility", facility_key: facility_key)
       .ordered
 
     discover_from_candidates!(player, candidates)

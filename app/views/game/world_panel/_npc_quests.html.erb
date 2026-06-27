@@ -77,9 +77,8 @@
           <p class="small mb-2">
             報酬: <span class="text-success"><%= NpcQuestService.reward_summary(quest) %></span>
           </p>
-          <%= button_to "受注する",
-              npc_accept_quest_path(npc_quest_id: quest.id),
-              method: :post,
+          <%= link_to "受注する",
+              game_path(panel: "npc_quest_accept", npc_id: npc&.id, npc_quest_id: quest.id),
               class: "btn btn-outline-info btn-sm w-100" %>
         </div>
       <% end %>

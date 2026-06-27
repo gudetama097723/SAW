@@ -13,7 +13,19 @@
 <% base_label = temporary_only ? "仮拠点" : "本拠点" %>
 <% inn_cost = current_base ? 0 : inn_cost %>
 
-<div class="card-header">宿屋</div>
+<div class="card-header d-flex align-items-center justify-content-between">
+  宿屋
+  <% if @talkable_npcs.present? %>
+    <div class="d-flex gap-1">
+      <% @talkable_npcs.each do |npc| %>
+        <%= button_to "#{npc.name}に話しかける",
+            talk_to_npc_path(npc_id: npc.id),
+            method: :post,
+            class: "btn btn-outline-light btn-sm" %>
+      <% end %>
+    </div>
+  <% end %>
+</div>
 <div class="card-body">
   <% if inn_menu == "rest" %>
     <%= render "game/world_panel/inn/rest", inn_cost: inn_cost %>

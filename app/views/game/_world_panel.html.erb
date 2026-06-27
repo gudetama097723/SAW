@@ -10,7 +10,7 @@
   - default_actions: 通常行動 / 移動
 %>
 <%
-  npc_panel_open = selected_panel.in?(%w[npc npc_menu npc_quests])
+  npc_panel_open = selected_panel.in?(%w[npc npc_menu npc_quests npc_quest_accept])
   facility_panel_open = selected_panel.in?(%w[inn item_shop blacksmith restaurant equipment items skills]) && @player.location&.safe_area?
 %>
 
@@ -60,6 +60,8 @@
       <%= render "game/world_panel/npc_menu" %>
     <% elsif selected_panel == "npc_quests" %>
       <%= render "game/world_panel/npc_quests" %>
+    <% elsif selected_panel == "npc_quest_accept" %>
+      <%= render "game/world_panel/npc_quest_accept" %>
     <% elsif selected_panel == "restaurant" %>
       <% if !@player.town_discovery_for&.found_restaurant? %>
         <div class="card-header">飲食店</div>

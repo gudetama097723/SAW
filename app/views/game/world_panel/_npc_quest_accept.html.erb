@@ -1,0 +1,38 @@
+<%
+  quest = NpcQuest.find_by(id: params[:npc_quest_id])
+  npc   = Npc.find_by(id: params[:npc_id])
+%>
+
+<div class="card-header d-flex align-items-center gap-2">
+  <%= npc&.name || "???" %>
+  <span class="badge bg-info">クエスト依頼</span>
+</div>
+
+<div class="card-body">
+  <% if quest && npc %>
+    <p class="small fw-bold text-warning mb-2">「<%= quest.name %>」</p>
+
+    <div class="border border-secondary rounded p-3 mb-3" style="background: #0d1117; min-height: 5rem;">
+      <p class="mb-1 small fw-bold text-warning"><%= npc.name %></p>
+      <p class="mb-0"><%= quest.description.presence || "頼めるか？" %></p>
+    </div>
+
+    <div class="small text-secondary mb-3">
+      <span class="me-3">達成条件: <%= NpcQuestService.completion_conditions_summary(quest) %></span>
+      <span class="text-success">報酬: <%= NpcQuestService.reward_summary(quest) %></span>
+    </div>
+
+    <div class="d-grid gap-2">
+      <%= button_to "受注する",
+          npc_accept_quest_path(npc_quest_id: quest.id),
+          method: :post,
+          class: "btn btn-info w-100" %>
+      <%= link_to "やめておく",
+          game_path(panel: "npc_quests", npc_id: npc.id),
+          class: "btn btn-outline-secondary w-100" %>
+    </div>
+  <% else %>
+    <p class="text-secondary">クエストが見つかりません。</p>
+    <%= link_to "戻る", game_path, class: "btn btn-outline-secondary w-100" %>
+  <% end %>
+</div>

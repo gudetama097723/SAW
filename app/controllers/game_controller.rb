@@ -18,7 +18,13 @@
     @available_treasures = ExplorationRewardService.discovered_treasures(@player)
     @available_bosses = ExplorationRewardService.discovered_bosses(@player)
     @town_discovery = @player.town_discovery_for if @player.location&.safe_area?
-    @talkable_npcs = talkable_npcs_for(@player)
+    current_panel = params[:panel].presence
+    if current_panel.in?(%w[inn item_shop blacksmith restaurant]) &&
+       @player.field_route.blank? && @player.location&.safe_area?
+      NpcDiscoveryService.discover_during_facility_visit!(@player, current_panel)
+    end
+    @talkable_npcs = talkable_npcs_for(@player, current_panel)
+    @active_player_quests = @player.active_quests.includes(npc_quest: :npc)
     if @battle
       BattleService.ensure_battle_enemies!(@battle)
       @battle_enemies = @battle.alive_enemies.includes(mob: :mob_parts).to_a
@@ -91,12 +97,16 @@
     result.status == :ok ? { notice: result.message } : { alert: result.message }
   end
 
-  def talkable_npcs_for(player)
-    if player.location&.safe_area? && player.location_id.present?
+  def talkable_npcs_for(player, current_panel = nil)
+    if player.field_route.blank? && player.location&.safe_area? && player.location_id.present?
       player.npc_discoveries
             .joins(:npc)
             .where(currently_available: true)
             .where(npcs: { active: true, location_id: player.location_id })
+            .where(
+              "npcs.placement_type = ? OR (npcs.placement_type = ? AND npcs.facility_key = ?)",
+              "town", "facility", current_panel.to_s
+            )
             .includes(:npc)
             .map(&:npc)
     elsif @current_field_area.present?
