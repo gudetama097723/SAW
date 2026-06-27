@@ -143,6 +143,8 @@ seed_rows("mobs.csv") do |row|
   mobs[mob.name] = mob
 end
 
+mobs.merge!(Mob.where.not(name: mobs.keys).index_by(&:name))
+
 seed_rows("mob_parts.csv") do |row|
   mob = mobs.fetch(row["mob"])
   part = MobPart.find_or_create_by!(mob: mob, name: row["name"])
@@ -235,5 +237,59 @@ seed_rows("weapon_upgrade_recipes.csv") do |row|
   recipe.update!(
     required_col: to_int(row["required_col"]) || 0,
     required_materials_data: row["required_materials_data"].presence || "{}"
+  )
+end
+
+field_areas_index = FieldArea.all.index_by(&:name)
+npcs_map = {}
+
+seed_rows("npcs.csv") do |row|
+  location   = row["location"].present?   ? locations[row["location"]]            : nil
+  field_area = row["field_area"].present? ? field_areas_index[row["field_area"]]  : nil
+  npc = Npc.find_or_initialize_by(code: row["code"])
+  npc.update!(
+    name:                      row["name"],
+    npc_type:                  row["npc_type"],
+    placement_type:            row["placement_type"],
+    location:                  location,
+    field_area:                field_area,
+    facility_key:              row["facility_key"].presence,
+    dungeon_key:               row["dungeon_key"].presence,
+    position_key:              row["position_key"].presence,
+    sort_order:                to_int(row["sort_order"]) || 0,
+    active:                    to_bool(row["active"]),
+    description:               row["description"].presence,
+    metadata_json:             row["metadata_json"].presence || "{}",
+    discovery_rate:            to_int(row["discovery_rate"]) || 50,
+    repeat_discovery_required: to_bool(row["repeat_discovery_required"]),
+    discovery_conditions_json: row["discovery_conditions_json"].presence || "{}"
+  )
+  npcs_map[npc.code] = npc
+end
+
+seed_rows("npc_dialogues.csv") do |row|
+  npc = npcs_map.fetch(row["npc_code"])
+  dialogue = NpcDialogue.find_or_initialize_by(
+    npc: npc,
+    dialogue_type: row["dialogue_type"],
+    sequence: to_int(row["sequence"]) || 0
+  )
+  dialogue.update!(text: row["text"], active: to_bool(row["active"]))
+end
+
+seed_rows("npc_quests.csv") do |row|
+  npc = npcs_map.fetch(row["npc_code"])
+  quest = NpcQuest.find_or_initialize_by(code: row["code"])
+  quest.update!(
+    npc:                        npc,
+    name:                       row["name"],
+    description:                row["description"].presence,
+    start_conditions_json:      row["start_conditions_json"].presence || "{}",
+    completion_conditions_json: row["completion_conditions_json"].presence || "{}",
+    reward_data:                row["reward_data"].presence || "{}",
+    repeatable:                 to_bool(row["repeatable"]),
+    sort_order:                 to_int(row["sort_order"]) || 0,
+    active:                     to_bool(row["active"]),
+    trigger_affinity:           to_int(row["trigger_affinity"])
   )
 end

@@ -21,4 +21,14 @@ class NpcDiscovery < ApplicationRecord
     self.currently_available = false if npc.repeat_discovery_required?
     save!
   end
+
+  def become_acquainted!
+    update!(acquainted: true, last_spoken_at: Time.current)
+  end
+
+  def increment_affinity!(amount = 1)
+    new_val = (affinity.to_i + amount.to_i).clamp(0, 100)
+    update!(affinity: new_val)
+    new_val
+  end
 end

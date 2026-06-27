@@ -64,4 +64,10 @@ Rails.application.routes.draw do
   post "allocate_strength", to: "game#allocate_strength"
   post "allocate_agility", to: "game#allocate_agility"
   post "allocate_stats", to: "game#allocate_stats"
+  post "talk_to_npc",       to: "game#talk_to_npc"
+  post "npc_next_dialogue", to: "game#npc_next_dialogue"
+  post "npc_gossip",        to: "game#npc_gossip"
+  post "npc_info",          to: "game#npc_info"
+  post "npc_accept_quest",  to: "game#npc_accept_quest"
+  post "npc_complete_quest", to: "game#npc_complete_quest"
 end

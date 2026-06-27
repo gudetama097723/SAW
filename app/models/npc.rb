@@ -5,6 +5,7 @@ class Npc < ApplicationRecord
   belongs_to :field_area, optional: true
   has_many :npc_discoveries, dependent: :destroy
   has_many :discovering_players, through: :npc_discoveries, source: :player
+  has_many :npc_quests, dependent: :destroy
 
   scope :active, -> { where(active: true) }
   scope :ordered, -> { order(:sort_order, :id) }

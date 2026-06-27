@@ -1,0 +1,16 @@
+npc_code,dialogue_type,sequence,text,active
+beginning_town_guide,intro,1,ようこそ、はじまりの街へ！私は街の案内人をしています。初めてここに来たんですね？,true
+beginning_town_guide,intro,2,アインクラッドは100層からなる浮遊城です。最上層のボスを倒すことがクリアの条件……と聞いています。,true
+beginning_town_guide,intro,3,まずは街の中を散策して、施設の場所を覚えることをおすすめします。宿屋や道具屋が役に立つはずですよ。,true
+beginning_town_guide,gossip,1,最近、外から来た冒険者が増えましたね。みんな攻略を目指しているんでしょうか。,true
+beginning_town_guide,gossip,2,広場の噴水、綺麗でしょう？こんな状況でも、街の暮らしは意外と落ち着いたものです。,true
+beginning_town_guide,gossip,3,時々、上の層から降りてくる冒険者もいます。強い人はやはり雰囲気が違いますね。,true
+beginning_town_guide,info,1,東の門を出ると外のルートへ出られます。モンスターには十分に気をつけてください。,true
+beginning_town_guide,info,2,街の中では安全です。この街で宿屋や道具屋などを発見するには、散策が必要ですよ。,true
+beginning_inn_keeper,intro,1,いらっしゃい。ここはアインクラッドでも数少ない安全な場所だよ。ゆっくりしていきな。,true
+beginning_inn_keeper,intro,2,うちに泊まると体の疲れが取れて楽になるよ。外で戦うには休息も大事さ。いつでも来てくれ。,true
+beginning_inn_keeper,gossip,1,昨日も何人かの冒険者が泊まっていったよ。みんな上の層を目指してるんだろうな。,true
+beginning_inn_keeper,gossip,2,最近は夜も外が騒がしいことがある。モンスターが活発になってるのかもしれないね。,true
+beginning_inn_keeper,gossip,3,この街の飯は悪くないよ。どこかに飲食店があるはずだから、探してみるといい。,true
+beginning_inn_keeper,info,1,宿泊すれば疲労が完全に回復するよ。命には代えられない。高くてもしっかり休んでいきな。,true
+beginning_inn_keeper,info,2,荷物が増えたときはここに預けておいてもいいよ。収納スペースも貸しているんだ。,true

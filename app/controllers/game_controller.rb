@@ -5,6 +5,7 @@
   include Game::ShopActions
   include Game::BaseActions
   include Game::GrowthActions
+  include Game::NpcActions
   before_action :require_login
 
   def index
@@ -17,6 +18,7 @@
     @available_treasures = ExplorationRewardService.discovered_treasures(@player)
     @available_bosses = ExplorationRewardService.discovered_bosses(@player)
     @town_discovery = @player.town_discovery_for if @player.location&.safe_area?
+    @talkable_npcs = talkable_npcs_for(@player)
     if @battle
       BattleService.ensure_battle_enemies!(@battle)
       @battle_enemies = @battle.alive_enemies.includes(mob: :mob_parts).to_a
@@ -87,6 +89,26 @@
 
   def flash_for(result)
     result.status == :ok ? { notice: result.message } : { alert: result.message }
+  end
+
+  def talkable_npcs_for(player)
+    if player.location&.safe_area? && player.location_id.present?
+      player.npc_discoveries
+            .joins(:npc)
+            .where(currently_available: true)
+            .where(npcs: { active: true, location_id: player.location_id })
+            .includes(:npc)
+            .map(&:npc)
+    elsif @current_field_area.present?
+      player.npc_discoveries
+            .joins(:npc)
+            .where(currently_available: true)
+            .where(npcs: { active: true, field_area_id: @current_field_area.id, placement_type: "field_area" })
+            .includes(:npc)
+            .map(&:npc)
+    else
+      []
+    end
   end
 
   def inn_cost_for(location)

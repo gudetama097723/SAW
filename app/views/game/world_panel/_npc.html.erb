@@ -1,0 +1,34 @@
+<%
+  npc  = Npc.find_by(id: params[:npc_id])
+  seq  = params[:seq].to_i
+  line = npc&.npc_dialogues&.active&.where(dialogue_type: "intro", sequence: seq)&.first
+  total_intro = npc&.npc_dialogues&.active&.where(dialogue_type: "intro")&.count.to_i
+  line_index  = npc&.npc_dialogues&.active&.where(dialogue_type: "intro")
+                    &.where("sequence <= ?", seq)&.count.to_i
+%>
+
+<div class="card-header d-flex align-items-center justify-content-between">
+  <span><%= npc&.name || "???" %></span>
+  <% if total_intro > 0 %>
+    <small class="text-secondary"><%= line_index %> / <%= total_intro %></small>
+  <% end %>
+</div>
+<div class="card-body">
+  <% if npc && line %>
+    <div class="border border-secondary rounded p-3 mb-3" style="background: #0d1117; min-height: 5rem;">
+      <p class="mb-1 small fw-bold text-warning"><%= npc.name %></p>
+      <p class="mb-0"><%= line.text %></p>
+    </div>
+
+    <div class="d-grid gap-2">
+      <%= button_to "次へ ▶",
+          npc_next_dialogue_path(npc_id: npc.id, seq: seq),
+          method: :post,
+          class: "btn btn-primary w-100" %>
+      <%= link_to "その場を離れる", game_path, class: "btn btn-outline-secondary w-100" %>
+    </div>
+  <% else %>
+    <p class="text-secondary">会話データが見つかりません。</p>
+    <%= link_to "その場を離れる", game_path, class: "btn btn-outline-secondary w-100" %>
+  <% end %>
+</div>

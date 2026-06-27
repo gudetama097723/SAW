@@ -37,18 +37,27 @@ module Game
     end
 
     def explore
-      result = FieldService.explore!(current_player)
-      redirect_with_result(result)
+      player = current_player
+      area   = FieldService.current_area_for(player)
+      result = FieldService.explore!(player)
+      npc_discovery = area ? NpcDiscoveryService.discover_during_explore!(player, area) : nil
+      redirect_with_field_action_result(result, npc_discovery)
     end
 
     def gather
-      result = FieldService.gather!(current_player)
-      redirect_with_result(result)
+      player = current_player
+      area   = FieldService.current_area_for(player)
+      result = FieldService.gather!(player)
+      npc_discovery = area ? NpcDiscoveryService.discover_during_explore!(player, area) : nil
+      redirect_with_field_action_result(result, npc_discovery)
     end
 
     def hunt
-      result = FieldService.hunt!(current_player)
-      redirect_to game_path, notice: result.message
+      player = current_player
+      area   = FieldService.current_area_for(player)
+      result = FieldService.hunt!(player)
+      npc_discovery = area ? NpcDiscoveryService.discover_during_explore!(player, area) : nil
+      redirect_with_field_action_result(result, npc_discovery)
     end
 
     def open_treasure
@@ -244,6 +253,17 @@ module Game
       return message unless npc_discovery&.discovered?
 
       "#{message} #{npc_discovery.message}"
+    end
+
+    def redirect_with_field_action_result(result, npc_discovery = nil)
+      message = append_npc_discovery_message(result.message, npc_discovery)
+      if result.status == :error
+        redirect_to game_path, alert: message
+      elsif result.status == :defeated
+        redirect_to game_path(panel: "inn"), alert: message
+      else
+        redirect_to game_path, notice: message
+      end
     end
   end
 end

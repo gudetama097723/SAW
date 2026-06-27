@@ -44,6 +44,8 @@ class Player < ApplicationRecord
   has_many :player_bases, class_name: "PlayerBase", dependent: :destroy
   has_many :npc_discoveries, dependent: :destroy
   has_many :discovered_npcs, through: :npc_discoveries, source: :npc
+  has_many :player_quests, dependent: :destroy
+  has_many :active_quests, -> { active }, class_name: "PlayerQuest"
   
 def formatted_datetime
   format("%d月 %d日 %02d:%02d", current_month.to_i, current_day.to_i, current_time.to_i / 60, current_time.to_i % 60)

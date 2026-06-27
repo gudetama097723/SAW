@@ -1,0 +1,95 @@
+<%
+  npc = Npc.find_by(id: params[:npc_id])
+%>
+
+<div class="card-header d-flex align-items-center justify-content-between">
+  <span>クエスト一覧</span>
+  <% if npc %>
+    <small class="text-secondary"><%= npc.name %></small>
+  <% end %>
+</div>
+
+<div class="card-body">
+  <% if npc && @player %>
+    <%
+      active_pqs = NpcQuestService.active_quests(@player, npc).to_a
+      available  = NpcQuestService.available_quests(@player, npc)
+    %>
+
+    <% if active_pqs.empty? && available.empty? %>
+      <p class="text-secondary mb-3 small">現在受けられるクエストはありません。</p>
+    <% end %>
+
+    <%# ── 受注中クエスト ── %>
+    <% if active_pqs.any? %>
+      <p class="small fw-bold text-warning mb-2">受注中</p>
+      <% active_pqs.each do |pq| %>
+        <% quest       = pq.npc_quest %>
+        <% completable = NpcQuestService.completion_conditions_met?(@player, quest) %>
+        <div class="border border-warning rounded p-2 mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="fw-bold"><%= quest.name %></span>
+            <% if quest.repeatable? %>
+              <span class="badge bg-secondary">繰り返し可</span>
+            <% end %>
+            <span class="ms-auto small text-secondary">
+              達成 <%= pq.completed_count.to_i %>回
+            </span>
+          </div>
+          <% if quest.description.present? %>
+            <p class="small text-secondary mb-1"><%= quest.description %></p>
+          <% end %>
+          <p class="small mb-2">
+            達成条件:
+            <span class="<%= completable ? "text-success" : "text-warning" %>">
+              <%= NpcQuestService.completion_conditions_summary(quest) %>
+            </span>
+          </p>
+          <% if completable %>
+            <%= button_to "達成報告する",
+                npc_complete_quest_path(npc_quest_id: quest.id),
+                method: :post,
+                class: "btn btn-warning btn-sm w-100" %>
+          <% else %>
+            <button class="btn btn-outline-secondary btn-sm w-100" disabled>条件未達成</button>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
+
+    <%# ── 受注可能クエスト ── %>
+    <% if available.any? %>
+      <p class="small fw-bold text-info mb-2 <%= active_pqs.any? ? "mt-3" : "" %>">受注可能</p>
+      <% available.each do |quest| %>
+        <div class="border border-secondary rounded p-2 mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="fw-bold"><%= quest.name %></span>
+            <% if quest.repeatable? %>
+              <span class="badge bg-secondary">繰り返し可</span>
+            <% end %>
+          </div>
+          <% if quest.description.present? %>
+            <p class="small text-secondary mb-1"><%= quest.description %></p>
+          <% end %>
+          <p class="small mb-1">
+            達成条件: <%= NpcQuestService.completion_conditions_summary(quest) %>
+          </p>
+          <p class="small mb-2">
+            報酬: <span class="text-success"><%= NpcQuestService.reward_summary(quest) %></span>
+          </p>
+          <%= button_to "受注する",
+              npc_accept_quest_path(npc_quest_id: quest.id),
+              method: :post,
+              class: "btn btn-outline-info btn-sm w-100" %>
+        </div>
+      <% end %>
+    <% end %>
+
+  <% else %>
+    <p class="text-secondary">NPCが見つかりません。</p>
+  <% end %>
+
+  <%= link_to "戻る",
+      game_path(panel: "npc_menu", npc_id: params[:npc_id]),
+      class: "btn btn-outline-light btn-sm w-100 mt-2" %>
+</div>

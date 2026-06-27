@@ -1,0 +1,5 @@
+npc_code,code,name,description,start_conditions_json,completion_conditions_json,reward_data,repeatable,sort_order,active,trigger_affinity
+beginning_town_guide,guide_herb_collection,薬草の採取依頼,近くの森で薬草が採れるはずだ。3本持ってきてくれないか？何かお礼をしたい。,{},"{""items"":[{""name"":""薬草"",""quantity"":3,""consume"":true}]}","{""col"":150,""exp"":80,""affinity"":1}",true,1,true,
+beginning_town_guide,guide_veteran_proof,実力の証明,君のことは信頼しているよ。でも正直、まだ実力が心配だ。レベル5になったら話しかけてくれ。,"{""affinity"":{""min"":3}}","{""level"":{""min"":5}}","{""col"":800,""exp"":400,""affinity"":2}",false,2,true,
+beginning_town_guide,guide_max_bond,案内人からの贈り物,こんなに仲良くなれるとは思っていなかった。長い付き合いへの感謝として、これを受け取ってくれ。君の冒険に役立つはずだ。,{},{},"{""col"":1000,""exp"":500,""items"":[{""name"":""友情の証"",""category"":""key_item"",""quantity"":1,""unique_item"":""true""}]}",false,99,true,100
+beginning_inn_keeper,inn_slime_materials,スライムの核の調達,宿の修繕に使う素材が必要なんだ。スライムの核を3個持ってきてくれるかい？,"{""affinity"":{""min"":2}}","{""items"":[{""name"":""スライムの核"",""quantity"":3,""consume"":true}]}","{""col"":400,""exp"":200,""affinity"":1}",false,1,true,

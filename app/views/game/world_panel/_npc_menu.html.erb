@@ -1,0 +1,54 @@
+<%
+  npc = Npc.find_by(id: params[:npc_id])
+
+  if npc && @player
+    discovery        = @player.npc_discoveries.find_by(npc: npc)
+    available_count  = NpcQuestService.available_quests(@player, npc).count
+    active_count     = NpcQuestService.active_quests(@player, npc).count
+    quest_badge      = available_count + active_count
+  else
+    discovery   = nil
+    quest_badge = 0
+  end
+%>
+
+<div class="card-header d-flex align-items-center gap-2">
+  <%= npc&.name || "???" %>
+  <span class="badge bg-success">顔見知り</span>
+  <% if discovery %>
+    <span class="ms-auto small text-secondary">親密度 <%= discovery.affinity %></span>
+  <% end %>
+</div>
+<div class="card-body">
+  <% if npc %>
+    <% if npc.description.present? %>
+      <p class="small text-secondary mb-3"><%= npc.description %></p>
+    <% end %>
+
+    <div class="d-grid gap-2">
+      <%= button_to "雑談する",
+          npc_gossip_path(npc_id: npc.id),
+          method: :post,
+          class: "btn btn-outline-info w-100" %>
+      <%= button_to "情報を聞く",
+          npc_info_path(npc_id: npc.id),
+          method: :post,
+          class: "btn btn-outline-warning w-100" %>
+
+      <% if quest_badge > 0 %>
+        <%= link_to game_path(panel: "npc_quests", npc_id: npc.id),
+            class: "btn btn-outline-primary w-100" do %>
+          クエスト
+          <span class="badge bg-warning text-dark ms-1"><%= quest_badge %></span>
+        <% end %>
+      <% else %>
+        <button class="btn btn-outline-secondary w-100" disabled>クエスト（なし）</button>
+      <% end %>
+
+      <%= link_to "別れを告げる", game_path, class: "btn btn-outline-light w-100" %>
+    </div>
+  <% else %>
+    <p class="text-secondary">NPCが見つかりません。</p>
+    <%= link_to "その場を離れる", game_path, class: "btn btn-outline-secondary w-100" %>
+  <% end %>
+</div>

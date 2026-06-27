@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_26_001000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_000001) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -150,7 +150,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_001000) do
     t.index ["route_id"], name: "index_mobs_on_route_id"
   end
 
+  create_table "npc_dialogues", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.string "dialogue_type", null: false
+    t.integer "npc_id", null: false
+    t.integer "sequence", default: 0, null: false
+    t.text "text", null: false
+    t.datetime "updated_at", null: false
+    t.index ["npc_id", "dialogue_type", "sequence"], name: "index_npc_dialogues_on_npc_type_seq"
+    t.index ["npc_id"], name: "index_npc_dialogues_on_npc_id"
+  end
+
   create_table "npc_discoveries", force: :cascade do |t|
+    t.boolean "acquainted", default: false, null: false
+    t.integer "affinity", default: 0, null: false
     t.datetime "created_at", null: false
     t.boolean "currently_available", default: false, null: false
     t.integer "discovered_count", default: 0, null: false
@@ -164,6 +178,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_001000) do
     t.index ["player_id", "currently_available"], name: "index_npc_discoveries_on_player_id_and_currently_available"
     t.index ["player_id", "npc_id"], name: "index_npc_discoveries_on_player_id_and_npc_id", unique: true
     t.index ["player_id"], name: "index_npc_discoveries_on_player_id"
+  end
+
+  create_table "npc_quests", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "code", null: false
+    t.text "completion_conditions_json", default: "{}", null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.integer "npc_id", null: false
+    t.boolean "repeatable", default: false, null: false
+    t.text "reward_data", default: "{}", null: false
+    t.integer "sort_order", default: 0, null: false
+    t.text "start_conditions_json", default: "{}", null: false
+    t.integer "trigger_affinity"
+    t.datetime "updated_at", null: false
+    t.index ["code"], name: "index_npc_quests_on_code", unique: true
+    t.index ["npc_id", "sort_order"], name: "index_npc_quests_on_npc_id_and_sort_order"
+    t.index ["npc_id"], name: "index_npc_quests_on_npc_id"
   end
 
   create_table "npcs", force: :cascade do |t|
@@ -230,6 +263,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_001000) do
     t.index ["field_area_id"], name: "index_player_field_area_progresses_on_field_area_id"
     t.index ["player_id", "field_area_id"], name: "index_player_area_progress_unique", unique: true
     t.index ["player_id"], name: "index_player_field_area_progresses_on_player_id"
+  end
+
+  create_table "player_quests", force: :cascade do |t|
+    t.datetime "accepted_at"
+    t.datetime "completed_at"
+    t.integer "completed_count", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.integer "npc_quest_id", null: false
+    t.integer "player_id", null: false
+    t.text "progress_data", default: "{}", null: false
+    t.string "status", default: "active", null: false
+    t.datetime "updated_at", null: false
+    t.index ["npc_quest_id"], name: "index_player_quests_on_npc_quest_id"
+    t.index ["player_id", "npc_quest_id"], name: "index_player_quests_on_player_id_and_npc_quest_id", unique: true
+    t.index ["player_id", "status"], name: "index_player_quests_on_player_id_and_status"
+    t.index ["player_id"], name: "index_player_quests_on_player_id"
   end
 
   create_table "player_route_progresses", force: :cascade do |t|
@@ -458,8 +507,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_001000) do
   add_foreign_key "mob_parts", "mobs"
   add_foreign_key "mobs", "field_areas"
   add_foreign_key "mobs", "routes"
+  add_foreign_key "npc_dialogues", "npcs"
   add_foreign_key "npc_discoveries", "npcs"
   add_foreign_key "npc_discoveries", "players"
+  add_foreign_key "npc_quests", "npcs"
   add_foreign_key "npcs", "field_areas"
   add_foreign_key "npcs", "locations"
   add_foreign_key "player_bases", "locations"
@@ -468,6 +519,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_001000) do
   add_foreign_key "player_boss_kills", "players"
   add_foreign_key "player_field_area_progresses", "field_areas"
   add_foreign_key "player_field_area_progresses", "players"
+  add_foreign_key "player_quests", "npc_quests"
+  add_foreign_key "player_quests", "players"
   add_foreign_key "player_route_progresses", "players"
   add_foreign_key "player_route_progresses", "routes"
   add_foreign_key "player_town_discoveries", "locations"
