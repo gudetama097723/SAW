@@ -575,7 +575,7 @@ end
 
     message = "経験値を #{total} 獲得した！"
     level_gain = player.level.to_i - before_level
-    message += " レベル#{player.level}に上昇！振り分けポイント +#{level_gain * 3}" if level_gain.positive?
+    message += " [levelup]レベル#{player.level}に上昇！振り分けポイント +#{level_gain * 3}[/levelup]" if level_gain.positive?
     message += " スキルスロット +#{player.skill_slots.to_i - before_slots}" if player.skill_slots.to_i > before_slots
     message
   end

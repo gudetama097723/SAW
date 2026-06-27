@@ -61,3 +61,27 @@
   padding: 0;
   line-height: 1.35;
 }
+
+@keyframes levelup-glow {
+  0%   { text-shadow: 0 0 4px #ffd700; }
+  50%  { text-shadow: 0 0 14px #ffd700, 0 0 28px #ff8c00; }
+  100% { text-shadow: 0 0 4px #ffd700; }
+}
+
+@keyframes boss-flash {
+  0%   { text-shadow: 0 0 4px #ff4500; }
+  50%  { text-shadow: 0 0 14px #ff0000, 0 0 28px #ff4500; }
+  100% { text-shadow: 0 0 4px #ff4500; }
+}
+
+.message-levelup {
+  color: #ffd700 !important;
+  font-weight: bold;
+  animation: levelup-glow 1.5s ease-in-out infinite;
+}
+
+.message-boss {
+  color: #ff6347 !important;
+  font-weight: bold;
+  animation: boss-flash 1s ease-in-out 4;
+}

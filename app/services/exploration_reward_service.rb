@@ -64,7 +64,7 @@ def self.start_boss_battle!(player, mob)
     return "" if state.defeated?
 
     state.update!(found: true, defeated: true, defeated_at: Time.current)
-    " #{mob.name}を討伐した！#{apply_reward!(player, mob.reward, unique_drops: true)}"
+    " [boss]#{mob.name}を討伐した！[/boss]#{apply_reward!(player, mob.reward, unique_drops: true)}"
   end
 
   def self.discovered_treasures(player)

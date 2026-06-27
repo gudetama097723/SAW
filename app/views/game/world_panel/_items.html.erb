@@ -1,9 +1,38 @@
       <div class="card-header">所持品一覧</div>
       <div class="card-body">
 
+        <%
+          cur_sort = params[:sort_by].to_s
+          cur_dir  = params[:sort_dir] == "asc" ? "asc" : "desc"
+          sort_link = ->(label, col, default_dir = "asc") do
+            active    = cur_sort == col
+            next_dir  = active && cur_dir == default_dir ? (default_dir == "asc" ? "desc" : "asc") : default_dir
+            arrow     = active ? (cur_dir == "asc" ? " ▲" : " ▼") : ""
+            link_to(
+              "#{label}#{arrow}",
+              game_path(panel: "items", item_category: params[:item_category], sort_by: col, sort_dir: next_dir),
+              class: "btn btn-sm py-0 px-2 #{active ? 'btn-secondary' : 'btn-outline-secondary'}"
+            )
+          end
+        %>
+
         <% if params[:item_category] == "weapons" %>
 
-          <% @player.weapons.order(:name).each do |weapon| %>
+          <div class="d-flex gap-1 mb-2 flex-wrap">
+            <%= sort_link.call("名前", "name", "asc") %>
+            <%= sort_link.call("攻撃力", "attack_power", "desc") %>
+            <%= sort_link.call("強化", "enhancement_level", "desc") %>
+            <%= sort_link.call("耐久", "durability", "desc") %>
+          </div>
+
+          <%
+            weapon_cols = { "name" => "name", "attack_power" => "attack_power",
+                            "enhancement_level" => "enhancement_level", "durability" => "durability" }
+            w_col = weapon_cols[cur_sort] || "name"
+            w_dir = cur_dir == "asc" ? :asc : :desc
+          %>
+
+          <% @player.weapons.order(w_col => w_dir).each do |weapon| %>
             <div class="border rounded mb-2">
               <button class="btn btn-dark w-100 text-start"
                       type="button"
@@ -47,7 +76,20 @@
 
         <% elsif params[:item_category] == "armors" %>
 
-          <% @player.armors.order(:slot, :name).each do |armor| %>
+          <div class="d-flex gap-1 mb-2 flex-wrap">
+            <%= sort_link.call("部位", "slot", "asc") %>
+            <%= sort_link.call("名前", "name", "asc") %>
+            <%= sort_link.call("防御力", "defense", "desc") %>
+          </div>
+
+          <%
+            armor_cols = { "name" => "name", "defense" => "defense", "slot" => "slot" }
+            a_col = armor_cols[cur_sort] || "slot"
+            a_dir = cur_dir == "asc" ? :asc : :desc
+            a_order = a_col == "slot" ? { slot: a_dir, name: :asc } : { a_col => a_dir }
+          %>
+
+          <% @player.armors.order(a_order).each do |armor| %>
 
             <div class="border rounded mb-2">
               <button class="btn btn-dark w-100 text-start"
@@ -84,9 +126,21 @@
 
         <% elsif params[:item_category].in?(%w[healing gathered drop]) %>
 
+          <div class="d-flex gap-1 mb-2 flex-wrap">
+            <%= sort_link.call("名前", "name", "asc") %>
+            <%= sort_link.call("数量", "quantity", "desc") %>
+            <%= sort_link.call("売値", "sell_price", "desc") %>
+          </div>
+
+          <%
+            item_cols = { "name" => "name", "quantity" => "quantity", "sell_price" => "sell_price" }
+            i_col = item_cols[cur_sort] || "name"
+            i_dir = cur_dir == "asc" ? :asc : :desc
+          %>
+
           <% items = @player.items.where(category: params[:item_category])
                                   .where("quantity > 0")
-                                  .order(:name) %>
+                                  .order(i_col => i_dir) %>
 
           <% items.each do |item| %>
 
