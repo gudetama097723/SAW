@@ -1,4 +1,4 @@
-SEED_DIR = Rails.root.join("db", "seeds")
+﻿SEED_DIR = Rails.root.join("db", "seeds")
 
 def seed_rows(file_name)
   SimpleCsv.foreach(SEED_DIR.join(file_name)) do |row|
@@ -262,7 +262,8 @@ seed_rows("npcs.csv") do |row|
     metadata_json:             row["metadata_json"].presence || "{}",
     discovery_rate:            to_int(row["discovery_rate"]) || 50,
     repeat_discovery_required: to_bool(row["repeat_discovery_required"]),
-    discovery_conditions_json: row["discovery_conditions_json"].presence || "{}"
+    discovery_conditions_json: row["discovery_conditions_json"].presence || "{}",
+    initial_affinity_cap:      to_int(row["initial_affinity_cap"]) || 60
   )
   npcs_map[npc.code] = npc
 end
@@ -292,4 +293,13 @@ seed_rows("npc_quests.csv") do |row|
     active:                     to_bool(row["active"]),
     trigger_affinity:           to_int(row["trigger_affinity"])
   )
+end
+
+if File.exist?(SEED_DIR.join("npc_affinity_rules.csv"))
+  NpcAffinityRuleCsvImporter.new.import!
+end
+
+
+if File.exist?(SEED_DIR.join("npc_affinity_cap_rules.csv"))
+  NpcAffinityCapRuleCsvImporter.new.import!
 end

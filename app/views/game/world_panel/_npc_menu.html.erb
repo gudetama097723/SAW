@@ -1,9 +1,10 @@
-<%
+﻿<%
   npc = Npc.find_by(id: params[:npc_id])
 
   if npc && @player
     discovery        = @player.npc_discoveries.find_by(npc: npc)
     available_count  = NpcQuestService.available_quests(@player, npc).count
+    gift_rules       = npc.npc_affinity_rules.active.where(action_type: "gift").ordered.select { |rule| @player.items.where(name: rule.target_key).where("quantity > 0").exists? }
     active_count     = NpcQuestService.active_quests(@player, npc).count
     quest_badge      = available_count + active_count
   else
@@ -34,6 +35,18 @@
           npc_info_path(npc_id: npc.id),
           method: :post,
           class: "btn btn-outline-warning w-100" %>
+
+      <% if gift_rules.present? %>
+        <div class="border border-secondary rounded p-2">
+          <p class="small text-secondary mb-2">贈り物</p>
+          <% gift_rules.each do |rule| %>
+            <%= button_to "#{rule.target_key}を渡す",
+                npc_gift_path(npc_id: npc.id, item_name: rule.target_key),
+                method: :post,
+                class: "btn btn-outline-success btn-sm w-100 mb-1" %>
+          <% end %>
+        </div>
+      <% end %>
 
       <% if quest_badge > 0 %>
         <%= link_to game_path(panel: "npc_quests", npc_id: npc.id),

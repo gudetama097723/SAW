@@ -1,3 +1,3 @@
-code,name,npc_type,placement_type,location,route,field_area,facility_key,dungeon_key,position_key,sort_order,active,description,metadata_json,discovery_rate,repeat_discovery_required,discovery_conditions_json
-beginning_town_guide,街の案内人,guide,town,はじまりの街,,,,,town_square,10,true,はじまりの街で新米プレイヤーに道案内をするNPC,{},100,false,{}
-beginning_inn_keeper,宿屋の主人,innkeeper,facility,はじまりの街,,,inn,,counter,20,true,宿屋を管理しているNPC,{},100,false,{}
+﻿code,name,npc_type,placement_type,location,route,field_area,facility_key,dungeon_key,position_key,sort_order,active,description,metadata_json,discovery_rate,repeat_discovery_required,discovery_conditions_json,initial_affinity_cap
+beginning_town_guide,街の案内人,guide,town,はじまりの街,,,,,town_square,10,true,はじまりの街で新米プレイヤーに道案内をするNPC,{},100,false,{},60
+beginning_inn_keeper,宿屋の主人,innkeeper,facility,はじまりの街,,,inn,,counter,20,true,宿屋を管理しているNPC,{},100,false,{},60

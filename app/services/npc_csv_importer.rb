@@ -45,7 +45,8 @@ class NpcCsvImporter
       metadata_json: row["metadata_json"].presence || "{}",
       discovery_rate: integer(row["discovery_rate"]) || 100,
       repeat_discovery_required: boolean(row["repeat_discovery_required"], default: false),
-      discovery_conditions_json: row["discovery_conditions_json"].presence || "{}"
+      discovery_conditions_json: row["discovery_conditions_json"].presence || "{}",
+      initial_affinity_cap: integer(row["initial_affinity_cap"]) || 60
     }
   end
 

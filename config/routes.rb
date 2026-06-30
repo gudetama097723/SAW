@@ -1,4 +1,4 @@
-Rails.application.routes.draw do
+﻿Rails.application.routes.draw do
   root "home#index"
   get "game", to: "game#index", as: :game
   get "signup", to: "registrations#new"
@@ -68,6 +68,7 @@ Rails.application.routes.draw do
   post "npc_next_dialogue", to: "game#npc_next_dialogue"
   post "npc_gossip",        to: "game#npc_gossip"
   post "npc_info",          to: "game#npc_info"
+  post "npc_gift",          to: "game#npc_gift"
   post "npc_accept_quest",  to: "game#npc_accept_quest"
   post "npc_complete_quest", to: "game#npc_complete_quest"
 end

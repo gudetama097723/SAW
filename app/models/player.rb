@@ -1,4 +1,4 @@
-class Player < ApplicationRecord
+﻿class Player < ApplicationRecord
   HP_GROWTH_POINTS = [
     [1, 100],
     [10, 1783],
@@ -43,6 +43,7 @@ class Player < ApplicationRecord
   has_many :player_boss_kills, dependent: :destroy
   has_many :player_bases, class_name: "PlayerBase", dependent: :destroy
   has_many :npc_discoveries, dependent: :destroy
+  has_many :player_npcs, dependent: :destroy
   has_many :discovered_npcs, through: :npc_discoveries, source: :npc
   has_many :player_quests, dependent: :destroy
   has_many :active_quests, -> { active }, class_name: "PlayerQuest"

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_28_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_01_001000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -150,6 +150,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_000001) do
     t.index ["route_id"], name: "index_mobs_on_route_id"
   end
 
+  create_table "npc_affinity_cap_rules", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.integer "cap_value", null: false
+    t.text "conditions_json", default: "{}", null: false
+    t.datetime "created_at", null: false
+    t.integer "npc_id", null: false
+    t.integer "required_affinity", default: 0, null: false
+    t.integer "sort_order", default: 0, null: false
+    t.string "unlock_key", null: false
+    t.string "unlock_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["npc_id", "unlock_type", "unlock_key"], name: "index_npc_affinity_cap_rules_lookup"
+    t.index ["npc_id"], name: "index_npc_affinity_cap_rules_on_npc_id"
+  end
+
+  create_table "npc_affinity_rules", force: :cascade do |t|
+    t.string "action_type", null: false
+    t.boolean "active", default: true, null: false
+    t.integer "affinity_gain", default: 0, null: false
+    t.text "conditions_json", default: "{}", null: false
+    t.datetime "created_at", null: false
+    t.boolean "daily_limit", default: false, null: false
+    t.integer "npc_id", null: false
+    t.integer "required_affinity", default: 0, null: false
+    t.integer "sort_order", default: 0, null: false
+    t.string "target_key"
+    t.datetime "updated_at", null: false
+    t.index ["npc_id", "action_type", "target_key"], name: "index_npc_affinity_rules_lookup"
+    t.index ["npc_id"], name: "index_npc_affinity_rules_on_npc_id"
+  end
+
   create_table "npc_dialogues", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.datetime "created_at", null: false
@@ -164,12 +195,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_000001) do
 
   create_table "npc_discoveries", force: :cascade do |t|
     t.boolean "acquainted", default: false, null: false
-    t.integer "affinity", default: 0, null: false
+    t.integer "affinity", default: 1, null: false
+    t.integer "affinity_cap", default: 60, null: false
+    t.text "affinity_cap_flags", default: "{}", null: false
+    t.text "affinity_event_flags", default: "{}", null: false
     t.datetime "created_at", null: false
     t.boolean "currently_available", default: false, null: false
     t.integer "discovered_count", default: 0, null: false
     t.datetime "first_discovered_at"
+    t.integer "last_chat_affinity_day"
     t.datetime "last_discovered_at"
+    t.integer "last_gift_affinity_day"
     t.datetime "last_spoken_at"
     t.integer "npc_id", null: false
     t.integer "player_id", null: false
@@ -209,6 +245,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_000001) do
     t.string "dungeon_key"
     t.string "facility_key"
     t.integer "field_area_id"
+    t.integer "initial_affinity_cap", default: 60, null: false
     t.integer "location_id"
     t.text "metadata_json", default: "{}", null: false
     t.string "name", null: false
@@ -507,6 +544,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_000001) do
   add_foreign_key "mob_parts", "mobs"
   add_foreign_key "mobs", "field_areas"
   add_foreign_key "mobs", "routes"
+  add_foreign_key "npc_affinity_cap_rules", "npcs"
+  add_foreign_key "npc_affinity_rules", "npcs"
   add_foreign_key "npc_dialogues", "npcs"
   add_foreign_key "npc_discoveries", "npcs"
   add_foreign_key "npc_discoveries", "players"

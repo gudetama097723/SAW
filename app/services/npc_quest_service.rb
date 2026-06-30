@@ -69,13 +69,14 @@ class NpcQuestService
       )
     end
 
-    affinity_gain = quest.reward["affinity"].to_i
-    affinity_gain = 2 if affinity_gain <= 0
-    discovery = player.npc_discoveries.find_by(npc: quest.npc)
-    new_affinity = discovery&.increment_affinity!(affinity_gain).to_i
-    trigger_msg = check_affinity_triggers!(player, quest.npc, new_affinity)
+    fallback_gain = quest.reward["affinity"].to_i
+    affinity_result = NpcAffinityService.gain!(player, quest.npc, action_type: "quest_clear", target_key: quest.code, fallback_gain: fallback_gain)
+    cap_result = NpcAffinityCapService.unlock!(player, quest.npc, unlock_type: "quest_clear", unlock_key: quest.code)
+    trigger_msg = affinity_result.ok? ? check_affinity_triggers!(player, quest.npc, affinity_result.affinity) : ""
+    cap_message = cap_result.ok? ? cap_result.message : ""
+    affinity_message = affinity_result.gain.to_i.positive? ? affinity_result.message : ""
 
-    Result.new(status: :ok, message: "クエスト「#{quest.name}」達成！#{reward_message}#{trigger_msg}")
+    Result.new(status: :ok, message: "クエスト「#{quest.name}」達成！#{reward_message}#{cap_message}#{affinity_message}#{trigger_msg}")
   end
 
   # ─── 条件チェック ──────────────────────────────────────────────

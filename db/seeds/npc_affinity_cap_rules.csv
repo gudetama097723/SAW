@@ -1,0 +1,5 @@
+﻿npc_code,cap_value,unlock_type,unlock_key,required_affinity,conditions_json,active,sort_order
+beginning_town_guide,80,quest_clear,guide_veteran_proof,60,{},true,10
+beginning_town_guide,99,event_clear,guide_memory,80,{},true,20
+beginning_town_guide,100,event_clear,guide_max_bond,99,{},true,30
+beginning_inn_keeper,80,quest_clear,inn_slime_materials,60,{},true,10

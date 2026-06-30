@@ -1,0 +1,15 @@
+﻿npc_code,action_type,target_key,affinity_gain,daily_limit,required_affinity,conditions_json,active,sort_order
+beginning_town_guide,first_talk,,1,false,0,{},true,1
+beginning_town_guide,chat,,1,true,0,{},true,10
+beginning_town_guide,info,,1,true,0,{},true,20
+beginning_town_guide,gift,薬草,2,true,0,{},true,30
+beginning_town_guide,gift,友情の証,5,true,20,{},true,31
+beginning_town_guide,quest_clear,guide_herb_collection,5,false,0,{},true,40
+beginning_town_guide,quest_clear,guide_veteran_proof,10,false,3,{},true,41
+beginning_town_guide,event_clear,guide_max_bond,20,false,80,"{""allow_affinity_100"":true}",true,90
+beginning_inn_keeper,first_talk,,1,false,0,{},true,1
+beginning_inn_keeper,chat,,1,true,0,{},true,10
+beginning_inn_keeper,info,,1,true,0,{},true,20
+beginning_inn_keeper,gift,薬草,2,true,0,{},true,30
+beginning_inn_keeper,gift,スライムの核,4,true,10,{},true,31
+beginning_inn_keeper,quest_clear,inn_slime_materials,8,false,0,{},true,40

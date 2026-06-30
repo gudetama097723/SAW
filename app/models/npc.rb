@@ -1,4 +1,4 @@
-class Npc < ApplicationRecord
+﻿class Npc < ApplicationRecord
   PLACEMENT_TYPES = %w[town facility field_area dungeon].freeze
 
   belongs_to :location, optional: true
@@ -7,6 +7,8 @@ class Npc < ApplicationRecord
   has_many :discovering_players, through: :npc_discoveries, source: :player
   has_many :npc_dialogues, dependent: :destroy
   has_many :npc_quests, dependent: :destroy
+  has_many :npc_affinity_rules, dependent: :destroy
+  has_many :npc_affinity_cap_rules, dependent: :destroy
 
   scope :active, -> { where(active: true) }
   scope :ordered, -> { order(:sort_order, :id) }
@@ -17,6 +19,7 @@ class Npc < ApplicationRecord
   validates :npc_type, presence: true
   validates :placement_type, inclusion: { in: PLACEMENT_TYPES }
   validates :discovery_rate, numericality: { only_integer: true, greater_than_or_equal_to: 0, less_than_or_equal_to: 100 }
+  validates :initial_affinity_cap, numericality: { only_integer: true, greater_than_or_equal_to: 1, less_than_or_equal_to: 100 }
   validate :placement_target_is_consistent
 
   def metadata
