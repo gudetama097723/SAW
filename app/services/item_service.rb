@@ -153,7 +153,6 @@ class ItemService
 
     messages = ["#{item.name}を食べた。"]
     messages << "HPが#{hp_restore}回復した。" if hp_restore.positive?
-    messages << "満腹度が#{satiety_restore}上がった。" if satiety_restore.positive?
     status_effects.each_key do |key|
       messages << "#{Player::STATUS_LABELS.fetch(key.to_s, key.to_s)}状態になった。"
     end

@@ -59,7 +59,6 @@
                 <p class="mb-1">能力反映: 筋力 <%= weapon.strength_ratio %>% / 敏捷 <%= weapon.agility_ratio %>%</p>
                 <p class="mb-1">補正: HP <%= signed_bonus(weapon.hp_bonus) %> / 筋力 <%= signed_bonus(weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(weapon.agility_bonus) %></p>
                 <p class="mb-1">売却価格: <%= weapon.sell_price %>コル</p>
-                <p class="mb-1">保護: <%= weapon.protected_item? ? "対象" : "なし" %></p>
                 <% if weapon.description.present? %>
                   <p class="mb-2"><%= weapon.description %></p>
                 <% end %>
@@ -111,7 +110,6 @@
                 <p class="mb-1">防御力: <%= armor.defense %></p>
                 <p class="mb-1">重量: <%= armor.weight %></p>
                 <p class="mb-1">補正: HP <%= signed_bonus(armor.hp_bonus) %>% / 筋力 <%= signed_bonus(armor.strength_bonus) %> / 敏捷 <%= signed_bonus(armor.agility_bonus) %></p>
-                <p class="mb-1">保護: <%= armor.protected_item? ? "対象" : "なし" %></p>
 
                 <% if armor.equipped? %>
                   <%= button_to "取り外す", unequip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
@@ -124,6 +122,42 @@
 
           <% end %>
 
+        <% elsif params[:item_category] == "key_items" %>
+
+          <% grouped_key_items = @player.key_items.order(:category, :obtained_at, :name).group_by(&:category) %>
+
+          <% if grouped_key_items.any? %>
+            <% KeyItem::CATEGORIES.each do |category, label| %>
+              <% key_items = grouped_key_items[category] || [] %>
+              <% next if key_items.empty? %>
+
+              <h6 class="mt-3"><%= label %></h6>
+              <% key_items.each do |key_item| %>
+                <div class="border rounded mb-2">
+                  <button class="btn btn-dark w-100 text-start"
+                          type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#key-item-<%= key_item.id %>">
+                    <%= key_item.name %>
+                  </button>
+
+                  <div class="collapse p-2"
+                      id="key-item-<%= key_item.id %>">
+                    <p class="mb-1">分類: <%= key_item.category_label %></p>
+                    <p class="mb-1">入手日時: <%= key_item.obtained_at_label %></p>
+                    <% if key_item.description.present? %>
+                      <p class="mb-0"><%= key_item.description %></p>
+                    <% else %>
+                      <p class="mb-0 text-secondary">説明はありません。</p>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+          <% else %>
+            <p class="mb-0">キーアイテムはまだありません。</p>
+          <% end %>
+
         <% elsif params[:item_category].in?(%w[healing gathered drop]) %>
 
           <div class="d-flex gap-1 mb-2 flex-wrap">
@@ -133,14 +167,19 @@
           </div>
 
           <%
-            item_cols = { "name" => "name", "quantity" => "quantity", "sell_price" => "sell_price" }
+            item_cols = { "name" => "name", "quantity" => "quantity" }
             i_col = item_cols[cur_sort] || "name"
             i_dir = cur_dir == "asc" ? :asc : :desc
           %>
 
           <% items = @player.items.where(category: params[:item_category])
                                   .where("quantity > 0")
-                                  .order(i_col => i_dir) %>
+            items = if cur_sort == "sell_price"
+                      sorted_items = items.to_a.sort_by { |item| [item.sell_price, item.name.to_s] }
+                      i_dir == :desc ? sorted_items.reverse : sorted_items
+                    else
+                      items.order(i_col => i_dir)
+                    end %>
 
           <% items.each do |item| %>
 
@@ -165,12 +204,11 @@
                 <p class="mb-1">売却価格: <%= item.sell_price %>コル / 個</p>
                 <p class="mb-1">売却合計: <%= item.sell_price * item.quantity.to_i %>コル</p>
                 <% if item.food? %>
-                  <p class="mb-1">食材: おいしさ <%= item.effective_tastiness %> / 満腹度 +<%= item.effective_satiety_restore %></p>
+                  <p class="mb-1">食材: おいしさ <%= item.effective_tastiness %></p>
                 <% end %>
                 <% if item.description.present? %>
                   <p class="mb-2"><%= item.description %></p>
                 <% end %>
-                <p class="mb-2">保護: <%= item.protected_item? ? "対象" : "なし" %></p>
 
                 <% if item.category == "healing" %>
                   <%= button_to "使う",

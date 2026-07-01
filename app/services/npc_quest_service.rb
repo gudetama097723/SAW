@@ -154,7 +154,8 @@ class NpcQuestService
     Array(r["items"]).each do |e|
       name = e.is_a?(Hash) ? e["name"] : e
       qty  = e.is_a?(Hash) ? e["quantity"].to_i : 1
-      parts << "#{name}×#{[qty, 1].max}"
+      category = e.is_a?(Hash) ? e["category"] : nil
+      parts << (category == "key_item" ? name.to_s : "#{name}×#{[qty, 1].max}")
     end
     Array(r["skills"]).each { |s| parts << "スキル「#{s}」" if s.present? }
     parts.empty? ? "なし" : parts.join(" / ")
@@ -269,6 +270,17 @@ class NpcQuestService
 
     Array(reward["items"]).each do |item_reward|
       category = item_reward["category"].presence || "drop"
+      if category == "key_item"
+        player.obtain_key_item!(
+          name: item_reward["name"],
+          description: item_reward["description"],
+          category: item_reward["key_item_category"].presence || item_reward["key_category"].presence || "quest",
+          unique_key: item_reward["unique_key"].presence || item_reward["name"].to_s
+        )
+        messages << "#{item_reward["name"]}を入手した。"
+        next
+      end
+
       unique   = item_reward["unique_item"].to_s.downcase == "true"
       qty      = (item_reward["quantity"].presence || 1).to_i
       item     = ItemService.add_item!(player, item_reward["name"], category, qty, unique: unique)

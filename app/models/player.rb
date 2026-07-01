@@ -28,6 +28,7 @@
 
   has_many :skills, dependent: :destroy
   has_many :items, dependent: :destroy
+  has_many :key_items, dependent: :destroy
   has_many :battles, dependent: :destroy
   has_many :rests, dependent: :destroy
   has_many :weapons, dependent: :destroy
@@ -209,6 +210,24 @@ def movement_speed_multiplier
   bonus = effective_agility.to_i / 10.0
   penalty = overweight? ? [overweight_amount / 20.0, 0.75].min : 0
   [1.0 + bonus - penalty, 0.35].max
+end
+
+def obtain_key_item!(name:, description: nil, category: "story", unique_key: nil, obtained_at: Time.current)
+  attributes = {
+    name: name,
+    description: description,
+    category: category.presence || "story",
+    obtained_at: obtained_at
+  }
+
+  if unique_key.present?
+    key_item = key_items.find_or_initialize_by(unique_key: unique_key)
+    key_item.assign_attributes(attributes) if key_item.new_record?
+    key_item.save! if key_item.changed?
+    key_item
+  else
+    key_items.create!(attributes)
+  end
 end
 
   def equipped_weapons

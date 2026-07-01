@@ -31,7 +31,6 @@
                 <p class="mb-1">能力反映: 筋力 <%= weapon.strength_ratio %>% / 敏捷 <%= weapon.agility_ratio %>%</p>
                 <p class="mb-1">補正: HP <%= signed_bonus(weapon.hp_bonus) %> / 筋力 <%= signed_bonus(weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(weapon.agility_bonus) %></p>
                 <p class="mb-1">売却価格: <%= weapon.sell_price %>コル</p>
-                <p class="mb-1">保護: <%= weapon.protected_item? ? "対象" : "なし" %></p>
                 <% if weapon.description.present? %>
                   <p class="mb-2"><%= weapon.description %></p>
                 <% end %>
@@ -67,7 +66,6 @@
                 <p class="mb-1">防御: <%= armor.defense %></p>
                 <p class="mb-1">重量: <%= armor.weight %></p>
                 <p class="mb-1">補正: HP <%= signed_bonus(armor.hp_bonus) %>% / 筋力 <%= signed_bonus(armor.strength_bonus) %> / 敏捷 <%= signed_bonus(armor.agility_bonus) %></p>
-                <p class="mb-1">保護: <%= armor.protected_item? ? "対象" : "なし" %></p>
 
                 <% if armor.equipped? %>
                   <%= button_to "取り外す", unequip_armor_path(armor_id: armor.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>

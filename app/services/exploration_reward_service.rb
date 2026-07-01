@@ -173,6 +173,17 @@ def self.start_boss_battle!(player, mob)
 
     Array(reward["items"]).each do |item_reward|
       category = item_reward["category"].presence || "drop"
+      if category == "key_item"
+        player.obtain_key_item!(
+          name: item_reward["name"],
+          description: item_reward["description"],
+          category: item_reward["key_item_category"].presence || item_reward["key_category"].presence || "map",
+          unique_key: item_reward["unique_key"].presence || item_reward["name"].to_s
+        )
+        messages << "#{item_reward["name"]}を入手した。"
+        next
+      end
+
       unique = item_reward["unique_item"] == true || item_reward["unique_item"].to_s.downcase == "true" || (unique_drops && category == "drop")
       item = ItemService.add_item!(player, item_reward["name"], category, item_reward["quantity"].presence || 1, unique: unique)
       item.save!

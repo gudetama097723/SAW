@@ -30,7 +30,6 @@ class RestaurantService
     end
 
     messages = ["#{menu_item.menu_name}を食べた。"]
-    messages << "満腹度が#{menu_item.satiety_restore}回復した。"
     messages << "#{menu_item.duration_minutes}分間、料理の効果を受ける。" if menu_item.buff_effects.present?
     messages << "#{menu_item.price}コル支払った。"
     messages << "#{menu_item.preparation_minutes}分経過した。"

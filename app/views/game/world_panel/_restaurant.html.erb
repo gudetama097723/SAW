@@ -14,7 +14,6 @@
     <%= link_to "メニューに戻る", game_path(panel: "restaurant"), class: "btn btn-outline-light w-100 mb-3" %>
     <h5><%= selected_menu.menu_name %></h5>
     <p class="mb-1">価格: <%= selected_menu.price %>コル</p>
-    <p class="mb-1">満腹度: +<%= selected_menu.satiety_restore %></p>
     <p class="mb-1">効果時間: <%= selected_menu.duration_minutes %>分</p>
     <p class="mb-1">調理時間: <%= selected_menu.preparation_minutes %>分</p>
     <% if buff_parts.any? %>
@@ -38,7 +37,7 @@
   <% elsif menu_items.any? %>
     <div class="d-grid gap-2">
       <% available_menu_items.each do |menu_item| %>
-        <% label = "#{menu_item.menu_name} / #{menu_item.price}コル / 満腹度+#{menu_item.satiety_restore}" %>
+        <% label = "#{menu_item.menu_name} / #{menu_item.price}コル" %>
         <% label = "特別: #{label}" if menu_item.special? %>
         <%= link_to label, game_path(panel: "restaurant", menu_name: menu_item.menu_name), class: "btn btn-outline-warning w-100" %>
       <% end %>

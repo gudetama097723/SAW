@@ -83,6 +83,25 @@ player.update!(
   skill_slots: player[:skill_slots].presence || 2
 )
 
+player.obtain_key_item!(
+  name: "はじまりの街の通行証",
+  description: "はじまりの街で正式なプレイヤーとして登録された証。",
+  category: "story",
+  unique_key: "beginning_town_pass"
+)
+player.obtain_key_item!(
+  name: "古びた地図",
+  description: "第一層の古い地図。ところどころ破れている。",
+  category: "map",
+  unique_key: "first_floor_old_map"
+)
+player.obtain_key_item!(
+  name: "老剣士の紹介状",
+  description: "老剣士が信頼できる相手へ向けて書いた紹介状。",
+  category: "npc",
+  unique_key: "old_swordsman_letter"
+)
+
 seed_rows("player_weapons.csv") do |row|
   weapon = Weapon.find_or_initialize_by(player: player, name: row["name"])
   weapon.update!(
