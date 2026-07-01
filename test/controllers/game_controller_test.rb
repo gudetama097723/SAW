@@ -26,6 +26,44 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "環境：通常"
   end
 
+  test "inn panel only shows facility npcs" do
+    @player.town_discovery_for.update!(found_inn: true)
+    town_guide = Npc.create!(
+      code: "controller_town_guide",
+      name: "街の案内人",
+      placement_type: "town",
+      location: @location,
+      discovery_rate: 100
+    )
+    innkeeper = Npc.create!(
+      code: "controller_innkeeper",
+      name: "宿屋の主人",
+      placement_type: "facility",
+      facility_key: "inn",
+      location: @location,
+      discovery_rate: 100
+    )
+    @player.npc_discoveries.create!(npc: town_guide, currently_available: true, acquainted: true, affinity: 1)
+    @player.npc_discoveries.create!(npc: innkeeper, currently_available: true, acquainted: true, affinity: 1)
+
+    get game_path, params: { panel: "inn" }
+
+    assert_response :success
+    assert_includes response.body, "宿屋の主人に話しかける"
+    assert_not_includes response.body, "街の案内人に話しかける"
+  end
+
+  test "inn can sleep until specified time" do
+    @player.town_discovery_for.update!(found_inn: true)
+    @player.update!(hp: 50, max_hp: 100, current_time: 22 * 60 + 30)
+
+    post inn_path, params: { wake_hour: 6, wake_minute: 0 }
+
+    assert_redirected_to game_path(panel: "inn")
+    assert_equal 6 * 60, @player.reload.current_time
+    assert_includes flash[:notice], "450分経過した"
+  end
+
   test "cannot accept quest from undiscovered npc by direct post" do
     npc = Npc.create!(
       code: "controller_hidden_npc",

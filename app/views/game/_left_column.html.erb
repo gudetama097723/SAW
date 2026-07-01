@@ -1,5 +1,6 @@
         <div class="col-md-4">
-          <details class="card bg-secondary text-light mb-3 ui-collapsible" <%= "open" if selected_panel.blank? %>>
+          <% status_panel_open = selected_panel.blank? && params[:status_collapsed] != "1" %>
+          <details class="card bg-secondary text-light mb-3 ui-collapsible" <%= "open" if status_panel_open %>>
             <summary class="card-header ui-collapsible-summary">
               <span>ステータス</span>
               <span class="small ui-collapsible-mini">
@@ -79,23 +80,23 @@
             </summary>
             <div class="card-body d-grid gap-2">
               <% if selected_panel == "equipment" %>
-                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+                <%= link_to "閉じる", game_path(status_collapsed: "1"), class: "btn btn-outline-danger w-100" %>
               <% else %>
                 <%= link_to "装備", game_path(panel: "equipment"), class: "btn btn-outline-light w-100" %>
               <% end %>
 
               <% if selected_panel == "items" %>
-                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+                <%= link_to "閉じる", game_path(status_collapsed: "1"), class: "btn btn-outline-danger w-100" %>
               <% else %>
                 <%= link_to "所持品", game_path(panel: "items"), class: "btn btn-outline-light w-100" %>
               <% end %>
               <% if selected_panel == "skills" %>
-                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+                <%= link_to "閉じる", game_path(status_collapsed: "1"), class: "btn btn-outline-danger w-100" %>
               <% else %>
                 <%= link_to "スキル", game_path(panel: "skills"), class: "btn btn-outline-light w-100" %>
               <% end %>
               <% if selected_panel == "growth" %>
-                <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
+                <%= link_to "閉じる", game_path(status_collapsed: "1"), class: "btn btn-outline-danger w-100" %>
               <% else %>
               <%= link_to "ステータス", game_path(panel: "growth"), class: @player.stat_points.to_i.positive? ? "btn btn-warning w-100" : "btn btn-outline-light w-100" %>
               <% end %>

@@ -149,7 +149,7 @@ module Game
         return
       end
 
-      requested_minutes = requested_inn_sleep_minutes
+      requested_minutes = requested_inn_sleep_minutes(player)
       if rest_recovery_complete?(player) && requested_minutes <= 0
         redirect_to game_path(panel: "inn"), alert: "HPと状態異常値は回復済みです。眠る時間を5分以上で入力してください。"
         return
@@ -204,8 +204,20 @@ module Game
       (minutes / REST_SLEEP_TICK_MINUTES.to_f).ceil * REST_SLEEP_TICK_MINUTES
     end
 
-    def requested_inn_sleep_minutes
+    def requested_inn_sleep_minutes(player)
+      if params.key?(:wake_hour) || params.key?(:wake_minute)
+        wake_hour = params[:wake_hour].to_i.clamp(0, 23)
+        wake_minute = params[:wake_minute].to_i.clamp(0, 59)
+        current_minutes = player.current_time.to_i % 1440
+        wake_minutes = wake_hour * 60 + wake_minute
+        minutes_until_wake = (wake_minutes - current_minutes) % 1440
+        minutes_until_wake = 1440 if minutes_until_wake.zero?
+
+        return (minutes_until_wake / REST_SLEEP_TICK_MINUTES.to_f).ceil * REST_SLEEP_TICK_MINUTES
+      end
+
       minutes = params[:sleep_minutes].to_i
+      minutes += params[:sleep_hours].to_i * 60 if params.key?(:sleep_hours)
       return 0 if minutes <= 0
 
       (minutes / REST_SLEEP_TICK_MINUTES.to_f).ceil * REST_SLEEP_TICK_MINUTES

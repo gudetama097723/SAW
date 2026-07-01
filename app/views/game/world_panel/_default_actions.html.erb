@@ -1,4 +1,6 @@
 <div class="d-grid gap-2">
+  <% in_field = @player.field_route.present? || !@player.location&.safe_area? %>
+
   <% if @player.field_route.present? %>
     <div class="d-flex gap-2">
       <%= button_to "探索", explore_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-primary btn-lg w-100" %>
@@ -21,28 +23,30 @@
     </div>
   <% end %>
 
-  <details class="card bg-secondary text-light ui-collapsible world-action-group">
-    <summary class="card-header ui-collapsible-summary">
-      <span>NPC</span>
-      <% if @talkable_npcs.present? %>
-        <span class="badge bg-info text-dark ms-auto"><%= @talkable_npcs.size %></span>
-      <% else %>
-        <span class="small ui-collapsible-mini">話せるNPCなし</span>
-      <% end %>
-    </summary>
-    <div class="card-body d-grid gap-2">
-      <% if @talkable_npcs.present? %>
+  <% if @talkable_npcs.present? || !in_field %>
+    <details class="card bg-secondary text-light ui-collapsible world-action-group">
+      <summary class="card-header ui-collapsible-summary">
+        <span>NPC</span>
+        <% if @talkable_npcs.present? %>
+          <span class="badge bg-info text-dark ms-auto"><%= @talkable_npcs.size %></span>
+        <% else %>
+          <span class="small ui-collapsible-mini">話せるNPCなし</span>
+        <% end %>
+      </summary>
+      <div class="card-body d-grid gap-2">
+        <% if @talkable_npcs.present? %>
         <% @talkable_npcs.each do |npc| %>
           <%= button_to "#{npc.name}に話しかける",
               talk_to_npc_path(npc_id: npc.id),
               method: :post,
               class: "btn btn-outline-light w-100" %>
+          <% end %>
+        <% else %>
+          <p class="text-secondary small mb-0">今話せるNPCはいません。</p>
         <% end %>
-      <% else %>
-        <p class="text-secondary small mb-0">今話せるNPCはいません。</p>
-      <% end %>
-    </div>
-  </details>
+      </div>
+    </details>
+  <% end %>
 
   <% if @player.location&.safe_area? && @player.field_route.blank? %>
     <% town_discovery = @town_discovery || @player.town_discovery_for %>
@@ -98,7 +102,7 @@
     </details>
   <% end %>
 
-  <details class="card bg-secondary text-light ui-collapsible world-action-group">
+  <details class="card bg-secondary text-light ui-collapsible world-action-group" <%= "open" if in_field %>>
     <summary class="card-header ui-collapsible-summary">
       <span>移動</span>
       <% if @player.field_route.present? %>

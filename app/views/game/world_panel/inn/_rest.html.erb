@@ -1,9 +1,26 @@
           <h6>眠る</h6>
           <p>5分ごとに最大HPの2%と状態異常値2を回復します。</p>
-          <%= form_with url: inn_path, method: :post do %>
-            <div class="mb-2">
-              <%= label_tag :sleep_minutes, "眠る時間（分）", class: "form-label" %>
-              <%= number_field_tag :sleep_minutes, nil, min: 5, step: 5, class: "form-control", placeholder: "回復完了まで眠る" %>
+
+          <%= button_to "回復完了まで眠る（#{inn_cost}コル）",
+              inn_path,
+              method: :post,
+              class: "btn btn-outline-success w-100 mb-3" %>
+
+          <% default_wake_minutes = (@player.current_time.to_i + 8 * 60) % 1440 %>
+          <%= form_with url: inn_path, method: :post, class: "border rounded p-2" do %>
+            <div class="row g-2 align-items-end">
+              <div class="col-6">
+                <%= label_tag :wake_hour, "起きる時", class: "form-label" %>
+                <%= select_tag :wake_hour,
+                    options_for_select((0..23).map { |hour| [format("%02d時", hour), hour] }, default_wake_minutes / 60),
+                    class: "form-select" %>
+              </div>
+              <div class="col-6">
+                <%= label_tag :wake_minute, "起きる分", class: "form-label" %>
+                <%= select_tag :wake_minute,
+                    options_for_select((0..55).step(5).map { |minutes| [format("%02d分", minutes), minutes] }, default_wake_minutes % 60),
+                    class: "form-select" %>
+              </div>
             </div>
-            <%= submit_tag "眠る（#{inn_cost}コル）", class: "btn btn-outline-success w-100" %>
+            <%= submit_tag "指定時刻まで眠る（#{inn_cost}コル）", class: "btn btn-outline-success w-100 mt-2" %>
           <% end %>

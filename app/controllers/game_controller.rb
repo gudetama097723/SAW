@@ -100,16 +100,20 @@
 
   def talkable_npcs_for(player, current_panel = nil)
     if player.field_route.blank? && player.location&.safe_area? && player.location_id.present?
-      player.npc_discoveries
-            .joins(:npc)
-            .where(currently_available: true)
-            .where(npcs: { active: true, location_id: player.location_id })
-            .where(
-              "npcs.placement_type = ? OR (npcs.placement_type = ? AND npcs.facility_key = ?)",
-              "town", "facility", current_panel.to_s
-            )
-            .includes(:npc)
-            .map(&:npc)
+      current_panel = current_panel.to_s
+      npc_scope = player.npc_discoveries
+                        .joins(:npc)
+                        .where(currently_available: true)
+                        .where(npcs: { active: true, location_id: player.location_id })
+
+      npc_scope =
+        if current_panel.in?(%w[inn item_shop blacksmith restaurant])
+          npc_scope.where(npcs: { placement_type: "facility", facility_key: current_panel })
+        else
+          npc_scope.where(npcs: { placement_type: "town" })
+        end
+
+      npc_scope.includes(:npc).map(&:npc)
     elsif @current_field_area.present?
       player.npc_discoveries
             .joins(:npc)
