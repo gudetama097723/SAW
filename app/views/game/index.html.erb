@@ -1,5 +1,5 @@
 <div class="container py-4">
-  <div class="card bg-dark text-light border-secondary shadow-lg">
+  <div class="<%= class_names("card border-secondary shadow-lg", game_environment_classes(@player, @environment_location)) %>">
     <%= render "header" %>
 
     <div class="card-body">
@@ -8,7 +8,6 @@
       <% selected_panel = params[:panel].presence %>
       <% equipped_weapon = @player.equipped_weapon %>
       <% equipped_weapons = @player.equipped_weapons %>
-      <% current_time = @player.current_time.to_i %>
 
       <div class="row">
         <%= render "left_column", selected_panel: selected_panel, equipped_weapons: equipped_weapons %>

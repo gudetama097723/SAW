@@ -1,11 +1,165 @@
 
 
+.game-shell {
+  --shell-bg: #111418;
+  --shell-fg: #f8f9fa;
+  --shell-muted: rgba(248, 249, 250, 0.72);
+  --shell-border: rgba(255, 255, 255, 0.28);
+  --weather-overlay: rgba(0, 0, 0, 0);
+
+  color: var(--shell-fg);
+  background:
+    linear-gradient(135deg, var(--weather-overlay), rgba(0, 0, 0, 0.16)),
+    var(--shell-bg);
+  transition: background-color 240ms ease, color 240ms ease;
+}
+
+.game-time-dawn,
+.game-time-evening {
+  --shell-bg: linear-gradient(135deg, #f19a3e 0%, #9f4e3d 58%, #2a2330 100%);
+  --shell-fg: #fff8ed;
+  --shell-muted: rgba(255, 248, 237, 0.76);
+}
+
+.game-time-day {
+  --shell-bg: linear-gradient(135deg, #7dccf0 0%, #338ec5 58%, #176b9a 100%);
+  --shell-fg: #082433;
+  --shell-muted: rgba(8, 36, 51, 0.7);
+  --shell-border: rgba(8, 36, 51, 0.24);
+}
+
+.game-time-night {
+  --shell-bg: linear-gradient(135deg, #090b13 0%, #151a2f 55%, #03040a 100%);
+  --shell-fg: #f4f7ff;
+  --shell-muted: rgba(244, 247, 255, 0.72);
+}
+
+.game-weather-cloudy {
+  --weather-overlay: rgba(107, 114, 128, 0.58);
+}
+
+.game-weather-rain {
+  --weather-overlay: rgba(42, 76, 102, 0.62);
+}
+
+.game-weather-thunderstorm,
+.game-environment-heavy_rain {
+  --weather-overlay: rgba(31, 41, 55, 0.76);
+}
+
+.game-weather-fog,
+.game-environment-deep_fog {
+  --weather-overlay: rgba(173, 181, 189, 0.5);
+}
+
+.game-weather-snow,
+.game-environment-extreme_cold {
+  --weather-overlay: rgba(225, 239, 250, 0.58);
+}
+
+.game-environment-darkness {
+  --weather-overlay: rgba(0, 0, 0, 0.58);
+}
+
+.game-environment-toxic_mist {
+  --weather-overlay: rgba(70, 102, 76, 0.5);
+}
+
+.game-environment-extreme_heat {
+  --weather-overlay: rgba(192, 88, 39, 0.42);
+}
+
+.game-environment-strong_wind {
+  --weather-overlay: rgba(118, 151, 163, 0.38);
+}
+
+.game-shell .card-header {
+  border-color: var(--shell-border);
+}
+
+.game-shell .card.bg-secondary {
+  background-color: rgba(12, 17, 24, 0.86) !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.game-shell .card.bg-secondary .card-header {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.game-shell .card.bg-secondary .text-secondary {
+  color: rgba(248, 249, 250, 0.68) !important;
+}
+
+.game-shell .text-secondary,
+.game-environment-note {
+  color: var(--shell-muted) !important;
+}
+
+.game-status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.55rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--shell-fg);
+  white-space: nowrap;
+}
+
+.game-environment-summary {
+  max-width: min(520px, 52vw);
+}
+
+.ui-collapsible {
+  overflow: hidden;
+}
+
+.ui-collapsible-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.ui-collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.ui-collapsible-summary::before {
+  content: "▾";
+  display: inline-block;
+  width: 1rem;
+  color: rgba(248, 249, 250, 0.76);
+  transition: transform 160ms ease;
+}
+
+.ui-collapsible:not([open]) .ui-collapsible-summary::before {
+  transform: rotate(-90deg);
+}
+
+.ui-collapsible-mini {
+  margin-left: auto;
+  color: rgba(248, 249, 250, 0.68);
+  font-weight: 400;
+}
+
+.ui-collapsible[open] .ui-collapsible-mini {
+  display: none;
+}
+
+.game-shell .btn,
 .card.bg-danger .btn,
 .card.bg-secondary .btn,
 .card.bg-dark .btn {
   color: #f8f9fa;
 }
 
+.game-shell .btn-warning,
+.game-shell .btn-success,
 .card.bg-danger .btn-warning,
 .card.bg-secondary .btn-warning,
 .card.bg-dark .btn-warning,
@@ -15,6 +169,10 @@
   color: #111;
 }
 
+.game-shell .btn-outline-warning,
+.game-shell .btn-outline-danger,
+.game-shell .btn-outline-success,
+.game-shell .btn-outline-light,
 .card.bg-danger .btn-outline-warning,
 .card.bg-danger .btn-outline-danger,
 .card.bg-danger .btn-outline-success,
@@ -30,6 +188,10 @@
   background-color: rgba(0, 0, 0, 0.18);
 }
 
+.game-shell .btn-outline-warning:hover,
+.game-shell .btn-outline-danger:hover,
+.game-shell .btn-outline-success:hover,
+.game-shell .btn-outline-light:hover,
 .card.bg-danger .btn-outline-warning:hover,
 .card.bg-danger .btn-outline-danger:hover,
 .card.bg-danger .btn-outline-success:hover,
@@ -45,14 +207,27 @@
   color: #111;
 }
 
+@media (max-width: 767.98px) {
+  .game-environment-summary {
+    max-width: 100%;
+    text-align: left !important;
+  }
+
+  .game-environment-summary .justify-content-end {
+    justify-content: flex-start !important;
+  }
+}
+
 .message-window {
   min-height: 72px;
   max-height: 72px;
   overflow-y: auto;
-  border: 1px solid #495057;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 0.375rem;
-  background: #111418;
-  padding: 0;
+  background: rgba(3, 6, 12, 0.92);
+  color: #f8f9fa;
+  padding: 0.45rem 0.55rem !important;
+  box-shadow: inset 0 1px 8px rgba(0, 0, 0, 0.36);
 }
 
 .message-line {
@@ -60,6 +235,10 @@
   margin: 0;
   padding: 0;
   line-height: 1.35;
+}
+
+.message-window .text-secondary {
+  color: rgba(248, 249, 250, 0.62) !important;
 }
 
 @keyframes levelup-glow {

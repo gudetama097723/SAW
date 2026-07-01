@@ -52,6 +52,34 @@ def formatted_datetime
   format("%d月 %d日 %02d:%02d", current_month.to_i, current_day.to_i, current_time.to_i / 60, current_time.to_i % 60)
 end
 
+def current_season
+  SeasonService.season_for_month(current_month)
+end
+
+def current_season_label
+  SeasonService.label_for(current_season)
+end
+
+def current_season_description
+  SeasonService.description_for(current_season)
+end
+
+def season_gathering_modifier
+  SeasonService.gathering_modifier(current_season)
+end
+
+def season_encounter_modifier
+  SeasonService.encounter_modifier(current_season)
+end
+
+def season_weather_modifier
+  SeasonService.weather_modifier(current_season)
+end
+
+def season_environment_modifier
+  SeasonService.environment_modifier(current_season)
+end
+
 def advance_time!(minutes)
   decrease_satiety!(minutes)
   StatusEffectService.apply_time_passage!(self, minutes)

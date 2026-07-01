@@ -17,7 +17,18 @@
           </div>
         <% end %>
 
-        <div class="ms-auto"><%= @player.formatted_datetime %></div>
+        <div class="ms-auto text-end game-environment-summary">
+          <div class="fw-semibold"><%= @player.formatted_datetime %></div>
+          <% if @environment_location.present? %>
+            <div class="d-flex flex-wrap justify-content-end gap-2 small mt-1">
+              <span class="game-status-chip">時間帯：<%= time_period_label(@player) %></span>
+              <span class="game-status-chip">季節：<%= @player.current_season_label %></span>
+              <span class="game-status-chip">天気：<%= @environment_location.weather_label %></span>
+              <span class="game-status-chip">環境：<%= @environment_location.environment_label %></span>
+            </div>
+            <div class="small game-environment-note mt-1"><%= @environment_location.environment_description %></div>
+          <% end %>
+        </div>
 
       </div>
     </div>

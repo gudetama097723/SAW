@@ -1,6 +1,5 @@
 <div class="d-grid gap-2">
   <% if @player.field_route.present? %>
-    <% route = @player.field_route %>
     <div class="d-flex gap-2">
       <%= button_to "探索", explore_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-primary btn-lg w-100" %>
       <%= button_to "狩り", hunt_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-danger btn-lg w-100" %>
@@ -9,64 +8,8 @@
         <%= button_to "休憩", start_rest_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-outline-light btn-lg w-100" %>
       <% end %>
     </div>
-
-    <% if @talkable_npcs.present? %>
-      <h5 class="mt-3">NPC</h5>
-      <div class="d-grid gap-2">
-        <% @talkable_npcs.each do |npc| %>
-          <%= button_to "#{npc.name}に話しかける",
-              talk_to_npc_path(npc_id: npc.id),
-              method: :post,
-              class: "btn btn-outline-light w-100" %>
-        <% end %>
-      </div>
-    <% end %>
-
   <% elsif @player.location&.safe_area? %>
     <%= button_to "街を散策する", stroll_path, method: :post, class: "btn btn-primary btn-lg" %>
-
-    <% if @talkable_npcs.present? %>
-      <h5 class="mt-3">NPC</h5>
-      <div class="d-grid gap-2">
-        <% @talkable_npcs.each do |npc| %>
-          <%= button_to "#{npc.name}に話しかける",
-              talk_to_npc_path(npc_id: npc.id),
-              method: :post,
-              class: "btn btn-outline-light w-100" %>
-        <% end %>
-      </div>
-    <% end %>
-
-    <h5 class="mt-3">施設</h5>
-
-    <% town_discovery = @town_discovery || @player.town_discovery_for %>
-    <% if town_discovery&.found_inn? %>
-      <%= link_to "宿屋に入る", game_path(panel: "inn"), class: "btn btn-outline-success w-100" %>
-    <% end %>
-
-    <% if town_discovery&.found_item_shop? %>
-      <% if FacilityHoursService.open?("item_shop", @player) %>
-        <%= link_to "道具屋に入る", game_path(panel: "item_shop"), class: "btn btn-outline-warning w-100" %>
-      <% else %>
-        <button class="btn btn-outline-secondary w-100" disabled>道具屋（閉店中 / <%= FacilityHoursService.hours_text("item_shop") %>）</button>
-      <% end %>
-    <% end %>
-
-    <% if town_discovery&.found_blacksmith? %>
-      <% if FacilityHoursService.open?("blacksmith", @player) %>
-        <%= link_to "鍛冶屋に入る", game_path(panel: "blacksmith"), class: "btn btn-outline-warning w-100" %>
-      <% else %>
-        <button class="btn btn-outline-secondary w-100" disabled>鍛冶屋（閉店中 / <%= FacilityHoursService.hours_text("blacksmith") %>）</button>
-      <% end %>
-    <% end %>
-
-    <% if town_discovery&.found_restaurant? %>
-      <% if FacilityHoursService.open?("restaurant", @player) %>
-        <%= link_to "飲食店に入る", game_path(panel: "restaurant"), class: "btn btn-outline-warning w-100" %>
-      <% else %>
-        <button class="btn btn-outline-secondary w-100" disabled>飲食店（閉店中 / <%= FacilityHoursService.hours_text("restaurant") %>）</button>
-      <% end %>
-    <% end %>
   <% else %>
     <div class="d-flex gap-2">
       <%= button_to "探索", explore_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-primary btn-lg w-100" %>
@@ -76,93 +19,168 @@
         <%= button_to "休憩", start_rest_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-outline-light btn-lg w-100" %>
       <% end %>
     </div>
-    <% if @available_treasures.present? %>
-      <h5 class="mt-3">発見済み宝箱</h5>
-      <div class="d-grid gap-2">
-        <% @available_treasures.each do |treasure| %>
-          <%= button_to "#{treasure.name}を開ける",
-              open_treasure_path(treasure_chest_id: treasure.id),
-              method: :post,
-              class: "btn btn-outline-warning w-100" %>
-        <% end %>
-      </div>
-    <% end %>
-    <% if @available_bosses.present? %>
-      <h5 class="mt-3">発見済みボス</h5>
-      <div class="d-grid gap-2">
-        <% @available_bosses.each do |boss| %>
-          <%= button_to "#{boss.name}に挑む",
-              challenge_boss_path(mob_id: boss.id),
-              method: :post,
-              class: boss.boss_type == "field_boss" ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
-        <% end %>
-      </div>
-    <% end %>
   <% end %>
 
-  <% if @player.field_route.present? %>
-    <% if @available_treasures.present? %>
-      <h5 class="mt-3">発見済み宝箱</h5>
-      <div class="d-grid gap-2">
-        <% @available_treasures.each do |treasure| %>
-          <%= button_to "#{treasure.name}を開ける",
-              open_treasure_path(treasure_chest_id: treasure.id),
-              method: :post,
-              class: "btn btn-outline-warning w-100" %>
-        <% end %>
-      </div>
-    <% end %>
-    <% if @available_bosses.present? %>
-      <h5 class="mt-3">発見済みボス</h5>
-      <div class="d-grid gap-2">
-        <% @available_bosses.each do |boss| %>
-          <%= button_to "#{boss.name}に挑む",
-              challenge_boss_path(mob_id: boss.id),
-              method: :post,
-              class: boss.boss_type == "field_boss" ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
-        <% end %>
-      </div>
-    <% end %>
-  <% end %>
-
-  <h5 class="mt-3">移動</h5>
-
-  <% if @player.field_route.present? %>
-    <% route = @player.field_route %>
-    <% route_progress = @player.player_route_progresses.find_by(route: route) %>
-    <% destination_discovered = FieldService.destination_discovered?(@player, route) %>
-    <% destination_reached = route_progress&.reached_destination? %>
-    <% next_discovered_area = FieldService.next_discovered_area_for(@player, route) %>
-
-    <div class="mb-2">
-      <%= button_to "#{route.from_location.name}方面へ戻る",
-          move_path(route_id: route.id, direction: "backward"),
-          method: :post,
-          class: "btn btn-outline-warning w-100 mb-1" %>
-
-      <% if destination_discovered %>
-        <%= button_to "#{route.to_location.name}方面へ進む",
-            move_path(route_id: route.id, direction: "forward"),
-            method: :post,
-            class: "btn btn-outline-info w-100 mb-2" %>
-      <% elsif next_discovered_area %>
-        <%= button_to "探索済みのエリア（#{next_discovered_area.name}）まで進む",
-            move_path(route_id: route.id, direction: "area"),
-            method: :post,
-            class: "btn btn-outline-info w-100 mb-2" %>
+  <details class="card bg-secondary text-light ui-collapsible world-action-group">
+    <summary class="card-header ui-collapsible-summary">
+      <span>NPC</span>
+      <% if @talkable_npcs.present? %>
+        <span class="badge bg-info text-dark ms-auto"><%= @talkable_npcs.size %></span>
+      <% else %>
+        <span class="small ui-collapsible-mini">話せるNPCなし</span>
       <% end %>
-
-      <% unless destination_discovered %>
-        <div class="small text-secondary mb-2">周辺を探索して道筋を探そう</div>
+    </summary>
+    <div class="card-body d-grid gap-2">
+      <% if @talkable_npcs.present? %>
+        <% @talkable_npcs.each do |npc| %>
+          <%= button_to "#{npc.name}に話しかける",
+              talk_to_npc_path(npc_id: npc.id),
+              method: :post,
+              class: "btn btn-outline-light w-100" %>
+        <% end %>
+      <% else %>
+        <p class="text-secondary small mb-0">今話せるNPCはいません。</p>
       <% end %>
     </div>
+  </details>
 
-  <% else %>
-    <% @routes.each do |route| %>
-      <%= button_to "#{route.name}へ出る",
-          move_path(route_id: route.id),
-          method: :post,
-          class: "btn btn-outline-info w-100 mb-2" %>
-    <% end %>
+  <% if @player.location&.safe_area? && @player.field_route.blank? %>
+    <% town_discovery = @town_discovery || @player.town_discovery_for %>
+    <% discovered_facility_count = [
+      town_discovery&.found_inn?,
+      town_discovery&.found_item_shop?,
+      town_discovery&.found_blacksmith?,
+      town_discovery&.found_restaurant?
+    ].count(true) %>
+
+    <details class="card bg-secondary text-light ui-collapsible world-action-group">
+      <summary class="card-header ui-collapsible-summary">
+        <span>施設</span>
+        <% if discovered_facility_count.positive? %>
+          <span class="badge bg-warning text-dark ms-auto"><%= discovered_facility_count %></span>
+        <% else %>
+          <span class="small ui-collapsible-mini">未発見</span>
+        <% end %>
+      </summary>
+      <div class="card-body d-grid gap-2">
+        <% if town_discovery&.found_inn? %>
+          <%= link_to "宿屋に入る", game_path(panel: "inn"), class: "btn btn-outline-success w-100" %>
+        <% end %>
+
+        <% if town_discovery&.found_item_shop? %>
+          <% if FacilityHoursService.open?("item_shop", @player) %>
+            <%= link_to "道具屋に入る", game_path(panel: "item_shop"), class: "btn btn-outline-warning w-100" %>
+          <% else %>
+            <button class="btn btn-outline-secondary w-100" disabled>道具屋（閉店中 / <%= FacilityHoursService.hours_text("item_shop") %>）</button>
+          <% end %>
+        <% end %>
+
+        <% if town_discovery&.found_blacksmith? %>
+          <% if FacilityHoursService.open?("blacksmith", @player) %>
+            <%= link_to "鍛冶屋に入る", game_path(panel: "blacksmith"), class: "btn btn-outline-warning w-100" %>
+          <% else %>
+            <button class="btn btn-outline-secondary w-100" disabled>鍛冶屋（閉店中 / <%= FacilityHoursService.hours_text("blacksmith") %>）</button>
+          <% end %>
+        <% end %>
+
+        <% if town_discovery&.found_restaurant? %>
+          <% if FacilityHoursService.open?("restaurant", @player) %>
+            <%= link_to "飲食店に入る", game_path(panel: "restaurant"), class: "btn btn-outline-warning w-100" %>
+          <% else %>
+            <button class="btn btn-outline-secondary w-100" disabled>飲食店（閉店中 / <%= FacilityHoursService.hours_text("restaurant") %>）</button>
+          <% end %>
+        <% end %>
+
+        <% unless discovered_facility_count.positive? %>
+          <p class="text-secondary small mb-0">街を散策して施設を探そう。</p>
+        <% end %>
+      </div>
+    </details>
+  <% end %>
+
+  <details class="card bg-secondary text-light ui-collapsible world-action-group">
+    <summary class="card-header ui-collapsible-summary">
+      <span>移動</span>
+      <% if @player.field_route.present? %>
+        <span class="small ui-collapsible-mini"><%= @player.field_route.name %></span>
+      <% elsif @routes.present? %>
+        <span class="badge bg-info text-dark ms-auto"><%= @routes.size %></span>
+      <% else %>
+        <span class="small ui-collapsible-mini">移動先なし</span>
+      <% end %>
+    </summary>
+    <div class="card-body d-grid gap-2">
+      <% if @player.field_route.present? %>
+        <% route = @player.field_route %>
+        <% route_progress = @player.player_route_progresses.find_by(route: route) %>
+        <% destination_discovered = FieldService.destination_discovered?(@player, route) %>
+        <% destination_reached = route_progress&.reached_destination? %>
+        <% next_discovered_area = FieldService.next_discovered_area_for(@player, route) %>
+
+        <%= button_to "#{route.from_location.name}方面へ戻る",
+            move_path(route_id: route.id, direction: "backward"),
+            method: :post,
+            class: "btn btn-outline-warning w-100" %>
+
+        <% if destination_discovered %>
+          <%= button_to "#{route.to_location.name}方面へ進む",
+              move_path(route_id: route.id, direction: "forward"),
+              method: :post,
+              class: "btn btn-outline-info w-100" %>
+        <% elsif next_discovered_area %>
+          <%= button_to "探索済みのエリア（#{next_discovered_area.name}）まで進む",
+              move_path(route_id: route.id, direction: "area"),
+              method: :post,
+              class: "btn btn-outline-info w-100" %>
+        <% end %>
+
+        <% unless destination_discovered %>
+          <div class="small text-secondary">周辺を探索して道筋を探そう</div>
+        <% end %>
+      <% elsif @routes.present? %>
+        <% @routes.each do |route| %>
+          <%= button_to "#{route.name}へ出る",
+              move_path(route_id: route.id),
+              method: :post,
+              class: "btn btn-outline-info w-100" %>
+        <% end %>
+      <% else %>
+        <p class="text-secondary small mb-0">今行ける場所はありません。</p>
+      <% end %>
+    </div>
+  </details>
+
+  <% if @available_treasures.present? %>
+    <details class="card bg-secondary text-light ui-collapsible world-action-group">
+      <summary class="card-header ui-collapsible-summary">
+        <span>発見済み宝箱</span>
+        <span class="badge bg-warning text-dark ms-auto"><%= @available_treasures.size %></span>
+      </summary>
+      <div class="card-body d-grid gap-2">
+        <% @available_treasures.each do |treasure| %>
+          <%= button_to "#{treasure.name}を開ける",
+              open_treasure_path(treasure_chest_id: treasure.id),
+              method: :post,
+              class: "btn btn-outline-warning w-100" %>
+        <% end %>
+      </div>
+    </details>
+  <% end %>
+
+  <% if @available_bosses.present? %>
+    <details class="card bg-secondary text-light ui-collapsible world-action-group">
+      <summary class="card-header ui-collapsible-summary">
+        <span>発見済みボス</span>
+        <span class="badge bg-danger ms-auto"><%= @available_bosses.size %></span>
+      </summary>
+      <div class="card-body d-grid gap-2">
+        <% @available_bosses.each do |boss| %>
+          <%= button_to "#{boss.name}に挑む",
+              challenge_boss_path(mob_id: boss.id),
+              method: :post,
+              class: boss.boss_type == "field_boss" ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
+        <% end %>
+      </div>
+    </details>
   <% end %>
 </div>

@@ -45,7 +45,7 @@ class FieldService
     current_area = current_area_for(player)
 
     event = rand(100)
-    encounter_rate = current_area_for(player)&.encounter_rate || field_danger_level(player)
+    encounter_rate = modified_chance(current_area_for(player)&.encounter_rate || field_danger_level(player), encounter_modifier_for(player))
     message =
       if event < encounter_rate
         battle = create_battle!(player, encounter_mobs_for(player))
@@ -335,7 +335,8 @@ class FieldService
   end
 
   def self.gather_encounter_chance(context)
-    [[field_danger_level(context) / 2, 10].max, 45].min
+    base_chance = [[field_danger_level(context) / 2, 10].max, 45].min
+    modified_chance(base_chance, encounter_modifier_for(context))
   end
 
   def self.gatherable_items_for(context)
@@ -354,6 +355,35 @@ class FieldService
 
   def self.field_danger_level(context)
     field_context(context)&.danger_level.to_i
+  end
+
+  def self.environment_location_for(context)
+    return context if context.is_a?(Location)
+
+    route = field_context(context)
+    return unless route
+
+    Location.find_by(name: route.name) || route.from_location
+  end
+
+  def self.mapping_modifier_for(context)
+    environment_location_for(context)&.mapping_modifier || 1.0
+  end
+
+  def self.encounter_modifier_for(context)
+    environment_location_for(context)&.encounter_modifier || 1.0
+  end
+
+  def self.gathering_modifier_for(context)
+    environment_location_for(context)&.gathering_modifier || 1.0
+  end
+
+  def self.stealth_modifier_for(context)
+    environment_location_for(context)&.stealth_modifier || 1.0
+  end
+
+  def self.search_modifier_for(context)
+    environment_location_for(context)&.search_modifier || 1.0
   end
 
   def self.current_area_for(player)
@@ -476,8 +506,13 @@ class FieldService
 
     gain += 1 if player.skills.exists?(name: "探索")
     gain = (gain * player.movement_speed_multiplier).ceil
+    gain = (gain * mapping_modifier_for(player)).ceil
     difficulty = route.mapping_difficulty.to_f
     difficulty = 1.0 if difficulty <= 0
     (gain / difficulty).ceil
+  end
+
+  def self.modified_chance(base_chance, modifier)
+    (base_chance.to_f * modifier.to_f).round.clamp(0, 100)
   end
 end

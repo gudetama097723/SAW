@@ -6,6 +6,24 @@ class PlayerTest < ActiveSupport::TestCase
     assert_equal 100, Player.new.max_satiety
   end
 
+  test "current season follows current month" do
+    player = Player.new(current_month: 3)
+    assert_equal "spring", player.current_season
+    assert_equal "春", player.current_season_label
+
+    player.current_month = 8
+    assert_equal "summer", player.current_season
+    assert_equal "夏", player.current_season_label
+
+    player.current_month = 11
+    assert_equal "autumn", player.current_season
+    assert_equal "秋", player.current_season_label
+
+    player.current_month = 12
+    assert_equal "winter", player.current_season
+    assert_equal "冬", player.current_season_label
+  end
+
   test "advance time reduces satiety to zero over six in-game hours" do
     player = players(:one)
     player.satiety = player.max_satiety

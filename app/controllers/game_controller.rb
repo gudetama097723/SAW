@@ -14,6 +14,7 @@
     @rest = current_rest
     @routes = FieldService.available_routes_for(@player)
     @current_field_area = FieldService.current_area_for(@player)
+    @environment_location = @player.field_route.present? ? FieldService.environment_location_for(@player) : @player.location
     @current_field_area_progress = @player.progress_for_area(@current_field_area)
     @available_treasures = ExplorationRewardService.discovered_treasures(@player)
     @available_bosses = ExplorationRewardService.discovered_bosses(@player)

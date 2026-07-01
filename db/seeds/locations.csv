@@ -1,5 +1,6 @@
-﻿name,floor,danger_level,safe_area
-はじまりの街,1,0,TRUE
-ホルンカの村,1,0,TRUE
-次の町,1,0,TRUE
-
+name,floor,danger_level,safe_area,weather,environment
+はじまりの街,1,0,TRUE,clear,normal
+ホルンカの村,1,0,TRUE,clear,normal
+次の町,1,0,TRUE,clear,normal
+はじまりの草原,1,20,FALSE,clear,normal
+静寂の森,1,30,FALSE,fog,deep_fog

@@ -1,6 +1,11 @@
         <div class="col-md-4">
-          <div class="card bg-secondary text-light mb-3">
-            <div class="card-header">ステータス</div>
+          <details class="card bg-secondary text-light mb-3 ui-collapsible" <%= "open" if selected_panel.blank? %>>
+            <summary class="card-header ui-collapsible-summary">
+              <span>ステータス</span>
+              <span class="small ui-collapsible-mini">
+                Lv<%= @player.level.to_i %> / HP <%= @player.hp %>/<%= @player.effective_max_hp %> / <%= @player.col %> col
+              </span>
+            </summary>
             <div class="card-body">
               <div class="d-flex gap-3 align-items-center">
                 <p>名前: <%= @player.name %></p>
@@ -37,14 +42,14 @@
                 <p class="text-warning mb-0"><%= @player.sleepiness_warning_message %></p>
               <% end %>
             </div>
-          </div>
+          </details>
 
           <% if @active_player_quests.any? %>
-            <div class="card bg-secondary text-light mb-3">
-              <div class="card-header d-flex align-items-center gap-2">
-                受注中クエスト
+            <details class="card bg-secondary text-light mb-3 ui-collapsible" open>
+              <summary class="card-header ui-collapsible-summary">
+                <span>受注中クエスト</span>
                 <span class="badge bg-warning text-dark ms-auto"><%= @active_player_quests.size %></span>
-              </div>
+              </summary>
               <div class="card-body p-2">
                 <% @active_player_quests.each do |pq| %>
                   <% quest = pq.npc_quest %>
@@ -62,11 +67,16 @@
                   </div>
                 <% end %>
               </div>
-            </div>
+            </details>
           <% end %>
 
-          <div class="card bg-secondary text-light mb-3">
-            <div class="card-header">情報コマンド</div>
+          <details class="card bg-secondary text-light mb-3 ui-collapsible" open>
+            <summary class="card-header ui-collapsible-summary">
+              <span>情報コマンド</span>
+              <% if selected_panel.present? %>
+                <span class="small ui-collapsible-mini">表示中: <%= selected_panel %></span>
+              <% end %>
+            </summary>
             <div class="card-body d-grid gap-2">
               <% if selected_panel == "equipment" %>
                 <%= link_to "閉じる", game_path, class: "btn btn-outline-danger w-100" %>
@@ -90,5 +100,5 @@
               <%= link_to "ステータス", game_path(panel: "growth"), class: @player.stat_points.to_i.positive? ? "btn btn-warning w-100" : "btn btn-outline-light w-100" %>
               <% end %>
             </div>
-          </div>
+          </details>
         </div>

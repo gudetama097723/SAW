@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_01_001000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_01_002000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -103,11 +103,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_01_001000) do
   create_table "locations", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "danger_level"
+    t.string "environment", default: "normal", null: false
     t.integer "floor"
     t.integer "mapping_progress", default: 0, null: false
     t.string "name"
     t.boolean "safe_area"
     t.datetime "updated_at", null: false
+    t.string "weather", default: "clear", null: false
   end
 
   create_table "mob_parts", force: :cascade do |t|

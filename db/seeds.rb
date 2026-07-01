@@ -20,7 +20,9 @@ seed_rows("locations.csv") do |row|
   location.update!(
     floor: to_int(row["floor"]),
     danger_level: to_int(row["danger_level"]),
-    safe_area: to_bool(row["safe_area"])
+    safe_area: to_bool(row["safe_area"]),
+    weather: row["weather"].presence || "clear",
+    environment: row["environment"].presence || "normal"
   )
   locations[location.name] = location
 end

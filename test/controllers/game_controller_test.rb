@@ -11,7 +11,8 @@ class GameControllerTest < ActionDispatch::IntegrationTest
       max_hp: 100,
       col: 100,
       floor: 1,
-      location: @location
+      location: @location,
+      current_month: 3
     )
 
     post login_path, params: { username: @user.username, password: "password" }
@@ -20,6 +21,9 @@ class GameControllerTest < ActionDispatch::IntegrationTest
   test "should get index" do
     get game_path
     assert_response :success
+    assert_includes response.body, "季節：春"
+    assert_includes response.body, "天気：晴れ"
+    assert_includes response.body, "環境：通常"
   end
 
   test "cannot accept quest from undiscovered npc by direct post" do
