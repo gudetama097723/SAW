@@ -15,6 +15,7 @@ class NpcQuestService
       pq = pq_map[quest.id]
       next false if pq&.active?
       next false if pq&.completed? && !quest.repeatable?
+      next false if repeat_acceptance_block_reason(player, quest, pq).present?
       start_conditions_met?(player, quest, npc: npc)
     end
   end
@@ -27,6 +28,13 @@ class NpcQuestService
           .includes(:npc_quest)
   end
 
+  def self.completed_quests(player, npc)
+    player.player_quests
+          .joins(:npc_quest)
+          .where(npc_quests: { npc_id: npc.id }, status: "completed")
+          .includes(:npc_quest)
+  end
+
   # ─── アクション ────────────────────────────────────────────────
 
   def self.accept_quest!(player, quest)
@@ -34,7 +42,10 @@ class NpcQuestService
 
     pq = player.player_quests.find_by(npc_quest: quest)
     return Result.new(status: :error, message: "そのクエストはすでに受注中です。") if pq&.active?
-    return Result.new(status: :error, message: "そのクエストはすでに完了済みです。") if pq&.completed? && !quest.repeatable?
+    return Result.new(status: :error, message: "このクエストは達成済みです。") if pq&.completed? && !quest.repeatable?
+
+    repeat_block_reason = repeat_acceptance_block_reason(player, quest, pq)
+    return Result.new(status: :error, message: repeat_block_reason) if repeat_block_reason.present?
 
     npc = quest.npc
     unless start_conditions_met?(player, quest, npc: npc)
@@ -42,7 +53,7 @@ class NpcQuestService
     end
 
     if pq&.completed? && quest.repeatable?
-      pq.update!(status: "active", accepted_at: Time.current, completed_at: nil, progress_data: "{}")
+      pq.update!(status: "active", accepted_at: Time.current, completed_at: nil)
     else
       player.player_quests.create!(npc_quest: quest, status: "active", accepted_at: Time.current)
     end
@@ -62,10 +73,13 @@ class NpcQuestService
     ActiveRecord::Base.transaction do
       consume_quest_items!(player, quest.completion_conditions)
       reward_message = apply_quest_reward!(player, quest.reward)
+      progress_data = pq.progress
+      progress_data["last_completed_game_day"] = game_day_key(player) if quest.repeatable?
       pq.update!(
         status: "completed",
         completed_at: Time.current,
-        completed_count: pq.completed_count.to_i + 1
+        completed_count: pq.completed_count.to_i + 1,
+        progress_data: progress_data.to_json
       )
     end
 
@@ -159,6 +173,24 @@ class NpcQuestService
     end
     Array(r["skills"]).each { |s| parts << "スキル「#{s}」" if s.present? }
     parts.empty? ? "なし" : parts.join(" / ")
+  end
+
+  def self.repeat_acceptance_block_reason(player, quest, player_quest)
+    return nil unless quest&.repeatable?
+    return nil unless player_quest&.completed?
+
+    if player_quest.progress["last_completed_game_day"].to_i == game_day_key(player)
+      return "この依頼は本日達成済みです。明日また受注できます。"
+    end
+
+    policy = quest.repeat_policy
+    return nil if policy.blank?
+
+    nil
+  end
+
+  def self.game_day_key(player)
+    (player.current_month.to_i * 100) + player.current_day.to_i
   end
 
   # 親密度が上昇した際、閾値に達した自動発動クエストを処理して報酬を付与する

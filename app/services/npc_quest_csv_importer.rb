@@ -24,8 +24,11 @@ class NpcQuestCsvImporter
         completion_conditions_json: row["completion_conditions_json"].presence || "{}",
         reward_data:                row["reward_data"].presence || "{}",
         repeatable:                 boolean(row["repeatable"], default: false),
+        quest_type:                 row["quest_type"].presence || "npc",
+        repeat_policy_json:         row["repeat_policy_json"].presence || "{}",
         sort_order:                 integer(row["sort_order"]) || 0,
-        active:                     boolean(row["active"], default: true)
+        active:                     boolean(row["active"], default: true),
+        trigger_affinity:           integer(row["trigger_affinity"])
       )
 
       quest.new_record? ? result.created += 1 : result.updated += 1

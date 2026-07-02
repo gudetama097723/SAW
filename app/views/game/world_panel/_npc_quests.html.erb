@@ -14,9 +14,11 @@
     <%
       active_pqs = NpcQuestService.active_quests(@player, npc).to_a
       available  = NpcQuestService.available_quests(@player, npc)
+      available_ids = available.map(&:id)
+      completed_pqs = NpcQuestService.completed_quests(@player, npc).to_a.reject { |pq| available_ids.include?(pq.npc_quest_id) }
     %>
 
-    <% if active_pqs.empty? && available.empty? %>
+    <% if active_pqs.empty? && available.empty? && completed_pqs.empty? %>
       <p class="text-secondary mb-3 small">現在受けられるクエストはありません。</p>
     <% end %>
 
@@ -29,9 +31,8 @@
         <div class="border border-warning rounded p-2 mb-2">
           <div class="d-flex align-items-center gap-2 mb-1">
             <span class="fw-bold"><%= quest.name %></span>
-            <% if quest.repeatable? %>
-              <span class="badge bg-secondary">繰り返し可</span>
-            <% end %>
+            <span class="badge <%= quest.repeatable? ? "bg-secondary" : "bg-info" %>"><%= quest.display_kind_label %></span>
+            <span class="badge bg-dark border border-secondary"><%= quest.quest_type_label %></span>
             <span class="ms-auto small text-secondary">
               達成 <%= pq.completed_count.to_i %>回
             </span>
@@ -64,9 +65,9 @@
         <div class="border border-secondary rounded p-2 mb-2">
           <div class="d-flex align-items-center gap-2 mb-1">
             <span class="fw-bold"><%= quest.name %></span>
-            <% if quest.repeatable? %>
-              <span class="badge bg-secondary">繰り返し可</span>
-            <% end %>
+            <span class="badge <%= quest.repeatable? ? "bg-secondary" : "bg-info" %>"><%= quest.display_kind_label %></span>
+            <span class="badge bg-dark border border-secondary"><%= quest.repeatability_label %></span>
+            <span class="badge bg-dark border border-secondary"><%= quest.quest_type_label %></span>
           </div>
           <% if quest.description.present? %>
             <p class="small text-secondary mb-1"><%= quest.description %></p>
@@ -80,6 +81,29 @@
           <%= link_to "受注する",
               game_path(panel: "npc_quest_accept", npc_id: npc&.id, npc_quest_id: quest.id),
               class: "btn btn-outline-info btn-sm w-100" %>
+        </div>
+      <% end %>
+    <% end %>
+
+    <% if completed_pqs.any? %>
+      <p class="small fw-bold text-secondary mb-2 <%= (active_pqs.any? || available.any?) ? "mt-3" : "" %>">達成済み</p>
+      <% completed_pqs.each do |pq| %>
+        <% quest = pq.npc_quest %>
+        <div class="border border-secondary rounded p-2 mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="fw-bold text-secondary"><%= quest.name %></span>
+            <span class="badge <%= quest.repeatable? ? "bg-secondary" : "bg-info" %>"><%= quest.display_kind_label %></span>
+            <span class="badge bg-dark border border-secondary"><%= quest.completed_label %></span>
+            <span class="ms-auto small text-secondary">達成 <%= pq.completed_count.to_i %>回</span>
+          </div>
+          <% if quest.repeatable? %>
+            <p class="small text-secondary mb-2">再受注可能な依頼です。</p>
+            <%= link_to "もう一度受注する",
+                game_path(panel: "npc_quest_accept", npc_id: npc&.id, npc_quest_id: quest.id),
+                class: "btn btn-outline-info btn-sm w-100" %>
+          <% else %>
+            <p class="small text-secondary mb-0">このクエストは達成済みです。</p>
+          <% end %>
         </div>
       <% end %>
     <% end %>

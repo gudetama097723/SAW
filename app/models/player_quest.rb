@@ -16,4 +16,10 @@ class PlayerQuest < ApplicationRecord
   def completed?
     status == "completed"
   end
+
+  def progress
+    JSON.parse(progress_data.presence || "{}")
+  rescue JSON::ParserError
+    {}
+  end
 end

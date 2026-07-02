@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_01_003000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_02_000000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -239,6 +239,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_01_003000) do
     t.text "description"
     t.string "name", null: false
     t.integer "npc_id", null: false
+    t.string "quest_type", default: "npc", null: false
+    t.text "repeat_policy_json", default: "{}", null: false
     t.boolean "repeatable", default: false, null: false
     t.text "reward_data", default: "{}", null: false
     t.integer "sort_order", default: 0, null: false
@@ -248,6 +250,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_01_003000) do
     t.index ["code"], name: "index_npc_quests_on_code", unique: true
     t.index ["npc_id", "sort_order"], name: "index_npc_quests_on_npc_id_and_sort_order"
     t.index ["npc_id"], name: "index_npc_quests_on_npc_id"
+    t.index ["quest_type"], name: "index_npc_quests_on_quest_type"
   end
 
   create_table "npcs", force: :cascade do |t|

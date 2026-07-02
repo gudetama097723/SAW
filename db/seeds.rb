@@ -310,6 +310,8 @@ seed_rows("npc_quests.csv") do |row|
     completion_conditions_json: row["completion_conditions_json"].presence || "{}",
     reward_data:                row["reward_data"].presence || "{}",
     repeatable:                 to_bool(row["repeatable"]),
+    quest_type:                 row["quest_type"].presence || "npc",
+    repeat_policy_json:         row["repeat_policy_json"].presence || "{}",
     sort_order:                 to_int(row["sort_order"]) || 0,
     active:                     to_bool(row["active"]),
     trigger_affinity:           to_int(row["trigger_affinity"])

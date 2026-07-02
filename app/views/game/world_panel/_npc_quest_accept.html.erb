@@ -5,16 +5,24 @@
 
 <div class="card-header d-flex align-items-center gap-2">
   <%= npc&.name || "???" %>
-  <span class="badge bg-info">クエスト依頼</span>
+  <% if quest %>
+    <span class="badge <%= quest.repeatable? ? "bg-secondary" : "bg-info" %>"><%= quest.display_kind_label %></span>
+    <span class="badge bg-dark border border-secondary"><%= quest.repeatability_label %></span>
+  <% end %>
 </div>
 
 <div class="card-body">
   <% if quest && npc %>
     <p class="small fw-bold text-warning mb-2">「<%= quest.name %>」</p>
+    <% completed = @player&.player_quests&.find_by(npc_quest: quest)&.completed? %>
 
     <div class="border border-secondary rounded p-3 mb-3" style="background: #0d1117; min-height: 5rem;">
       <p class="mb-1 small fw-bold text-warning"><%= npc.name %></p>
-      <p class="mb-0"><%= quest.description.presence || "頼めるか？" %></p>
+      <% if completed && !quest.repeatable? %>
+        <p class="mb-0">このクエストは達成済みです。</p>
+      <% else %>
+        <p class="mb-0"><%= quest.description.presence || "頼めるか？" %></p>
+      <% end %>
     </div>
 
     <div class="small text-secondary mb-3">
@@ -23,10 +31,14 @@
     </div>
 
     <div class="d-grid gap-2">
-      <%= button_to "受注する",
-          npc_accept_quest_path(npc_quest_id: quest.id),
-          method: :post,
-          class: "btn btn-info w-100" %>
+      <% if completed && !quest.repeatable? %>
+        <button class="btn btn-outline-secondary w-100" disabled>達成済み</button>
+      <% else %>
+        <%= button_to "受注する",
+            npc_accept_quest_path(npc_quest_id: quest.id),
+            method: :post,
+            class: "btn btn-info w-100" %>
+      <% end %>
       <%= link_to "やめておく",
           game_path(panel: "npc_quests", npc_id: npc.id),
           class: "btn btn-outline-secondary w-100" %>
