@@ -17,27 +17,42 @@ module Game
   end
 
   def attack
+      player = current_player
+      weapon = BattleService.combat_weapon_for(player)
+      attack_group = params[:attack_group].presence || (weapon ? "weapon_attack" : "unarmed")
+
+      if attack_group == "weapon_attack" && !weapon
+        redirect_to game_path(battle_command: "attack"), alert: "武器を装備していないため、武器攻撃はできません。"
+        return
+      end
+
+      unarmed_attack = attack_group == "unarmed"
 
       result = BattleService.resolve_player_attack!(
         battle: current_battle,
-        player: current_player,
+        player: player,
         mob_part_id: params[:mob_part_id],
         target_enemy_id: params[:target_enemy_id],
-        label: "通常攻撃",
+        label: unarmed_attack ? "素手攻撃" : "通常攻撃",
         damage_multiplier: 100,
-        durability_cost: 1,
+        durability_cost: unarmed_attack ? 0 : 1,
         skill_gain: 0,
         stiffness: false,
         hits: 1,
         sword_skill: false,
-        attack_attribute: params[:attack_attribute]
+        attack_attribute: unarmed_attack ? "打撃" : params[:attack_attribute]
       )
-      redirect_with_result(result, battle_command: "attack", attack_group: params[:attack_group], target_enemy_id: params[:target_enemy_id], attack_attribute: params[:attack_attribute])
+      redirect_with_result(result, battle_command: "attack", attack_group: attack_group, target_enemy_id: params[:target_enemy_id], attack_attribute: unarmed_attack ? "打撃" : params[:attack_attribute])
     end
 
     def sword_skill
       player = current_player
-      weapon = player.equipped_weapon
+      weapon = BattleService.combat_weapon_for(player)
+      unless weapon
+        redirect_to game_path(battle_command: "attack"), alert: "武器を装備していないため、ソードスキルは使用できません。"
+        return
+      end
+
       skill_set = BattleService.weapon_skill_name(weapon)
       skill_key = params[:skill].presence || SkillCatalog.first_for(skill_set)&.key || "vertical"
       sword_skill = player.skills.find_by(name: skill_set)

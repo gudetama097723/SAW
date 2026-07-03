@@ -51,7 +51,7 @@
   def self.resolve_player_attack!(battle:, player:, mob_part_id:, target_enemy_id: nil, group_start: nil, label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:, area: false, attack_attribute: nil, skill_key: nil)
     return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
 
-    weapon = player.equipped_weapon
+    weapon = combat_weapon_for(player)
     return Result.new(status: :error, message: "武器を装備していないため、ソードスキルは使用できません。") if sword_skill && !weapon
 
     ensure_battle_enemies!(battle)
@@ -651,6 +651,15 @@ def self.gain_weapon_skill!(player, weapon, amount)
     else
       weapon.weapon_type.presence || "武器"
     end
+  end
+
+  def self.combat_weapon_for(player)
+    weapon = player&.equipped_weapon
+    return nil unless weapon&.player_id == player.id
+    return nil unless weapon.equipped?
+    return nil if weapon.broken?
+
+    weapon
   end
 
   def self.try_drop_weapon!(player, mob)

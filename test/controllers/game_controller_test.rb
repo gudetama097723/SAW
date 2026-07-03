@@ -26,6 +26,48 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "環境：通常"
   end
 
+  test "battle commands hide weapon actions without combat weapon" do
+    @player.weapons.destroy_all
+    mob = Mob.create!(name: "武器なし表示テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    @player.battles.create!(mob: mob, enemy_hp: 10)
+
+    get game_path
+    assert_response :success
+    assert_includes response.body, "戦闘"
+    assert_not_includes response.body, "battle_command=sword_skill"
+
+    get game_path, params: { battle_command: "battle" }
+    assert_response :success
+    assert_includes response.body, "素手攻撃"
+    assert_not_includes response.body, "パリィを狙う"
+
+    get game_path, params: { battle_command: "attack" }
+    assert_response :success
+    assert_includes response.body, "素手攻撃"
+    assert_not_includes response.body, "武器攻撃"
+
+    get game_path, params: { battle_command: "sword_skill" }
+    assert_response :success
+    assert_includes response.body, "素手攻撃"
+    assert_not_includes response.body, "片手直剣スキル"
+  end
+
+  test "battle actions reject direct weapon commands without combat weapon" do
+    @player.weapons.destroy_all
+    mob = Mob.create!(name: "武器なし直叩きテストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = @player.battles.create!(mob: mob, enemy_hp: 10)
+    BattleService.ensure_battle_enemies!(battle)
+    part = BattleService.ensure_mob_parts!(mob).first
+
+    post attack_path, params: { attack_group: "weapon_attack", mob_part_id: part.id }
+    assert_redirected_to game_path(battle_command: "attack")
+    assert_equal "武器を装備していないため、武器攻撃はできません。", flash[:alert]
+
+    post sword_skill_path, params: { skill: "vertical", mob_part_id: part.id }
+    assert_redirected_to game_path(battle_command: "attack")
+    assert_equal "武器を装備していないため、ソードスキルは使用できません。", flash[:alert]
+  end
+
   test "inn panel only shows facility npcs" do
     @player.town_discovery_for.update!(found_inn: true)
     town_guide = Npc.create!(

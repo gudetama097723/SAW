@@ -1,5 +1,7 @@
   <% if @battle.present? %>
     <% battle_command = params[:battle_command].presence %>
+    <% equipped_weapon = BattleService.combat_weapon_for(@player) %>
+    <% battle_command = "attack" if battle_command == "sword_skill" && !equipped_weapon %>
     <% battle_enemies = @battle_enemies.presence || @battle.alive_enemies.to_a %>
     <% selected_enemy = battle_enemies.find { |enemy| enemy.id == params[:target_enemy_id].to_i } || battle_enemies.first %>
     <% selected_parts = selected_enemy ? BattleService.ensure_mob_parts!(selected_enemy.mob) : [] %>
@@ -10,43 +12,57 @@
   <% if battle_command.blank? %>
     <div class="d-grid gap-2">
       <%= link_to "戦闘", game_path(battle_command: "battle"), class: "btn btn-outline-warning w-100" %>
-      <%= link_to "スキル", game_path(battle_command: "sword_skill"), class: "btn btn-outline-danger w-100" %>
+      <% if equipped_weapon %>
+        <%= link_to "スキル", game_path(battle_command: "sword_skill"), class: "btn btn-outline-danger w-100" %>
+      <% end %>
       <%= link_to "アイテム", game_path(battle_command: "item"), class: "btn btn-outline-success w-100" %>
       <%= button_to "逃走", escape_path, method: :post, class: "btn btn-outline-light w-100" %>
     </div>
   <% elsif battle_command == "battle" %>
     <div class="d-grid gap-2">
-      <%= link_to "通常攻撃", game_path(battle_command: "attack"), class: "btn btn-outline-warning w-100" %>
+      <%= link_to equipped_weapon ? "通常攻撃" : "素手攻撃",
+          game_path(battle_command: "attack", attack_group: equipped_weapon ? nil : "unarmed", attack_attribute: equipped_weapon ? nil : "打撃"),
+          class: "btn btn-outline-warning w-100" %>
       <div class="btn btn-outline-secondary disabled w-100">防御</div>
-      <div class="btn btn-outline-secondary disabled w-100">パリィを狙う</div>
+      <% if equipped_weapon %>
+        <div class="btn btn-outline-secondary disabled w-100">パリィを狙う</div>
+      <% end %>
       <%= link_to "戻る", game_path, class: "btn btn-outline-light w-100" %>
     </div>
   <% elsif battle_command == "attack" %>
     <% selected_attack_group = params[:attack_group].presence %>
-    <% selected_attack_attribute = AttackAttribute.normalize(params[:attack_attribute].presence || equipped_weapon&.primary_attack_attribute || "斬撃") %>
+    <% selected_attack_group = "unarmed" if !equipped_weapon && selected_attack_group == "weapon_attack" %>
+    <% selected_attack_attribute = AttackAttribute.normalize(params[:attack_attribute].presence || equipped_weapon&.primary_attack_attribute || "打撃") %>
     <% if selected_attack_group.blank? %>
       <h5>使用可能攻撃</h5>
       <div class="d-grid gap-2">
-        <div class="btn btn-outline-secondary disabled w-100">素手</div>
-        <%= link_to "武器攻撃",
-            game_path(battle_command: "attack", attack_group: "weapon_attack"),
-            class: "btn btn-outline-warning w-100" %>
-      </div>
-    <% else %>
-      <h5>武器攻撃</h5>
-      <div class="d-grid gap-2 mb-3">
-        <% AttackAttribute.normal_attack_options.each do |label, attribute| %>
-          <%= link_to label,
-              game_path(battle_command: "attack", attack_group: "weapon_attack", target_enemy_id: selected_enemy&.id, attack_attribute: attribute),
-              class: selected_attack_attribute == attribute ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
+        <% if equipped_weapon %>
+          <%= link_to "武器攻撃",
+              game_path(battle_command: "attack", attack_group: "weapon_attack"),
+              class: "btn btn-outline-warning w-100" %>
+        <% else %>
+          <%= link_to "素手攻撃",
+              game_path(battle_command: "attack", attack_group: "unarmed", attack_attribute: "打撃"),
+              class: "btn btn-outline-warning w-100" %>
         <% end %>
       </div>
+    <% else %>
+      <h5><%= selected_attack_group == "unarmed" ? "素手攻撃" : "武器攻撃" %></h5>
+      <% if selected_attack_group == "weapon_attack" %>
+        <div class="d-grid gap-2 mb-3">
+          <% AttackAttribute.normal_attack_options.each do |label, attribute| %>
+            <%= link_to label,
+                game_path(battle_command: "attack", attack_group: "weapon_attack", target_enemy_id: selected_enemy&.id, attack_attribute: attribute),
+                class: selected_attack_attribute == attribute ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
+          <% end %>
+        </div>
+      <% end %>
       <% if battle_enemies.many? %>
         <h5>攻撃対象</h5>
         <div class="d-grid gap-2">
           <% battle_enemies.each do |enemy| %>
             <%= link_to "#{enemy.position}. #{enemy.display_name} HP #{enemy.enemy_hp}/#{enemy.effective_max_hp}",
-                game_path(battle_command: "attack", attack_group: "weapon_attack", target_enemy_id: enemy.id, attack_attribute: selected_attack_attribute),
+                game_path(battle_command: "attack", attack_group: selected_attack_group, target_enemy_id: enemy.id, attack_attribute: selected_attack_attribute),
                 class: enemy == selected_enemy ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
           <% end %>
         </div>
