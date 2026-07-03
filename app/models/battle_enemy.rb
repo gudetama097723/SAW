@@ -9,8 +9,18 @@ class BattleEnemy < ApplicationRecord
   end
 
   def effective_level
+    return 1 unless level_based?
+
     value = has_attribute?(:enemy_level) ? enemy_level : mob.level
     [value.to_i, 1].max
+  end
+
+  def level_based?
+    mob.level_based?
+  end
+
+  def display_name
+    level_based? ? "#{mob.name} Lv#{effective_level}" : mob.name
   end
 
   def effective_max_hp
@@ -66,6 +76,8 @@ class BattleEnemy < ApplicationRecord
 
   def scaled_value(base)
     base_value = [base.to_i, 1].max
+    return base_value unless level_based?
+
     multiplier = 1.0 + ((effective_level - 1) * 0.25)
     (base_value * multiplier).round
   end

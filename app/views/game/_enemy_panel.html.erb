@@ -5,7 +5,7 @@
     <div class="d-flex flex-wrap gap-2">
       <% battle_enemies.each do |enemy| %>
         <div class="border rounded p-2 flex-fill" style="min-width: 140px;">
-          <h5 class="mb-2"><%= enemy.position %>. <%= enemy.mob.name %> Lv<%= enemy.effective_level %></h5>
+          <h5 class="mb-2"><%= enemy.position %>. <%= enemy.display_name %></h5>
           <p class="mb-1">
             HP: <%= enemy.enemy_hp %> / <%= enemy.effective_max_hp %>
             <% enemy.condition_labels.each do |label| %>

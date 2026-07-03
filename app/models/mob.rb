@@ -9,6 +9,8 @@
   end
 
   def effective_level
+    return 1 unless level_based?
+
     [level.to_i, 1].max
   end
 
@@ -26,6 +28,14 @@
 
   def boss?
     boss_type != "normal"
+  end
+
+  def field_boss?
+    boss_type == "field_boss"
+  end
+
+  def level_based?
+    !field_boss?
   end
 
   def reward

@@ -208,7 +208,7 @@ seed_rows("boss_mobs.csv") do |row|
     hp: to_int(row["hp"]),
     atk: to_int(row["atk"]),
     rarity: row["rarity"],
-    level: to_int(row["level"]),
+    level: row["boss_type"] == "field_boss" ? 1 : to_int(row["level"]),
     agility: to_int(row["agility"]),
     durability: to_int(row["durability"]),
     exp_reward: to_int(row["exp_reward"]),

@@ -2,6 +2,12 @@ class FieldService
   Result = Struct.new(:status, :message, :battle, keyword_init: true)
   REQUIRED_MAPPING_TO_REACH_DESTINATION = 30
   ROAMING_AREA_BOSS_ENCOUNTER_RATE = 5
+  TIME_PERIOD_MODIFIERS = {
+    dawn: { encounter: 0.9, danger: 0.85, level_bonus: 0 },
+    day: { encounter: 1.0, danger: 1.0, level_bonus: 0 },
+    evening: { encounter: 1.25, danger: 1.35, level_bonus: 1 },
+    night: { encounter: 1.8, danger: 2.5, level_bonus: 4 }
+  }.freeze
 
   def self.available_routes_for(player)
     location = player&.location
@@ -45,7 +51,7 @@ class FieldService
     current_area = current_area_for(player)
 
     event = rand(100)
-    encounter_rate = modified_chance(current_area_for(player)&.encounter_rate || field_danger_level(player), encounter_modifier_for(player))
+    encounter_rate = field_encounter_chance(current_area_for(player)&.encounter_rate || effective_field_danger_level(player), player)
     message =
       if event < encounter_rate
         battle = create_battle!(player, encounter_mobs_for(player))
@@ -142,7 +148,7 @@ class FieldService
 
   def self.item_use_surprise_encounter!(player)
     return Result.new(status: :none) unless player.field_route.present?
-    return Result.new(status: :none) unless rand(100) < 40
+    return Result.new(status: :none) unless rand(100) < field_encounter_chance(40, player)
 
     mobs = encounter_mobs_for(player)
     return Result.new(status: :none) if mobs.empty?
@@ -154,7 +160,7 @@ class FieldService
   def self.movement_encounter!(player)
     return Result.new(status: :none) unless player.field_route.present?
 
-    chance = [[field_danger_level(player) / 2, 8].max, 40].min
+    chance = field_encounter_chance([[effective_field_danger_level(player) / 2, 8].max, 75].min, player)
     return Result.new(status: :none) unless rand(100) < chance
 
     mobs = encounter_mobs_for(player)
@@ -186,7 +192,7 @@ class FieldService
       StatusEffectService.recover_values_percent!(player, 0.10)
       player.save!
 
-      chance = [[field_danger_level(player), 0].max, 100].min
+      chance = [[effective_field_danger_level(player), 0].max, 100].min
       if rand(100) >= chance
         StatusEffectService.cure!(player, "sleep")
         player.reset_sleep_deprivation!
@@ -214,7 +220,7 @@ class FieldService
     player.save!
     battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp, ambush: ambush)
     mobs.first(5).each.with_index(1) do |mob, position|
-      enemy_level = enemy_level_for(player.field_route, mob)
+      enemy_level = enemy_level_for(player, mob)
       enemy_max_hp = scaled_mob_value(mob.hp, enemy_level)
       battle.battle_enemies.create!(
         battle_enemy_attributes(
@@ -229,15 +235,26 @@ class FieldService
     battle
   end
 
-  def self.enemy_level_for(route, mob)
-    if route&.name == "はじまりの草原"
-      roll = rand(100)
-      return 1 if roll < 60
-      return 2 if roll < 95
-      return 3
-    end
+  def self.enemy_level_for(context, mob)
+    return 1 unless mob&.level_based?
 
-    [mob.level.to_i, 1].max
+    route = field_context(context)
+    bonus = time_period_modifier_for(context, :level_bonus).to_i
+    base_level =
+      if route&.name == "はじまりの草原"
+        roll = rand(100)
+        if roll < 60
+          1
+        elsif roll < 95
+          2
+        else
+          3
+        end
+      else
+        [mob.level.to_i, 1].max
+      end
+
+    [base_level + bonus, 1].max
   end
 
   def self.scaled_mob_value(base, enemy_level)
@@ -318,14 +335,14 @@ class FieldService
 
   def self.encounter_count_for(context)
     roll = rand(100)
-    if field_name_for(context) == "はじまりの草原"
+    if field_name_for(context) == "はじまりの草原" && %i[dawn day].include?(time_period_key_for(context))
       return 5 if roll < 1
       return 4 if roll < 3
       return 3 if roll < 10
       return 2 if roll < 30
       1
     else
-      danger = field_danger_level(context)
+      danger = effective_field_danger_level(context)
       return 5 if roll < danger - 35
       return 4 if roll < danger - 20
       return 3 if roll < danger
@@ -335,8 +352,8 @@ class FieldService
   end
 
   def self.gather_encounter_chance(context)
-    base_chance = [[field_danger_level(context) / 2, 10].max, 45].min
-    modified_chance(base_chance, encounter_modifier_for(context))
+    base_chance = [[effective_field_danger_level(context) / 2, 10].max, 65].min
+    field_encounter_chance(base_chance, context)
   end
 
   def self.gatherable_items_for(context)
@@ -355,6 +372,22 @@ class FieldService
 
   def self.field_danger_level(context)
     field_context(context)&.danger_level.to_i
+  end
+
+  def self.effective_field_danger_level(context)
+    (field_danger_level(context) * time_period_modifier_for(context, :danger)).round
+  end
+
+  def self.field_encounter_chance(base_chance, context)
+    modified_chance(base_chance.to_i * time_period_modifier_for(context, :encounter), encounter_modifier_for(context))
+  end
+
+  def self.time_period_key_for(context)
+    GameTimeService.period_key(context.respond_to?(:current_time) ? context : 480)
+  end
+
+  def self.time_period_modifier_for(context, key)
+    TIME_PERIOD_MODIFIERS.fetch(time_period_key_for(context)).fetch(key)
   end
 
   def self.environment_location_for(context)
@@ -427,9 +460,9 @@ class FieldService
 
   def self.base_rest_encounter_chance(player)
     area = current_area_for(player)
-    return [[field_danger_level(player) / 3, 0].max, 100].min unless area
+    return [[effective_field_danger_level(player) / 3, 0].max, 100].min unless area
 
-    (100 - area.rest_safety.to_i).clamp(0, 100)
+    field_encounter_chance(100 - area.rest_safety.to_i, player)
   end
 
   def self.route_progress_for(player, route)

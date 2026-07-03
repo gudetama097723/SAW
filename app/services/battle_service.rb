@@ -212,7 +212,7 @@
   def self.ensure_battle_enemies!(battle)
     return battle.alive_enemies.to_a if battle.battle_enemies.exists?
 
-    enemy_level = [battle.mob.level.to_i, 1].max
+    enemy_level = battle.mob.effective_level
     enemy_max_hp = FieldService.scaled_mob_value(battle.mob.hp, enemy_level)
     battle.battle_enemies.create!(
       FieldService.battle_enemy_attributes(
@@ -581,6 +581,8 @@ end
   end
 
   def self.adjusted_exp_reward(player, battle_enemy)
+    return battle_enemy.effective_exp_reward unless battle_enemy.level_based?
+
     level_gap = battle_enemy.effective_level - player.effective_level
     multiplier = 1.0 + (level_gap * 0.15)
     multiplier = [[multiplier, 0.1].max, 2.5].min

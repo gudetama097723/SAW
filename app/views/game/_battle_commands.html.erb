@@ -45,7 +45,7 @@
         <h5>攻撃対象</h5>
         <div class="d-grid gap-2">
           <% battle_enemies.each do |enemy| %>
-            <%= link_to "#{enemy.position}. #{enemy.mob.name} Lv#{enemy.effective_level} HP #{enemy.enemy_hp}/#{enemy.effective_max_hp}",
+            <%= link_to "#{enemy.position}. #{enemy.display_name} HP #{enemy.enemy_hp}/#{enemy.effective_max_hp}",
                 game_path(battle_command: "attack", attack_group: "weapon_attack", target_enemy_id: enemy.id, attack_attribute: selected_attack_attribute),
                 class: enemy == selected_enemy ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
           <% end %>
@@ -153,7 +153,7 @@
           <h6>攻撃対象</h6>
           <div class="d-grid gap-2 mb-3">
             <% battle_enemies.each do |enemy| %>
-              <%= link_to "#{enemy.position}. #{enemy.mob.name} Lv#{enemy.effective_level} HP #{enemy.enemy_hp}/#{enemy.effective_max_hp}",
+              <%= link_to "#{enemy.position}. #{enemy.display_name} HP #{enemy.enemy_hp}/#{enemy.effective_max_hp}",
                   game_path(battle_command: "sword_skill", skill_group: "sword_skill", selected_skill: selected_skill, target_enemy_id: enemy.id),
                   class: enemy == selected_enemy ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
             <% end %>
