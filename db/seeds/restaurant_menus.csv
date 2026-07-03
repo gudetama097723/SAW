@@ -1,4 +1,4 @@
-location,restaurant_name,menu_name,price,satiety_restore,duration_minutes,preparation_minutes,hp_bonus,strength_bonus,agility_bonus,accuracy_bonus,required_item_name,required_item_category,required_item_quantity,description
+﻿location,restaurant_name,menu_name,price,satiety_restore,duration_minutes,preparation_minutes,hp_bonus,strength_bonus,agility_bonus,accuracy_bonus,required_item_name,required_item_category,required_item_quantity,description
 はじまりの街,黒鉄亭,黒パンとシチュー,35,25,120,20,10,0,0,0,,,,街の定番料理。体を温めて少しだけ粘り強くなる。
 はじまりの街,黒鉄亭,香草焼き串,50,18,90,15,0,2,0,0,,,,香草の香りで力が湧く串焼き。
 はじまりの街,黒鉄亭,薬草リゾット,80,30,180,25,20,1,0,5,薬草,gathered,5,持ち込んだ薬草で作る特別メニュー。
