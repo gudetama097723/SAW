@@ -10,7 +10,7 @@ module Game
 
     def allocate_stats
       player = current_player
-      available_points = [player.stat_points.to_i, 3].min
+      available_points = player.stat_points.to_i
       strength_points = params[:strength_points].to_i
       agility_points = params[:agility_points].to_i
       total_points = strength_points + agility_points
@@ -20,8 +20,8 @@ module Game
         return
       end
 
-      if strength_points.negative? || agility_points.negative? || total_points != available_points
-        redirect_to game_path(panel: "growth", strength_points: strength_points, agility_points: agility_points), alert: "#{available_points}ポイントをすべて振り分けてください。"
+      if strength_points.negative? || agility_points.negative? || total_points <= 0 || total_points > available_points
+        redirect_to game_path(panel: "growth", strength_points: strength_points, agility_points: agility_points), alert: "1〜#{available_points}ポイントの範囲で振り分けてください。"
         return
       end
 

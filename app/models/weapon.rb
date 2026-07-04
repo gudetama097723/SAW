@@ -15,7 +15,7 @@ class Weapon < ApplicationRecord
   end
 
   def starter_weapon?
-    name == "スモールソード"
+    StarterWeaponCatalog.all.any? { |choice| choice.name == name }
   end
 
   def apply_durability_loss!(amount)

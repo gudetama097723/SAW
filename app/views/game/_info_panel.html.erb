@@ -86,7 +86,7 @@
   <h6 class="mt-3">ポイント振り分け</h6>
   <p>振り分け: <%= @player.stat_points.to_i %> pt</p>
   <% if @player.stat_points.to_i > 0 %>
-    <% allocatable_points = [@player.stat_points.to_i, 3].min %>
+    <% allocatable_points = @player.stat_points.to_i %>
     <% strength_points = [[params[:strength_points].to_i, 0].max, allocatable_points].min %>
     <% agility_points = [[params[:agility_points].to_i, 0].max, allocatable_points - strength_points].min %>
     <% before_hp = @player.effective_max_hp %>
@@ -102,8 +102,8 @@
     <% @player.strength = original_strength %>
     <% @player.agility = original_agility %>
     <div id="growth-stat-allocation" class="border border-warning rounded p-2 mb-2">
-      <p class="mb-1">最大<%= allocatable_points %>ポイントをまとめて振り分けます。</p>
-      <p class="mb-2">残り: <%= allocatable_points - strength_points - agility_points %> pt</p>
+      <p class="mb-1">所持ポイント内で任意の量を振り分けます。</p>
+      <p class="mb-2">今回使用: <%= strength_points + agility_points %> pt / 未使用で残す: <%= allocatable_points - strength_points - agility_points %> pt</p>
       <div class="d-grid gap-2 mb-2">
         <div class="d-flex align-items-center gap-2">
           <span class="flex-fill">筋力 +<%= strength_points %></span>
@@ -131,7 +131,7 @@
             以降このメッセージを表示しない
           </label>
         <% end %>
-        <%= submit_tag "この配分で確定する", class: "btn btn-warning w-100", disabled: (strength_points + agility_points != allocatable_points) %>
+        <%= submit_tag "この配分で確定する", class: "btn btn-warning w-100", disabled: (strength_points + agility_points <= 0) %>
       <% end %>
     </div>
   <% end %>

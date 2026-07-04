@@ -1,0 +1,53 @@
+<div class="container py-4 starter-weapon-page">
+  <div class="mb-4 text-light">
+    <h1 class="h3 mb-2">最初の武器を選択</h1>
+    <p class="mb-0 text-secondary">あなたの最初の戦い方を決めます。選んだ武器は装備済みになり、対応する武器スキルを習得した状態でゲームを開始します。</p>
+  </div>
+
+  <% if alert.present? %>
+    <div class="alert alert-warning"><%= alert %></div>
+  <% end %>
+  <% if notice.present? %>
+    <div class="alert alert-success"><%= notice %></div>
+  <% end %>
+
+  <div class="alert alert-info border-info starter-weapon-note">
+    <h2 class="h6 mb-2">注意</h2>
+    <p class="mb-1">ここで選ばなかった武器も、ゲーム開始後に入手・装備できます。</p>
+    <p class="mb-0">他の武器スキルも後から習得できますが、その場合は追加でスキル枠を1つ使用します。</p>
+  </div>
+
+  <div class="row g-3">
+    <% @starter_weapons.each do |weapon| %>
+      <div class="col-md-6">
+        <div class="card h-100 bg-dark text-light border-secondary starter-weapon-card">
+          <div class="card-header d-flex align-items-center justify-content-between gap-2">
+            <div>
+              <div class="small text-secondary"><%= weapon.style %> / <%= weapon.weapon_type %></div>
+              <h2 class="h5 mb-0"><%= weapon.name %></h2>
+            </div>
+            <span class="badge bg-primary"><%= weapon.attack_attributes %></span>
+          </div>
+          <div class="card-body d-grid gap-3">
+            <p class="mb-0"><%= weapon.description %></p>
+            <p class="mb-0 text-secondary"><%= weapon.gameplay %></p>
+
+            <div class="starter-weapon-stats">
+              <div>攻撃力 <strong><%= weapon.attack_power %></strong></div>
+              <div>耐久 <strong><%= weapon.durability %></strong></div>
+              <div>会心 <strong><%= weapon.critical_rate %>%</strong></div>
+              <div>重量 <strong><%= weapon.weight %></strong></div>
+              <div>STR補正 <strong><%= weapon.strength_ratio %>%</strong></div>
+              <div>AGI補正 <strong><%= weapon.agility_ratio %>%</strong></div>
+            </div>
+
+            <%= button_to "この武器で始める",
+                          starter_weapon_path,
+                          params: { starter_weapon: weapon.key },
+                          class: "btn btn-primary w-100" %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

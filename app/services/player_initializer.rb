@@ -18,31 +18,43 @@ class PlayerInitializer
       skill_slot_bonus: 0
     )
 
-    create_initial_weapons!(player)
     create_initial_armors!(player)
-    create_initial_skills!(player)
     player
   end
 
-  def self.create_initial_weapons!(player)
-    seed_rows("player_weapons.csv") do |row|
-      player.weapons.create!(
-        name: row["name"],
-        weapon_type: row["weapon_type"],
-        rarity: row["rarity"],
-        attack_power: to_int(row["attack_power"]),
-        durability: to_int(row["durability"]),
-        max_durability: to_int(row["max_durability"]),
-        hp_bonus: to_int(row["hp_bonus"]),
-        strength_bonus: to_int(row["strength_bonus"]),
-        agility_bonus: to_int(row["agility_bonus"]),
-        critical_rate: to_int(row["critical_rate"]),
-part_break_power: to_int(row["part_break_power"]) || 100,
-attack_attributes: row["attack_attributes"].presence || "斬撃",
-enhancement_level: to_int(row["enhancement_level"]) || 0,
-equipped: to_bool(row["equipped"])
-      )
+  def self.choose_initial_weapon!(player, choice)
+    return false if choice.blank? || player.weapons.exists?
+
+    player.transaction do
+      create_initial_weapon!(player, choice)
+      create_initial_weapon_skill!(player, choice.weapon_type)
     end
+    true
+  end
+
+  def self.create_initial_weapon!(player, choice)
+    player.weapons.create!(
+      name: choice.name,
+      weapon_type: choice.weapon_type,
+      rarity: choice.rarity,
+      attack_power: choice.attack_power,
+      durability: choice.durability,
+      max_durability: choice.max_durability,
+      hp_bonus: choice.hp_bonus,
+      strength_bonus: choice.strength_bonus,
+      agility_bonus: choice.agility_bonus,
+      critical_rate: choice.critical_rate,
+      part_break_power: choice.part_break_power,
+      attack_attributes: choice.attack_attributes,
+      enhancement_level: 0,
+      equipped: true,
+      weight: choice.weight,
+      strength_ratio: choice.strength_ratio,
+      agility_ratio: choice.agility_ratio,
+      description: choice.description,
+      discardable: false,
+      protected_from_death_penalty: true
+    )
   end
 
   def self.create_initial_armors!(player)
@@ -62,16 +74,16 @@ equipped: to_bool(row["equipped"])
     end
   end
 
-  def self.create_initial_skills!(player)
-    seed_rows("player_skills.csv") do |row|
-      player.skills.create!(
-        name: row["name"],
-        proficiency: to_int(row["proficiency"]) || 0,
-skill_exp: to_int(row["skill_exp"]) || 0,
-  skill_category: row["skill_category"].presence || "general",
-  weapon_skill: to_bool(row["weapon_skill"])
-)
-    end
+  def self.create_initial_weapon_skill!(player, weapon_type)
+    return if player.skills.exists?(name: weapon_type)
+
+    player.skills.create!(
+      name: weapon_type,
+      proficiency: 0,
+      skill_exp: 0,
+      skill_category: "weapon",
+      weapon_skill: true
+    )
   end
 
   def self.seed_rows(file_name, &block)

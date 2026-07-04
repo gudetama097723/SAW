@@ -6,6 +6,8 @@
   get "login", to: "sessions#new"
   post "login", to: "sessions#create"
   delete "logout", to: "sessions#destroy"
+  get "starter_weapon", to: "starter_weapons#show"
+  post "starter_weapon", to: "starter_weapons#create"
   post "explore", to: "game#explore"
   post "gather", to: "game#gather"
   post "hunt", to: "game#hunt"

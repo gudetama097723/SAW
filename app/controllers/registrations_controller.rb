@@ -12,7 +12,7 @@ class RegistrationsController < ApplicationController
     end
 
     session[:user_id] = @user.id
-    redirect_to game_path, notice: "登録しました。ゲームを開始します。"
+    redirect_to starter_weapon_path, notice: "登録しました。最初の武器を選んでください。"
   rescue ActiveRecord::RecordInvalid
     flash.now[:alert] = @user.errors.full_messages.join("、")
     render :new, status: :unprocessable_entity

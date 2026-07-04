@@ -7,7 +7,11 @@ class SessionsController < ApplicationController
 
     if user&.authenticate(params[:password].to_s)
       session[:user_id] = user.id
-      redirect_to game_path, notice: "ログインしました。"
+      if user.player&.weapons&.exists?
+        redirect_to game_path, notice: "ログインしました。"
+      else
+        redirect_to starter_weapon_path, notice: "ログインしました。最初の武器を選んでください。"
+      end
     else
       flash.now[:alert] = "ユーザー名またはパスワードが違います。"
       render :new, status: :unprocessable_entity

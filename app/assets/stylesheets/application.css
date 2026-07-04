@@ -264,3 +264,34 @@
   font-weight: bold;
   animation: boss-flash 1s ease-in-out 4;
 }
+
+.starter-weapon-page {
+  min-height: 100vh;
+}
+
+.starter-weapon-page,
+body:has(.starter-weapon-page) {
+  background: #101419;
+}
+
+.starter-weapon-note {
+  background: rgba(13, 202, 240, 0.12);
+  color: #e9fbff;
+}
+
+.starter-weapon-card {
+  border-radius: 0.5rem;
+}
+
+.starter-weapon-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.starter-weapon-stats > div {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0.375rem;
+  padding: 0.45rem 0.55rem;
+  background: rgba(255, 255, 255, 0.06);
+}

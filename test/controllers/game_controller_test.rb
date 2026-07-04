@@ -106,6 +106,28 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_includes flash[:notice], "450分経過した"
   end
 
+  test "can allocate some or all stat points" do
+    @player.update!(stat_points: 3, strength: 10, agility: 10)
+
+    post allocate_stats_path, params: { strength_points: 1, agility_points: 0 }
+
+    assert_redirected_to game_path(panel: "growth")
+    @player.reload
+    assert_equal 2, @player.stat_points
+    assert_equal 11, @player.strength
+    assert_equal 10, @player.agility
+
+    @player.update!(stat_points: 6, strength: 10, agility: 10)
+
+    post allocate_stats_path, params: { strength_points: 4, agility_points: 2 }
+
+    assert_redirected_to game_path(panel: "growth")
+    @player.reload
+    assert_equal 0, @player.stat_points
+    assert_equal 14, @player.strength
+    assert_equal 12, @player.agility
+  end
+
   test "cannot accept quest from undiscovered npc by direct post" do
     npc = Npc.create!(
       code: "controller_hidden_npc",
