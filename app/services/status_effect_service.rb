@@ -10,6 +10,7 @@ class StatusEffectService
   }.freeze
   DEFAULT_THRESHOLD = 100
   VALUE_DECAY_PER_MINUTE = 0.2
+  SLEEP_ACTIVATION_VALUE_REMAINING_RATE = 0.5
 
   def self.labels_for(entity)
     effect_data(entity).keys.filter_map { |key| LABELS[key.to_s] if active?(entity, key) }
@@ -28,6 +29,7 @@ class StatusEffectService
   def self.accumulate!(entity, status, amount)
     key = status.to_s
     return unless STATUSES.include?(key)
+    return if active?(entity, key)
 
     values = value_data(entity)
     values[key] = values[key].to_f + amount.to_f
@@ -37,6 +39,15 @@ class StatusEffectService
 
   def self.activate!(entity, status)
     key = status.to_s
+    values = value_data(entity)
+    if key == "sleep"
+      remaining = values[key].to_f * SLEEP_ACTIVATION_VALUE_REMAINING_RATE
+      remaining.positive? ? values[key] = remaining.round(2) : values.delete(key)
+    else
+      values.delete(key)
+    end
+    write_value_data(entity, values)
+
     effects = effect_data(entity)
     effects[key] =
       if key == "paralysis"
@@ -59,6 +70,13 @@ class StatusEffectService
     effects = effect_data(entity)
     RECOVERABLE_STATUSES.each { |status| effects.delete(status) }
     write_effect_data(entity, effects)
+  end
+
+  def self.clear_all!(entity)
+    write_value_data(entity, {})
+    write_effect_data(entity, {})
+    entity.awake_minutes_since_sleep = 0 if entity.respond_to?(:awake_minutes_since_sleep=)
+    clamp_hp_to_max!(entity)
   end
 
   def self.decay_values!(entity, minutes)

@@ -158,7 +158,8 @@
       end
 
       raw_damage = rand(1..mob_effective_atk(battle_enemy))
-      enemy_damage = [raw_damage - player.damage_cut, 1].max
+      defense_rate = 100.0 / (100 + [player.damage_cut.to_i, 0].max * 10)
+      enemy_damage = [(raw_damage * defense_rate).ceil, 1].max
       enemy_damage = (enemy_damage * StatusEffectService.damage_dealt_multiplier(battle_enemy)).ceil
       enemy_damage = (enemy_damage * StatusEffectService.damage_taken_multiplier(player)).ceil
       enemy_damage = (enemy_damage * BuffEffectService.defense_damage_taken_multiplier(player)).ceil
@@ -185,6 +186,24 @@
     end
 
     Result.new(status: :ok, message: messages.join)
+  end
+
+  def self.resolve_player_action_block!(player, battle)
+    return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
+
+    ensure_battle_enemies!(battle)
+    turn_messages = apply_battle_turn_start_effects!(player, battle)
+    return handle_player_defeat!(player, battle, "#{turn_messages.join}あなたは倒れた……。") if player.hp.to_i <= 0
+
+    blocked_message = StatusEffectService.action_blocked_message!(player)
+    return nil unless blocked_message
+
+    BuffEffectService.tick_battle_turn!(player)
+    player.save!
+    enemy_result = apply_enemy_attack!(player, battle)
+    return enemy_result if enemy_result.status == :defeated
+
+    Result.new(status: :ok, message: "#{turn_messages.join}#{blocked_message}#{enemy_result.message}")
   end
 
   def self.ensure_part_states!(battle, parts)
@@ -365,6 +384,7 @@ end
 
   def self.handle_player_defeat!(player, battle, prefix_message)
     respawn_location = player.death_respawn_location
+    StatusEffectService.clear_all!(player)
     player.hp = player.effective_max_hp
     player.floor = respawn_location&.floor || 1
     player.col = 0

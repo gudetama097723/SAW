@@ -242,14 +242,7 @@ class FieldService
     bonus = time_period_modifier_for(context, :level_bonus).to_i
     base_level =
       if route&.name == "はじまりの草原"
-        roll = rand(100)
-        if roll < 60
-          1
-        elsif roll < 95
-          2
-        else
-          3
-        end
+        starting_grassland_enemy_level(mob)
       else
         [mob.level.to_i, 1].max
       end
@@ -261,6 +254,26 @@ class FieldService
     base_value = [base.to_i, 1].max
     multiplier = 1.0 + (([enemy_level.to_i, 1].max - 1) * 0.25)
     (base_value * multiplier).round
+  end
+
+  def self.starting_grassland_enemy_level(mob)
+    base_level = [mob.level.to_i, 1].max
+    roll = rand(100)
+
+    case mob.name
+    when "スライム"
+      roll < 85 ? 1 : 2
+    when "ホーンラビット"
+      roll < 65 ? 1 : 2
+    when "フォレストワスプ"
+      roll < 80 ? 2 : 3
+    when "コボルド歩哨"
+      roll < 60 ? 2 : 3
+    when "変異スライム", "ワイルドボア", "コボルド斥候"
+      roll < 20 ? [base_level, 2].max : [base_level, 3].max
+    else
+      base_level
+    end
   end
 
   def self.battle_enemy_attributes(mob:, enemy_hp:, enemy_max_hp:, enemy_level:, position:)
@@ -542,7 +555,36 @@ class FieldService
     gain = (gain * mapping_modifier_for(player)).ceil
     difficulty = route.mapping_difficulty.to_f
     difficulty = 1.0 if difficulty <= 0
-    (gain / difficulty).ceil
+    gain = (gain / difficulty).ceil
+    apply_mapping_danger_penalty(gain, player)
+  end
+
+  def self.apply_mapping_danger_penalty(gain, player)
+    gain = gain.to_i
+    return 0 if gain <= 0
+
+    [(gain * mapping_danger_modifier_for(player)).floor, 1].max
+  end
+
+  def self.mapping_danger_modifier_for(player)
+    case exploration_mapping_danger_for(player)
+    when 0..20
+      1.0
+    when 21..40
+      0.8
+    when 41..60
+      0.6
+    when 61..80
+      0.45
+    else
+      0.3
+    end
+  end
+
+  def self.exploration_mapping_danger_for(player)
+    area = current_area_for(player)
+    area_danger = area ? field_encounter_chance(area.encounter_rate, player) : 0
+    [area_danger, effective_field_danger_level(player)].max
   end
 
   def self.modified_chance(base_chance, modifier)

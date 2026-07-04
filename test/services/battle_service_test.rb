@@ -79,4 +79,23 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert Battle.exists?(battle.id)
     assert_operator player.reload.hp, :<, 100
   end
+
+  test "enemy damage uses proportional armor mitigation" do
+    player = players(:one)
+    player.armors.destroy_all
+    player.armors.create!(name: "軽鎧", armor_type: "body", slot: "body", rarity: "common", defense: 2, equipped: true)
+    player.update!(hp: 100, max_hp: 100, agility: 0)
+    mob = Mob.create!(name: "防御計算mob", hp: 10, atk: 6, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 10)
+
+    BattleService.singleton_class.define_method(:rand) { |range| range.end }
+    begin
+      result = BattleService.apply_enemy_attack!(player, battle, allow_evasion: false)
+
+      assert_equal :ok, result.status
+      assert_equal 95, player.reload.hp
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+  end
 end

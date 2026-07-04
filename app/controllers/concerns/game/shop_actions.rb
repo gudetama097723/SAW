@@ -386,6 +386,20 @@ module Game
       battle = current_battle
       weapon = player.weapons.find_by(id: params[:weapon_id])
 
+      if battle
+        blocked_result = BattleService.resolve_player_action_block!(player, battle)
+        if blocked_result
+          if blocked_result.status == :defeated
+            redirect_to game_path(panel: "inn"), alert: blocked_result.message
+          elsif blocked_result.status == :error
+            redirect_to game_path(panel: "equipment"), alert: blocked_result.message
+          else
+            redirect_to game_path(battle_command: "attack"), notice: blocked_result.message
+          end
+          return
+        end
+      end
+
       unless weapon
         redirect_to game_path(panel: "equipment"), alert: "その武器は所持していません。"
         return
@@ -430,7 +444,22 @@ module Game
 
     def equip_armor
       player = current_player
+      battle = current_battle
       armor = player.armors.find_by(id: params[:armor_id])
+
+      if battle
+        blocked_result = BattleService.resolve_player_action_block!(player, battle)
+        if blocked_result
+          if blocked_result.status == :defeated
+            redirect_to game_path(panel: "inn"), alert: blocked_result.message
+          elsif blocked_result.status == :error
+            redirect_to game_path(panel: "equipment"), alert: blocked_result.message
+          else
+            redirect_to game_path(battle_command: "attack"), notice: blocked_result.message
+          end
+          return
+        end
+      end
 
       unless armor
         redirect_to game_path(panel: "equipment"), alert: "その防具は所持していません。"

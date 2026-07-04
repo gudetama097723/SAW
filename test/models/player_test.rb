@@ -62,11 +62,34 @@ class PlayerTest < ActiveSupport::TestCase
 
     StatusEffectService.accumulate!(player, "poison", 100)
     assert StatusEffectService.active?(player, "poison")
+    assert_nil player.status_value_data["poison"]
 
     player.advance_time!(10)
 
     assert_equal 90, player.hp
-    assert_operator player.status_value_data["poison"], :<, 100
+    assert_nil player.status_value_data["poison"]
+  end
+
+  test "active status does not keep accumulating or immediately reactivate after ending" do
+    player = players(:one)
+    player.update!(status_values: "{}", status_effects: "{}")
+
+    StatusEffectService.accumulate!(player, "paralysis", 100)
+    assert StatusEffectService.active?(player, "paralysis")
+    assert_nil player.status_value_data["paralysis"]
+
+    StatusEffectService.accumulate!(player, "paralysis", 100)
+    assert_nil player.status_value_data["paralysis"]
+
+    player.status_effects = { paralysis: { active: true, turns: 1 } }.to_json
+    message = StatusEffectService.action_blocked_message!(player)
+
+    assert_includes message, "麻痺が解けた"
+    assert_not StatusEffectService.active?(player, "paralysis")
+
+    StatusEffectService.accumulate!(player, "paralysis", 1)
+    assert_not StatusEffectService.active?(player, "paralysis")
+    assert_equal 1, player.status_value_data["paralysis"]
   end
 
   test "sleep value rises after fifteen awake hours" do
@@ -85,15 +108,24 @@ class PlayerTest < ActiveSupport::TestCase
     player.advance_time!(60)
 
     assert StatusEffectService.active?(player, "sleep")
+    assert_equal 50, player.status_value_data["sleep"]
     assert_equal "限界だ……", player.sleepiness_warning_message
+  end
+
+  test "sleep activation leaves reduced sleep value until proper rest" do
+    player = players(:one)
+    player.update!(status_values: { sleep: 120 }.to_json, status_effects: "{}")
+
+    StatusEffectService.activate!(player, "sleep")
+
+    assert StatusEffectService.active?(player, "sleep")
+    assert_equal 60, player.status_value_data["sleep"]
   end
 
   test "rest recovery reduces recoverable status values by ten percent and clears low values" do
     player = players(:one)
     player.status_values = { poison: 50, burn: 4, curse: 50 }.to_json
-    StatusEffectService.activate!(player, "poison")
-    StatusEffectService.activate!(player, "burn")
-    StatusEffectService.activate!(player, "curse")
+    player.status_effects = { poison: true, burn: true, curse: true }.to_json
 
     StatusEffectService.rest_recover_values!(player)
 
@@ -117,7 +149,11 @@ class PlayerTest < ActiveSupport::TestCase
     player = players(:one)
     home_location = Location.create!(name: "本拠地の宿町", floor: 3, danger_level: 0, safe_area: true)
     player.player_bases.create!(location: home_location, base_type: "home", active: true, rent: 0, storage_limit: 30)
-    player.update!(hp: 1, max_hp: 100, col: 50, floor: 9, location: locations(:one), field_route: routes(:one), field_position: 42)
+    player.update!(hp: 1, max_hp: 100, col: 50, floor: 9, location: locations(:one), field_route: routes(:one), field_position: 42, awake_minutes_since_sleep: 20 * 60)
+    player.status_values = { poison: 100, curse: 100, sleep: 90 }.to_json
+    StatusEffectService.activate!(player, "poison")
+    StatusEffectService.activate!(player, "curse")
+    player.save!
     mob = Mob.create!(name: "強敵", hp: 10, atk: 100, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 1)
     battle = player.battles.create!(mob: mob, enemy_hp: 10)
 
@@ -128,6 +164,10 @@ class PlayerTest < ActiveSupport::TestCase
     assert_equal home_location, player.location
     assert_equal 3, player.floor
     assert_equal 0, player.col
+    assert_equal 100, player.hp
+    assert_empty player.status_value_data
+    assert_empty player.status_effect_data
+    assert_equal 0, player.awake_minutes_since_sleep
     assert_nil player.field_route
     assert_equal 0, player.field_position
     assert_not Battle.exists?(battle.id)

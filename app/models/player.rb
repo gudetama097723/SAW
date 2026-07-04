@@ -136,6 +136,8 @@ def reset_sleep_deprivation!
 end
 
 def sleepiness_warning_message
+  return "限界だ……" if StatusEffectService.active?(self, "sleep")
+
   value = status_value_data["sleep"].to_f
   return "限界だ……" if value >= 100
   return "このままでは倒れてしまう。" if value >= 95

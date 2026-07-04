@@ -68,6 +68,29 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_equal "武器を装備していないため、ソードスキルは使用できません。", flash[:alert]
   end
 
+  test "paralysis blocks battle item escape and equipment actions" do
+    mob = Mob.create!(name: "麻痺操作不能テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = @player.battles.create!(mob: mob, enemy_hp: 10)
+    potion = @player.items.create!(name: "ポーション", category: "healing", quantity: 1)
+    weapon = @player.weapons.create!(name: "麻痺中装備テスト剣", weapon_type: "片手直剣", rarity: "common", attack_power: 1, durability: 10, max_durability: 10)
+    @player.update!(status_effects: { paralysis: { active: true, turns: 3 } }.to_json)
+
+    post use_battle_item_path, params: { item_name: "ポーション" }
+    assert_redirected_to game_path(battle_command: "item")
+    assert_equal 1, potion.reload.quantity
+    assert_includes flash[:notice], "麻痺して動けない"
+
+    post escape_path
+    assert_redirected_to game_path
+    assert Battle.exists?(battle.id)
+    assert_includes flash[:notice], "麻痺して動けない"
+
+    post equip_weapon_path, params: { weapon_id: weapon.id }
+    assert_redirected_to game_path(battle_command: "attack")
+    assert_not weapon.reload.equipped?
+    assert_includes flash[:notice], "麻痺が解けた"
+  end
+
   test "inn panel only shows facility npcs" do
     @player.town_discovery_for.update!(found_inn: true)
     town_guide = Npc.create!(

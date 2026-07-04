@@ -98,6 +98,12 @@ module Game
         return
       end
 
+      blocked_result = BattleService.resolve_player_action_block!(player, battle)
+      if blocked_result
+        redirect_with_result(blocked_result, battle_command: "item")
+        return
+      end
+
       unless params[:item_name].in?(["ポーション", *ItemService::STATUS_CURE_ITEMS.keys])
         redirect_to game_path(battle_command: "item"), alert: "そのアイテムはまだ使用できません。"
         return
@@ -174,6 +180,12 @@ module Game
 
       unless battle
         redirect_to game_path, alert: "戦闘中ではありません。"
+        return
+      end
+
+      blocked_result = BattleService.resolve_player_action_block!(player, battle)
+      if blocked_result
+        redirect_with_result(blocked_result, battle_command: params[:battle_command].presence)
         return
       end
 

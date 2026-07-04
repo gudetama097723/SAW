@@ -73,6 +73,49 @@ class FieldServiceTest < ActiveSupport::TestCase
     assert_equal 72, FieldService.field_encounter_chance(40, player)
   end
 
+  test "mapping gain is lower in dangerous areas" do
+    player = players(:one)
+    route = routes(:one)
+    area = field_areas(:one)
+    route.update!(danger_level: 20)
+    player.skills.destroy_all
+    player.update!(field_route: route, field_position: area.start_distance, current_time: 12 * 60)
+
+    FieldService.singleton_class.define_method(:rand) { |arg = nil| arg.is_a?(Range) ? arg.end : 99 }
+    begin
+      area.update!(encounter_rate: 20)
+      safe_gain = FieldService.mapping_gain_for(0, player, route)
+
+      area.update!(encounter_rate: 60)
+      danger_gain = FieldService.mapping_gain_for(0, player, route)
+
+      assert_operator danger_gain, :<, safe_gain
+    ensure
+      FieldService.singleton_class.remove_method(:rand)
+    end
+  end
+
+  test "night reduces mapping gain even in safer areas" do
+    player = players(:one)
+    route = routes(:one)
+    area = field_areas(:one)
+    route.update!(danger_level: 20)
+    area.update!(encounter_rate: 20)
+    player.skills.destroy_all
+    player.update!(field_route: route, field_position: area.start_distance, current_time: 22 * 60)
+
+    FieldService.singleton_class.define_method(:rand) { |arg = nil| arg.is_a?(Range) ? arg.end : 99 }
+    begin
+      night_gain = FieldService.mapping_gain_for(0, player, route)
+      player.update!(current_time: 12 * 60)
+      day_gain = FieldService.mapping_gain_for(0, player, route)
+
+      assert_operator night_gain, :<, day_gain
+    ensure
+      FieldService.singleton_class.remove_method(:rand)
+    end
+  end
+
   test "night raises roaming enemy levels" do
     player = players(:one)
     route = routes(:one)
@@ -82,6 +125,26 @@ class FieldServiceTest < ActiveSupport::TestCase
     player.update!(field_route: route, current_time: 23 * 60)
 
     assert_equal 6, FieldService.enemy_level_for(player, mob)
+  end
+
+  test "starting grassland enemy levels follow mob identity" do
+    player = players(:one)
+    route = routes(:one)
+    route.update!(name: "はじまりの草原")
+    player.update!(field_route: route, current_time: 12 * 60)
+
+    slime = mobs(:one)
+    slime.update!(name: "スライム", level: 1)
+    scout = mobs(:two)
+    scout.update!(name: "コボルド斥候", rarity: "rare", level: 3)
+
+    FieldService.singleton_class.define_method(:rand) { |*| 0 }
+    begin
+      assert_equal 1, FieldService.enemy_level_for(player, slime)
+      assert_equal 3, FieldService.enemy_level_for(player, scout)
+    ensure
+      FieldService.singleton_class.remove_method(:rand)
+    end
   end
 
   test "field bosses are not level based" do
