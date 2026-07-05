@@ -51,6 +51,20 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_includes result.message, "武器を装備していないため、ソードスキルは使用できません。"
   end
 
+  test "area attack can target arbitrary selected enemy ids" do
+    player = players(:one)
+    mob = Mob.create!(name: "複数選択テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 10)
+    first = battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 1)
+    second = battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 2)
+    third = battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 3)
+
+    targets = BattleService.target_enemies_for(battle, nil, nil, true, "#{first.id},#{third.id}")
+
+    assert_equal [first.id, third.id], targets.map(&:id)
+    assert_not_includes targets.map(&:id), second.id
+  end
+
   test "enemy with flee rate can flee instead of attacking" do
     player = players(:one)
     player.update!(hp: 100, max_hp: 100)
@@ -97,5 +111,26 @@ class BattleServiceTest < ActiveSupport::TestCase
     ensure
       BattleService.singleton_class.remove_method(:rand)
     end
+  end
+
+  test "experience uses base reward and level gap only" do
+    player = players(:one)
+    player.update!(level: 1, exp: 0)
+    mob = Mob.create!(name: "経験値計算mob", hp: 10, atk: 1, rarity: "normal", level: 3, agility: 1, durability: 1, exp_reward: 40, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 10)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 3, position: 1)
+
+    assert_equal 52, BattleService.adjusted_exp_reward(player, enemy)
+  end
+
+  test "mob defeat drops can be filtered by enemy level" do
+    mob = Mob.create!(name: "スライム", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 8, flee_rate: 0)
+
+    low_level_names = MobDropCatalog.definitions_for(mob, enemy_level: 3).map(&:item_name)
+    high_level_names = MobDropCatalog.definitions_for(mob, enemy_level: 16).map(&:item_name)
+
+    assert_includes low_level_names, "スライムの粘液"
+    assert_not_includes low_level_names, "スライムコア"
+    assert_includes high_level_names, "スライムコア"
   end
 end

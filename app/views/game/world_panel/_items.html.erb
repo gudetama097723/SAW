@@ -49,9 +49,9 @@
 
                 <p class="mb-1">種別: <%= weapon.weapon_type %></p>
                 <p class="mb-1">レアリティ: <%= weapon.rarity %></p>
-                <p class="mb-1">攻撃力: <%= weapon.attack_power %>（強化込み <%= weapon.effective_attack_power %>）</p>
+                <p class="mb-1">攻撃力: <%= weapon.effective_attack_power %>（本来 <%= weapon.base_effective_attack_power %>）</p>
                 <p class="mb-1">強化: +<%= weapon.enhancement_level.to_i %> / <%= Weapon::MAX_ENHANCEMENT_LEVEL %></p>
-                <p class="mb-1">耐久力: <%= weapon.durability %>/<%= weapon.max_durability %></p>
+                <p class="mb-1">耐久力: <%= weapon.durability %>/<%= weapon.max_durability %>（<%= weapon.durability_condition_label %> / 攻撃力 <%= (weapon.durability_attack_multiplier * 100).to_i %>%）</p>
                 <p class="mb-1">攻撃属性: <%= weapon.attack_attribute_list.join(" / ") %></p>
                 <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
                 <p class="mb-1">部位破壊力: <%= weapon.effective_part_break_power %>%</p>

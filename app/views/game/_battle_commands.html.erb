@@ -15,6 +15,7 @@
       <% if equipped_weapon %>
         <%= link_to "スキル", game_path(battle_command: "sword_skill"), class: "btn btn-outline-danger w-100" %>
       <% end %>
+      <%= link_to "装備", game_path(battle_command: "weapon"), class: "btn btn-outline-info w-100" %>
       <%= link_to "アイテム", game_path(battle_command: "item"), class: "btn btn-outline-success w-100" %>
       <%= button_to "逃走", escape_path, method: :post, class: "btn btn-outline-light w-100" %>
     </div>
@@ -59,11 +60,11 @@
       <% end %>
       <% if battle_enemies.many? %>
         <h5>攻撃対象</h5>
-        <div class="d-grid gap-2">
+        <div class="battle-target-grid mb-3">
           <% battle_enemies.each do |enemy| %>
             <%= link_to "#{enemy.position}. #{enemy.display_name} HP #{enemy.enemy_hp}/#{enemy.effective_max_hp}",
                 game_path(battle_command: "attack", attack_group: selected_attack_group, target_enemy_id: enemy.id, attack_attribute: selected_attack_attribute),
-                class: enemy == selected_enemy ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
+                class: enemy == selected_enemy ? "battle-target-card battle-target-card-active" : "battle-target-card" %>
           <% end %>
         </div>
       <% end %>
@@ -130,14 +131,14 @@
         <% selected_group = battle_enemies.select { |enemy| enemy.position >= group_start && enemy.position < group_start + 4 }.first(4) %>
         <% if battle_enemies.many? %>
           <h6>攻撃グループ</h6>
-          <div class="d-grid gap-2 mb-3">
+          <div class="battle-target-grid mb-3">
             <% battle_enemies.each_with_index do |enemy, index| %>
               <% group = battle_enemies[index, 4] || [] %>
               <% next if group.empty? %>
               <% names = group.map { |group_enemy| "#{group_enemy.position}.#{group_enemy.mob.name}" }.join(" / ") %>
               <%= link_to names,
                   game_path(battle_command: "sword_skill", skill_group: "sword_skill", selected_skill: selected_skill, group_start: enemy.position),
-                  class: enemy.position == group_start ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
+                  class: enemy.position == group_start ? "battle-target-card battle-target-card-danger battle-target-card-active" : "battle-target-card battle-target-card-danger" %>
             <% end %>
           </div>
         <% end %>
@@ -167,11 +168,11 @@
       <% else %>
         <% if battle_enemies.many? %>
           <h6>攻撃対象</h6>
-          <div class="d-grid gap-2 mb-3">
+          <div class="battle-target-grid mb-3">
             <% battle_enemies.each do |enemy| %>
               <%= link_to "#{enemy.position}. #{enemy.display_name} HP #{enemy.enemy_hp}/#{enemy.effective_max_hp}",
                   game_path(battle_command: "sword_skill", skill_group: "sword_skill", selected_skill: selected_skill, target_enemy_id: enemy.id),
-                  class: enemy == selected_enemy ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
+                  class: enemy == selected_enemy ? "battle-target-card battle-target-card-danger battle-target-card-active" : "battle-target-card battle-target-card-danger" %>
             <% end %>
           </div>
         <% end %>
@@ -200,11 +201,11 @@
     <h5>武器を装備</h5>
     <% if available_weapons.any? %>
       <p>武器を装備しますか？ 装備変更には1ターン消費します。</p>
-      <div class="d-grid gap-2">
+      <div class="battle-target-grid">
         <% available_weapons.each do |weapon| %>
-          <div class="border rounded p-2">
+          <div class="battle-equipment-card">
             <p class="mb-1"><%= weapon.display_name %></p>
-            <p class="mb-1">攻撃力: <%= weapon.attack_power %> / 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %></p>
+            <p class="mb-1">攻撃力: <%= weapon.effective_attack_power %>（本来 <%= weapon.base_effective_attack_power %>） / 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %>（<%= weapon.durability_condition_label %>）</p>
             <% if weapon.effective_part_break_power > 100 %>
               <p class="mb-1">特性: 部位破壊率が高い</p>
             <% end %>
@@ -212,10 +213,11 @@
             <%= button_to "装備する", equip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-info w-100" %>
           </div>
         <% end %>
-        <%= link_to "変更しない", game_path(battle_command: "attack"), class: "btn btn-outline-light w-100" %>
       </div>
+      <%= link_to "変更しない", game_path, class: "btn btn-outline-light w-100 mt-3" %>
     <% else %>
       <p class="mb-0">装備できる武器がありません。通常攻撃または逃走を選択してください。</p>
+      <%= link_to "戻る", game_path, class: "btn btn-outline-light w-100 mt-3" %>
     <% end %>
   <% elsif battle_command == "item" %>
     <h5>アイテム</h5>

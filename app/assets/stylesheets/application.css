@@ -241,6 +241,110 @@
   color: rgba(248, 249, 250, 0.62) !important;
 }
 
+.battle-status-card .card-body,
+.battle-enemy-panel .card-body {
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.battle-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.battle-status-strip {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(220px, 1.4fr) minmax(140px, 1fr) minmax(180px, 1.2fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.battle-status-hp {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.battle-status-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.battle-command-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.15fr) minmax(220px, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.battle-command-card {
+  min-height: 18rem;
+}
+
+.battle-hp-bar {
+  height: 0.8rem;
+}
+
+.battle-enemy-grid,
+.battle-target-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.65rem;
+}
+
+.battle-enemy-card,
+.battle-target-card,
+.battle-equipment-card {
+  display: block;
+  min-height: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  color: #f8f9fa;
+  text-decoration: none;
+}
+
+.battle-target-card:hover {
+  border-color: #ffc107;
+  color: #fff8db;
+  background: rgba(255, 193, 7, 0.14);
+}
+
+.battle-enemy-card:hover {
+  border-color: #ffc107;
+  color: #fff8db;
+  background: rgba(255, 193, 7, 0.12);
+}
+
+.battle-target-card-danger:hover {
+  border-color: #dc3545;
+  color: #ffe5e8;
+  background: rgba(220, 53, 69, 0.16);
+}
+
+.battle-target-card-active {
+  border-color: #ffc107;
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.28);
+  background: rgba(255, 193, 7, 0.18);
+}
+
+.battle-target-card-danger.battle-target-card-active {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.32);
+  background: rgba(220, 53, 69, 0.2);
+}
+
+@media (max-width: 991.98px) {
+  .battle-status-strip,
+  .battle-command-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-command-card {
+    min-height: auto;
+  }
+}
+
 @keyframes levelup-glow {
   0%   { text-shadow: 0 0 4px #ffd700; }
   50%  { text-shadow: 0 0 14px #ffd700, 0 0 28px #ff8c00; }

@@ -17,36 +17,115 @@ class ExplorationRewardService
 
     message = apply_reward!(player, treasure_chest.reward)
     state.update!(opened: true, opened_at: Time.current)
-    Result.new(status: :ok, message: "#{treasure_chest.name}を開けた。#{message}")
+    Result.new(status: :ok, message: "#{treasure_chest.name}を#{treasure_chest.requires_inspection? ? "開けた" : "回収した"}。#{message}")
   end
 
-def self.treasure_inspection_message(player, treasure_chest)
-  case treasure_chest.hazard_type
-  when "mimic"
-    threshold = 50 + ((player.effective_level - treasure_chest.hazard_level.to_i) * 10)
-    threshold = threshold.clamp(10, 90)
-    rand(100) < threshold ? "#{treasure_chest.name}??????????????????" : "#{treasure_chest.name}??????????????????"
-  when "trap"
-    threshold = 45 + ((player.effective_level - treasure_chest.hazard_level.to_i) * 8)
-    threshold = threshold.clamp(10, 85)
-    rand(100) < threshold ? "#{treasure_chest.name}?????????????" : "#{treasure_chest.name}??????????????????"
-  else
-    "#{treasure_chest.name}???????????????"
-  end
-end
+  def self.inspect_treasure!(player, treasure_chest)
+    state = player.player_treasure_chests.find_or_create_by!(treasure_chest: treasure_chest)
+    return Result.new(status: :error, message: "その宝箱はまだ発見していません。") unless state.found?
+    return Result.new(status: :error, message: "その宝箱はすでに開封済みです。") if state.opened? && !treasure_chest.respawnable?
+    unless treasure_chest.requires_inspection?
+      return Result.new(status: :ok, message: "#{treasure_chest.name}は宝箱ではなさそうだ。すぐ回収できる。")
+    end
 
-def self.treasure_hazard_message(treasure_chest, inspected: false)
-  case treasure_chest.hazard_type
-  when "mimic"
-    inspected ? "????????????" : "???????????"
-  when "trap"
-    inspected ? "????????????" : "???????"
-  else
-    ""
+    message = treasure_inspection_message(player, treasure_chest)
+    state.update!(inspected: true, inspection_result: message)
+    Result.new(status: :ok, message: message)
   end
-end
 
-def self.start_boss_battle!(player, mob)
+  def self.use_treasure_skill!(player, treasure_chest, skill_name)
+    state = player.player_treasure_chests.find_or_create_by!(treasure_chest: treasure_chest)
+    return Result.new(status: :error, message: "その宝箱はまだ発見していません。") unless state.found?
+    return Result.new(status: :error, message: "その宝箱はすでに開封済みです。") if state.opened? && !treasure_chest.respawnable?
+    return Result.new(status: :error, message: "#{treasure_chest.name}には使えるスキルがありません。") unless treasure_chest.requires_inspection?
+
+    skill = treasure_skill_for(player, skill_name)
+    return Result.new(status: :error, message: "使用できるスキルを習得していません。") unless skill
+
+    message = treasure_inspection_message(player, treasure_chest, skill: skill)
+    state.update!(inspected: true, inspection_result: message)
+    Result.new(status: :ok, message: message)
+  end
+
+  def self.ignore_treasure!(player, treasure_chest)
+    state = player.player_treasure_chests.find_or_create_by!(treasure_chest: treasure_chest)
+    return Result.new(status: :error, message: "その宝箱はまだ発見していません。") unless state.found?
+    return Result.new(status: :error, message: "その宝箱はすでに開封済みです。") if state.opened? && !treasure_chest.respawnable?
+
+    state.update!(ignored: true)
+    Result.new(status: :ok, message: "#{treasure_chest.name}には手を出さず、場所だけ覚えておいた。")
+  end
+
+  def self.treasure_inspection_message(player, treasure_chest, skill: nil)
+    threshold = treasure_inspection_threshold(player, treasure_chest, skill)
+    success = rand(100) < threshold
+    skill_message = award_treasure_skill_exp!(skill)
+
+    result =
+      case treasure_chest.hazard_type
+      when "mimic"
+        if success
+          "#{treasure_chest.name}を調べた。箱の内側から、生き物のような気配がする。"
+        else
+          "#{treasure_chest.name}を調べた。普通の箱に見えるが、どこか落ち着かない。"
+        end
+      when "trap"
+        if success
+          "#{treasure_chest.name}を調べた。留め具の奥に罠の仕掛けを見つけた。"
+        else
+          "#{treasure_chest.name}を調べた。少し違和感はあるが、仕掛けまでは見抜けない。"
+        end
+      else
+        "#{treasure_chest.name}を調べた。危険な仕掛けはなさそうだ。"
+      end
+
+    "#{result}#{skill_message}"
+  end
+
+  def self.treasure_inspection_threshold(player, treasure_chest, skill)
+    base =
+      case treasure_chest.hazard_type
+      when "mimic"
+        50 + ((player.effective_level - treasure_chest.hazard_level.to_i) * 10)
+      when "trap"
+        45 + ((player.effective_level - treasure_chest.hazard_level.to_i) * 8)
+      else
+        100
+      end
+    skill_bonus = skill ? (10 + (skill.proficiency.to_i / 50)).clamp(10, 30) : 0
+    (base + skill_bonus).clamp(10, 95)
+  end
+
+  def self.treasure_skill_for(player, skill_name)
+    usable_names = ["探索"]
+    requested_name = skill_name.presence
+    requested_name = usable_names.first unless requested_name.in?(usable_names)
+    player.skills.find_by(name: requested_name)
+  end
+
+  def self.award_treasure_skill_exp!(skill)
+    return "" unless skill
+
+    growth = SkillGrowthCatalog.find(skill.name)
+    before = skill.proficiency.to_i
+    skill.gain_skill_exp!(growth.use_exp, growth_scale: growth.growth_scale)
+    suffix = " 探索スキルを使って確認した。"
+    suffix += " 探索の熟練度が#{skill.proficiency}に上がった。" if skill.proficiency.to_i > before
+    suffix
+  end
+
+  def self.treasure_hazard_message(treasure_chest, inspected: false)
+    case treasure_chest.hazard_type
+    when "mimic"
+      inspected ? "ミミックの気配がある。" : "不穏な気配がある。"
+    when "trap"
+      inspected ? "罠の仕掛けがある。" : "違和感がある。"
+    else
+      ""
+    end
+  end
+
+  def self.start_boss_battle!(player, mob)
 
     state = player.player_boss_kills.find_or_create_by!(mob: mob)
     return Result.new(status: :error, message: "そのボスはまだ発見していません。") unless state.found?
@@ -68,7 +147,11 @@ def self.start_boss_battle!(player, mob)
   end
 
   def self.discovered_treasures(player)
-    player.player_treasure_chests.includes(:treasure_chest).where(found: true, opened: false).map(&:treasure_chest)
+    discovered_treasure_states(player).map(&:treasure_chest)
+  end
+
+  def self.discovered_treasure_states(player)
+    player.player_treasure_chests.includes(:treasure_chest).where(found: true, opened: false, ignored: false)
   end
 
   def self.discovered_bosses(player)

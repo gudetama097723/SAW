@@ -127,7 +127,7 @@ class FieldServiceTest < ActiveSupport::TestCase
     assert_equal 6, FieldService.enemy_level_for(player, mob)
   end
 
-  test "starting grassland enemy levels follow mob identity" do
+  test "spawn rows define enemy level ranges" do
     player = players(:one)
     route = routes(:one)
     route.update!(name: "はじまりの草原")
@@ -135,26 +135,50 @@ class FieldServiceTest < ActiveSupport::TestCase
 
     slime = mobs(:one)
     slime.update!(name: "スライム", level: 1)
-    scout = mobs(:two)
-    scout.update!(name: "コボルド斥候", rarity: "rare", level: 3)
+    entry = { mob: slime, weight: 1, min_level: 1, max_level: 3 }
 
-    FieldService.singleton_class.define_method(:rand) { |*| 0 }
+    FieldService.singleton_class.define_method(:rand) { |arg = nil| arg.is_a?(Range) ? arg.end : 0 }
     begin
-      assert_equal 1, FieldService.enemy_level_for(player, slime)
-      assert_equal 3, FieldService.enemy_level_for(player, scout)
+      assert_equal 3, FieldService.spawn_level_for(entry, player, slime)
     ensure
       FieldService.singleton_class.remove_method(:rand)
     end
   end
 
-  test "field bosses are not level based" do
+  test "battle creation applies per-stat mob growth" do
+    player = players(:one)
+    route = routes(:one)
+    player.update!(field_route: route, current_time: 12 * 60)
     mob = mobs(:one)
-    mob.update!(boss_type: "field_boss", level: 14)
-    battle = battles(:one)
-    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 100, enemy_max_hp: 100, enemy_level: 14, position: 1)
+    mob.update!(hp: 10, atk: 4, agility: 2, durability: 1, level: 1, hp_growth: 3, atk_growth: 2, agility_growth: 1, durability_growth: 0)
 
-    assert_not enemy.level_based?
-    assert_equal mob.name, enemy.display_name
-    assert_equal 100, enemy.effective_max_hp
+    battle = FieldService.create_battle!(player, [FieldService::Encounter.new(mob: mob, level: 4)])
+    enemy = battle.battle_enemies.first
+
+    assert_equal 4, enemy.effective_level
+    assert_equal 19, enemy.effective_max_hp
+    assert_equal 10, enemy.effective_atk
+    assert_equal 5, enemy.effective_agility
+    assert_equal 1, enemy.effective_durability
+  end
+
+  test "field bosses use the same level based display and stats" do
+    mob = mobs(:one)
+    mob.update!(boss_type: "field_boss", hp: 100, hp_growth: 10, level: 14)
+    battle = battles(:one)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 230, enemy_max_hp: 230, enemy_level: 14, position: 1)
+
+    assert enemy.level_based?
+    assert_equal "#{mob.name} Lv14", enemy.display_name
+    assert_equal 230, enemy.effective_max_hp
+  end
+
+  test "boss levels come from csv level without time bonus" do
+    player = players(:one)
+    mob = mobs(:one)
+    mob.update!(boss_type: "field_boss", level: 12)
+    player.update!(current_time: 23 * 60)
+
+    assert_equal 12, FieldService.enemy_level_for(player, mob)
   end
 end

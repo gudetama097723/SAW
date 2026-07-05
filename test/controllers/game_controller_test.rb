@@ -68,6 +68,42 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_equal "武器を装備していないため、ソードスキルは使用できません。", flash[:alert]
   end
 
+  test "battle command links keep selected single enemy target" do
+    mob = Mob.create!(name: "対象保持テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = @player.battles.create!(mob: mob, enemy_hp: 10)
+    BattleService.ensure_battle_enemies!(battle)
+    left_enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 2)
+
+    get game_path, params: { target_enemy_id: left_enemy.id }
+
+    assert_response :success
+    assert_match(/target_enemy_id=#{left_enemy.id}.*battle_command=battle|battle_command=battle.*target_enemy_id=#{left_enemy.id}/, response.body)
+  end
+
+  test "area skill selection shows limit warning" do
+    mob = Mob.create!(name: "範囲選択上限テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = @player.battles.create!(mob: mob, enemy_hp: 10)
+    @player.weapons.create!(name: "範囲選択テスト剣", weapon_type: "片手直剣", rarity: "common", attack_power: 1, durability: 10, max_durability: 10, equipped: true)
+    @player.skills.create!(name: "片手直剣", proficiency: 50, skill_exp: 0, skill_category: "weapon", weapon_skill: true)
+    BattleService.ensure_battle_enemies!(battle)
+    enemies = battle.battle_enemies.to_a
+    4.times do |index|
+      enemies << battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: index + 2)
+    end
+
+    get game_path, params: {
+      battle_command: "sword_skill",
+      skill_group: "sword_skill",
+      selected_skill: "horizontal",
+      target_enemy_ids: enemies.first(4).map(&:id).join(","),
+      selection_error: "too_many"
+    }
+
+    assert_response :success
+    assert_includes response.body, "これ以上選択できません。"
+    assert_includes response.body, "選択中: 4 / 4"
+  end
+
   test "paralysis blocks battle item escape and equipment actions" do
     mob = Mob.create!(name: "麻痺操作不能テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
     battle = @player.battles.create!(mob: mob, enemy_hp: 10)
@@ -202,6 +238,25 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to game_path
     assert_equal "別場所NPCには今は話しかけられません。", flash[:alert]
     assert_equal 1, @player.npc_discoveries.find_by!(npc: npc).affinity
+  end
+
+  test "npc info shows one dialogue line at a time" do
+    npc = Npc.create!(
+      code: "controller_info_npc",
+      name: "情報NPC",
+      placement_type: "town",
+      location: @location,
+      discovery_rate: 100
+    )
+    npc.npc_dialogues.create!(dialogue_type: "info", sequence: 1, text: "一つ目の情報")
+    npc.npc_dialogues.create!(dialogue_type: "info", sequence: 2, text: "二つ目の情報")
+    @player.npc_discoveries.create!(npc: npc, currently_available: true, acquainted: true, affinity: 1)
+
+    post npc_info_path, params: { npc_id: npc.id }
+
+    assert_redirected_to game_path(panel: "npc_menu", npc_id: npc.id)
+    assert_equal 1, flash[:notice].scan("情報NPC「").size
+    assert_not_includes flash[:notice], "」 / 情報NPC「"
   end
 
   test "rare npc becomes unavailable after conversation action" do

@@ -1,5 +1,6 @@
 class FieldService
   Result = Struct.new(:status, :message, :battle, keyword_init: true)
+  Encounter = Struct.new(:mob, :level, keyword_init: true)
   REQUIRED_MAPPING_TO_REACH_DESTINATION = 30
   ROAMING_AREA_BOSS_ENCOUNTER_RATE = 5
   TIME_PERIOD_MODIFIERS = {
@@ -211,17 +212,19 @@ class FieldService
   end
 
   def self.create_battle!(player, mobs, ambush: false)
-    mobs = Array(mobs).compact
-    first_mob = mobs.first
+    encounters = Array(mobs).compact.map { |entry| normalize_encounter(entry, player) }.compact
+    first_mob = encounters.first&.mob
     return unless first_mob
 
     player.battles.destroy_all
     BuffEffectService.clear_battle_effects!(player)
     player.save!
-    battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp, ambush: ambush)
-    mobs.first(5).each.with_index(1) do |mob, position|
-      enemy_level = enemy_level_for(player, mob)
-      enemy_max_hp = scaled_mob_value(mob.hp, enemy_level)
+    first_level = encounters.first.level
+    battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp_for_level(first_level), ambush: ambush)
+    encounters.first(5).each.with_index(1) do |encounter, position|
+      mob = encounter.mob
+      enemy_level = encounter.level
+      enemy_max_hp = mob.hp_for_level(enemy_level)
       battle.battle_enemies.create!(
         battle_enemy_attributes(
           mob: mob,
@@ -236,44 +239,14 @@ class FieldService
   end
 
   def self.enemy_level_for(context, mob)
-    return 1 unless mob&.level_based?
+    return 1 unless mob
 
-    route = field_context(context)
-    bonus = time_period_modifier_for(context, :level_bonus).to_i
-    base_level =
-      if route&.name == "はじまりの草原"
-        starting_grassland_enemy_level(mob)
-      else
-        [mob.level.to_i, 1].max
-      end
-
-    [base_level + bonus, 1].max
+    bonus = mob.boss? ? 0 : time_period_modifier_for(context, :level_bonus).to_i
+    [[mob.level.to_i, 1].max + bonus, 1].max
   end
 
-  def self.scaled_mob_value(base, enemy_level)
-    base_value = [base.to_i, 1].max
-    multiplier = 1.0 + (([enemy_level.to_i, 1].max - 1) * 0.25)
-    (base_value * multiplier).round
-  end
-
-  def self.starting_grassland_enemy_level(mob)
-    base_level = [mob.level.to_i, 1].max
-    roll = rand(100)
-
-    case mob.name
-    when "スライム"
-      roll < 85 ? 1 : 2
-    when "ホーンラビット"
-      roll < 65 ? 1 : 2
-    when "フォレストワスプ"
-      roll < 80 ? 2 : 3
-    when "コボルド歩哨"
-      roll < 60 ? 2 : 3
-    when "変異スライム", "ワイルドボア", "コボルド斥候"
-      roll < 20 ? [base_level, 2].max : [base_level, 3].max
-    else
-      base_level
-    end
+  def self.scaled_mob_value(base, _enemy_level)
+    [base.to_i, 1].max
   end
 
   def self.battle_enemy_attributes(mob:, enemy_hp:, enemy_max_hp:, enemy_level:, position:)
@@ -320,9 +293,9 @@ class FieldService
     roll = rand(total_weight)
     entries.each do |entry|
       roll -= entry[:weight]
-      return entry[:mob] if roll < 0
+      return encounter_for_entry(entry, context) if roll < 0
     end
-    entries.last[:mob]
+    encounter_for_entry(entries.last, context)
   end
 
   def self.encounter_entries_for(context)
@@ -333,8 +306,36 @@ class FieldService
       weight = row["weight"].to_i
       next unless mob && weight.positive?
 
-      { mob: mob, weight: weight }
+      {
+        mob: mob,
+        weight: weight,
+        min_level: row["min_level"].presence&.to_i,
+        max_level: row["max_level"].presence&.to_i
+      }
     end
+  end
+
+  def self.encounter_for_entry(entry, context)
+    mob = entry[:mob]
+    Encounter.new(mob: mob, level: spawn_level_for(entry, context, mob))
+  end
+
+  def self.spawn_level_for(entry, context, mob)
+    fallback = [mob.level.to_i, 1].max
+    min_level = [entry[:min_level] || fallback, 1].max
+    max_level = [entry[:max_level] || min_level, min_level].max
+    base_level = min_level == max_level ? min_level : rand(min_level..max_level)
+    [base_level + time_period_modifier_for(context, :level_bonus).to_i, 1].max
+  end
+
+  def self.normalize_encounter(entry, context)
+    return entry if entry.is_a?(Encounter)
+
+    mob = entry.respond_to?(:mob) ? entry.mob : entry
+    return unless mob
+
+    level = entry.respond_to?(:level) && entry.level.present? ? entry.level.to_i : enemy_level_for(context, mob)
+    Encounter.new(mob: mob, level: [level, 1].max)
   end
 
   def self.mob_spawn_rows

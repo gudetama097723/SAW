@@ -12,4 +12,8 @@ class TreasureChest < ApplicationRecord
   rescue JSON::ParserError
     {}
   end
+
+  def requires_inspection?
+    name.to_s.include?("箱")
+  end
 end

@@ -66,19 +66,25 @@ module Game
       redirect_with_result(result)
     end
 
-  def inspect_treasure
-    treasure = TreasureChest.find_by(id: params[:treasure_chest_id])
-    result = treasure ? ExplorationRewardService.inspect_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "その宝箱は見つかりません。")
-    redirect_with_result(result)
-  end
+    def inspect_treasure
+      treasure = TreasureChest.find_by(id: params[:treasure_chest_id])
+      result = treasure ? ExplorationRewardService.inspect_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "その宝箱は見つかりません。")
+      redirect_with_result(result)
+    end
 
-  def ignore_treasure
-    treasure = TreasureChest.find_by(id: params[:treasure_chest_id])
-    result = treasure ? ExplorationRewardService.ignore_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "その宝箱は見つかりません。")
-    redirect_with_result(result)
-  end
+    def use_treasure_skill
+      treasure = TreasureChest.find_by(id: params[:treasure_chest_id])
+      result = treasure ? ExplorationRewardService.use_treasure_skill!(current_player, treasure, params[:skill_name]) : ExplorationRewardService::Result.new(status: :error, message: "その宝箱は見つかりません。")
+      redirect_with_result(result)
+    end
 
-  def challenge_boss
+    def ignore_treasure
+      treasure = TreasureChest.find_by(id: params[:treasure_chest_id])
+      result = treasure ? ExplorationRewardService.ignore_treasure!(current_player, treasure) : ExplorationRewardService::Result.new(status: :error, message: "その宝箱は見つかりません。")
+      redirect_with_result(result)
+    end
+
+    def challenge_boss
 
       mob = Mob.find_by(id: params[:mob_id])
       result = mob ? ExplorationRewardService.start_boss_battle!(current_player, mob) : ExplorationRewardService::Result.new(status: :error, message: "そのボスは存在しません。")

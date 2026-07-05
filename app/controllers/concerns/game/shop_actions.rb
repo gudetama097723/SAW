@@ -259,9 +259,17 @@ module Game
         return
       end
 
+      required_materials = repair_materials_for(weapons)
+      missing_materials = missing_repair_materials_for(player, required_materials)
+      if missing_materials.any?
+        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "破損武器の修繕素材が足りません。#{format_materials(missing_materials)}が必要です。"
+        return
+      end
+
       ActiveRecord::Base.transaction do
         player.col = player.col.to_i - total_price
         player.advance_time!(20 * weapons.size)
+        consume_repair_materials!(player, required_materials)
         weapons.each do |weapon|
           weapon.durability = weapon.max_durability
           weapon.save!
@@ -495,6 +503,38 @@ module Game
 
     def facility_open_for?(player, facility_key)
       FacilityHoursService.open?(facility_key, player)
+    end
+
+    def repair_materials_for(weapons)
+      weapons.each_with_object(Hash.new(0)) do |weapon, materials|
+        weapon.repair_materials_required.each do |name, count|
+          materials[name] += count.to_i
+        end
+      end
+    end
+
+    def missing_repair_materials_for(player, required_materials)
+      required_materials.each_with_object({}) do |(name, required_count), missing|
+        owned_count = player.items.where(name: name).sum(:quantity).to_i
+        missing[name] = required_count - owned_count if owned_count < required_count
+      end
+    end
+
+    def consume_repair_materials!(player, required_materials)
+      required_materials.each do |name, required_count|
+        remaining = required_count.to_i
+        player.items.where(name: name).order(:id).each do |item|
+          used = [item.quantity.to_i, remaining].min
+          item.quantity = item.quantity.to_i - used
+          remaining -= used
+          item.quantity.to_i <= 0 ? item.destroy! : item.save!
+          break if remaining <= 0
+        end
+      end
+    end
+
+    def format_materials(materials)
+      materials.map { |name, count| "#{name} ×#{count}" }.join("、")
     end
   end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_02_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_05_000000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -142,16 +142,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_02_000000) do
 
   create_table "mobs", force: :cascade do |t|
     t.integer "agility", default: 1, null: false
+    t.integer "agility_growth", default: 0, null: false
     t.integer "atk"
+    t.integer "atk_growth", default: 0, null: false
     t.string "boss_type", default: "normal", null: false
+    t.integer "col_growth", default: 0, null: false
     t.integer "col_max", default: 3, null: false
     t.integer "col_min", default: 1, null: false
     t.datetime "created_at", null: false
     t.integer "durability", default: 0, null: false
+    t.integer "durability_growth", default: 0, null: false
     t.integer "exp_reward", default: 10, null: false
     t.integer "field_area_id"
     t.integer "flee_rate", default: 0, null: false
     t.integer "hp"
+    t.integer "hp_growth", default: 0, null: false
     t.integer "level", default: 1, null: false
     t.string "name"
     t.string "rarity"

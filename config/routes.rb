@@ -13,6 +13,7 @@
   post "hunt", to: "game#hunt"
   post "open_treasure", to: "game#open_treasure"
   post "inspect_treasure", to: "game#inspect_treasure"
+  post "use_treasure_skill", to: "game#use_treasure_skill"
   post "ignore_treasure", to: "game#ignore_treasure"
   post "challenge_boss", to: "game#challenge_boss"
   post "learn_skill", to: "game#learn_skill"

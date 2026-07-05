@@ -102,9 +102,9 @@
 
       affinity_result = NpcAffinityService.gain!(player, npc, action_type: "info")
       trigger_msg = affinity_result.ok? ? NpcQuestService.check_affinity_triggers!(player, npc, affinity_result.affinity) : ""
-      lines = npc.npc_dialogues.active.info
-      message = if lines.any?
-        lines.map { |line| "#{npc.name}「#{line.text}」" }.join(" / ")
+      line = npc.npc_dialogues.active.info.sample
+      message = if line
+        "#{npc.name}「#{line.text}」"
       else
         "#{npc.name}は特に情報を持っていないようだ。"
       end

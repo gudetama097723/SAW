@@ -9,9 +9,31 @@
   end
 
   def effective_level
-    return 1 unless level_based?
-
     [level.to_i, 1].max
+  end
+
+  def hp_for_level(enemy_level)
+    stat_for_level(hp, growth_value(:hp_growth), enemy_level, minimum: 1)
+  end
+
+  def atk_for_level(enemy_level)
+    stat_for_level(atk, growth_value(:atk_growth), enemy_level, minimum: 1)
+  end
+
+  def agility_for_level(enemy_level)
+    stat_for_level(agility, growth_value(:agility_growth), enemy_level, minimum: 1)
+  end
+
+  def durability_for_level(enemy_level)
+    stat_for_level(durability, growth_value(:durability_growth), enemy_level, minimum: 0)
+  end
+
+  def col_min_for_level(enemy_level)
+    stat_for_level(col_min, growth_value(:col_growth), enemy_level, minimum: 1)
+  end
+
+  def col_max_for_level(enemy_level)
+    stat_for_level(col_max, growth_value(:col_growth), enemy_level, minimum: 1)
   end
 
   def effective_agility
@@ -35,7 +57,7 @@
   end
 
   def level_based?
-    !field_boss?
+    true
   end
 
   def reward
@@ -80,6 +102,17 @@
     else
       {}
     end
+  end
+
+  private
+
+  def stat_for_level(base, growth, enemy_level, minimum:)
+    level = [enemy_level.to_i, 1].max
+    [base.to_i + (growth.to_i * (level - 1)), minimum].max
+  end
+
+  def growth_value(column)
+    has_attribute?(column) ? self[column].to_i : 0
   end
 end
 

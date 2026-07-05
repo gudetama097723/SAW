@@ -48,7 +48,7 @@
     end
   end
 
-  def self.resolve_player_attack!(battle:, player:, mob_part_id:, target_enemy_id: nil, group_start: nil, label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:, area: false, attack_attribute: nil, skill_key: nil)
+  def self.resolve_player_attack!(battle:, player:, mob_part_id:, target_enemy_id: nil, target_enemy_ids: nil, group_start: nil, label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:, area: false, attack_attribute: nil, skill_key: nil)
     return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
 
     weapon = combat_weapon_for(player)
@@ -71,7 +71,7 @@
       return Result.new(status: :ok, message: "#{turn_messages.join}#{blocked_message}#{enemy_result.message}")
     end
 
-    target_enemies = target_enemies_for(battle, target_enemy_id, group_start, area)
+    target_enemies = target_enemies_for(battle, target_enemy_id, group_start, area, target_enemy_ids)
     return Result.new(status: :error, message: "攻撃対象がいません。") if target_enemies.empty?
 
     hit_messages = []
@@ -232,7 +232,7 @@
     return battle.alive_enemies.to_a if battle.battle_enemies.exists?
 
     enemy_level = battle.mob.effective_level
-    enemy_max_hp = FieldService.scaled_mob_value(battle.mob.hp, enemy_level)
+    enemy_max_hp = battle.mob.hp_for_level(enemy_level)
     battle.battle_enemies.create!(
       FieldService.battle_enemy_attributes(
         mob: battle.mob,
@@ -245,9 +245,14 @@
     battle.alive_enemies.to_a
   end
 
-  def self.target_enemies_for(battle, target_enemy_id, group_start, area)
+  def self.target_enemies_for(battle, target_enemy_id, group_start, area, target_enemy_ids = nil)
     alive = battle.alive_enemies.to_a
     if area
+      selected_ids = Array(target_enemy_ids).flat_map { |ids| ids.to_s.split(",") }.map(&:to_i).reject(&:zero?)
+      if selected_ids.any?
+        return alive.select { |enemy| selected_ids.include?(enemy.id) }.first(4)
+      end
+
       start = group_start.to_i
       start = alive.first&.position.to_i if start <= 0
       alive.select { |enemy| enemy.position >= start && enemy.position < start + 4 }.first(4)
@@ -519,7 +524,7 @@ end
 
   def self.defeat_drop_message!(player, defeated_enemies)
     messages = defeated_enemies.filter_map do |battle_enemy|
-      drop = MobDropCatalog.roll_defeat_drop(battle_enemy.mob)
+      drop = MobDropCatalog.roll_defeat_drop(battle_enemy.mob, enemy_level: battle_enemy.effective_level)
       next unless drop
 
       item = ItemService.add_item!(player, drop.item_name, drop.category, 1, unique: battle_enemy.mob.boss?)
@@ -601,8 +606,6 @@ end
   end
 
   def self.adjusted_exp_reward(player, battle_enemy)
-    return battle_enemy.effective_exp_reward unless battle_enemy.level_based?
-
     level_gap = battle_enemy.effective_level - player.effective_level
     multiplier = 1.0 + (level_gap * 0.15)
     multiplier = [[multiplier, 0.1].max, 2.5].min
@@ -677,7 +680,6 @@ def self.gain_weapon_skill!(player, weapon, amount)
     weapon = player&.equipped_weapon
     return nil unless weapon&.player_id == player.id
     return nil unless weapon.equipped?
-    return nil if weapon.broken?
 
     weapon
   end
@@ -711,13 +713,13 @@ def self.gain_weapon_skill!(player, weapon, amount)
 
   def self.destroy_weapon_if_broken!(weapon)
     return "" unless weapon
-    unless weapon.broken?
+    unless weapon.lost_by_durability?
       weapon.save!
       return ""
     end
 
     name = weapon.name
     weapon.destroy!
-    " #{name}は耐久力が尽きて破損した。"
+    " #{name}は限界を超えて大破し、消失した。"
   end
 end

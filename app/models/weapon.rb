@@ -1,5 +1,21 @@
 class Weapon < ApplicationRecord
   MAX_ENHANCEMENT_LEVEL = 10
+  MAJOR_DAMAGE_DURABILITY = -40
+  LOST_DURABILITY_THRESHOLD = -50
+
+  BROKEN_REPAIR_MATERIALS = {
+    "蒼狼の牙剣" => { "狼王の牙" => 1 },
+    "錆びたショートソード" => { "コボルドの牙" => 1 },
+    "斥候のショートソード" => { "コボルドの牙" => 1 }
+  }.freeze
+
+  DEFAULT_REPAIR_MATERIALS_BY_TYPE = {
+    "片手直剣" => { "硬い甲殻" => 1 },
+    "細剣" => { "薄羽蜂の針" => 1 },
+    "棍" => { "蟹の脚殻" => 1 },
+    "斧" => { "蟹の脚殻" => 1 }
+  }.freeze
+
   belongs_to :player, optional: true
   belongs_to :mob, optional: true
   belongs_to :player_base, optional: true
@@ -9,9 +25,15 @@ class Weapon < ApplicationRecord
   end
 
   def broken?
-    return false if starter_weapon?
-
     durability.to_i <= 0
+  end
+
+  def major_damage?
+    durability.to_i <= MAJOR_DAMAGE_DURABILITY
+  end
+
+  def lost_by_durability?
+    durability.to_i < LOST_DURABILITY_THRESHOLD
   end
 
   def starter_weapon?
@@ -20,7 +42,6 @@ class Weapon < ApplicationRecord
 
   def apply_durability_loss!(amount)
     self.durability = durability.to_i - amount.to_i
-    self.durability = 1 if starter_weapon? && durability.to_i < 1
   end
 
   def repair_cost
@@ -30,7 +51,66 @@ class Weapon < ApplicationRecord
     missing_rate = missing.to_f / [max_durability.to_i, 1].max
     estimated_price = [attack_power.to_i * 12 + max_durability.to_i / 20 + enhancement_level.to_i * 120, 100].max
     full_repair_cost = (estimated_price * rarity_cost_multiplier * 0.5).ceil
-    [(full_repair_cost * missing_rate).ceil, 1].max
+    [(full_repair_cost * missing_rate * repair_condition_cost_multiplier).ceil, 1].max
+  end
+
+  def repair_condition_cost_multiplier
+    return 3.0 if major_damage?
+    return 2.5 if broken?
+
+    rate = durability_rate
+    return 1.8 if rate <= 0.10
+    return 1.4 if rate <= 0.25
+    return 1.15 if rate <= 0.50
+
+    1.0
+  end
+
+  def repair_materials_required
+    return {} unless broken?
+
+    BROKEN_REPAIR_MATERIALS.fetch(name) do
+      DEFAULT_REPAIR_MATERIALS_BY_TYPE.fetch(weapon_type, { "硬い甲殻" => 1 })
+    end
+  end
+
+  def repair_materials_text
+    return "不要" if repair_materials_required.empty?
+
+    repair_materials_required.map { |name, count| "#{name} ×#{count}" }.join("、")
+  end
+
+  def durability_rate
+    return 0.0 unless max_durability.to_i.positive?
+
+    (durability.to_i.to_f / max_durability.to_i).clamp(0.0, 1.0)
+  end
+
+  def durability_percent
+    (durability_rate * 100).floor
+  end
+
+  def durability_condition_label
+    return "大破" if major_damage?
+    return "破損" if broken?
+
+    rate = durability_rate
+    return "破損寸前" if rate <= 0.10
+    return "損傷" if rate <= 0.25
+    return "消耗" if rate <= 0.50
+
+    "良好"
+  end
+
+  def durability_attack_multiplier
+    return 0.10 if broken?
+
+    rate = durability_rate
+    return 0.50 if rate <= 0.10
+    return 0.70 if rate <= 0.25
+    return 0.85 if rate <= 0.50
+
+    1.0
   end
 
 def display_name
@@ -81,6 +161,10 @@ def sell_price
   end
 
   def effective_attack_power
+    [(base_effective_attack_power * durability_attack_multiplier).ceil, 1].max
+  end
+
+  def base_effective_attack_power
     attack_power.to_i + enhancement_attack_bonus
   end
 

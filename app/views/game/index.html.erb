@@ -9,11 +9,15 @@
       <% equipped_weapon = @player.equipped_weapon %>
       <% equipped_weapons = @player.equipped_weapons %>
 
-      <div class="row">
-        <%= render "left_column", selected_panel: selected_panel, equipped_weapons: equipped_weapons %>
-        <%= render "center_column", selected_panel: selected_panel, equipped_weapon: equipped_weapon, equipped_weapons: equipped_weapons %>
-        <%= render "right_column", selected_panel: selected_panel, equipped_weapon: equipped_weapon %>
-      </div>
+      <% if @battle.present? %>
+        <%= render "battle_layout", equipped_weapon: equipped_weapon, equipped_weapons: equipped_weapons %>
+      <% else %>
+        <div class="row">
+          <%= render "left_column", selected_panel: selected_panel, equipped_weapons: equipped_weapons %>
+          <%= render "center_column", selected_panel: selected_panel, equipped_weapon: equipped_weapon, equipped_weapons: equipped_weapons %>
+          <%= render "right_column", selected_panel: selected_panel, equipped_weapon: equipped_weapon %>
+        </div>
+      <% end %>
 
       <%= render "footer" %>
     </div>

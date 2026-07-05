@@ -1,0 +1,266 @@
+<% battle_command = params[:battle_command].presence %>
+<% combat_weapon = BattleService.combat_weapon_for(@player) %>
+<% battle_command = "attack" if battle_command == "sword_skill" && !combat_weapon %>
+<% battle_enemies = @battle_enemies.presence || @battle.alive_enemies.to_a %>
+<% skill_set = combat_weapon ? BattleService.weapon_skill_name(combat_weapon) : nil %>
+<% sword_skill = skill_set ? @player.skills.find_by(name: skill_set) : nil %>
+<% sword_skill_level = sword_skill&.proficiency.to_i %>
+<% sword_skill_definitions = skill_set ? SkillCatalog.sword_skills(skill_set).select { |skill_definition| skill_definition.unlocked?(sword_skill_level) } : [] %>
+<% selected_skill = params[:selected_skill].presence %>
+<% selected_skill = nil unless sword_skill_definitions.any? { |skill_definition| skill_definition.key == selected_skill } %>
+<% selected_skill_definition = selected_skill.present? ? SkillCatalog.find(selected_skill) : nil %>
+<% selected_skill_is_area = selected_skill_definition&.area? %>
+<% selected_attack_group = params[:attack_group].presence %>
+<% selected_attack_group = "unarmed" if !combat_weapon && selected_attack_group == "weapon_attack" %>
+<% selected_attack_attribute = AttackAttribute.normalize(params[:attack_attribute].presence || combat_weapon&.primary_attack_attribute || "打撃") %>
+<% area_target_limit = 4 %>
+<% selected_enemy_ids = params[:target_enemy_ids].to_s.split(",").map(&:to_i).reject(&:zero?) %>
+<% selected_group = selected_skill_is_area ? battle_enemies.select { |enemy| selected_enemy_ids.include?(enemy.id) }.first(area_target_limit) : [] %>
+<% selected_enemy = battle_enemies.find { |enemy| enemy.id == params[:target_enemy_id].to_i } || battle_enemies.first %>
+<% selected_parts = selected_enemy ? BattleService.ensure_mob_parts!(selected_enemy.mob) : [] %>
+<% selected_part_states = selected_enemy ? (@part_states_by_enemy || {})[selected_enemy.id] || {} : {} %>
+<% selected_target_params = { target_enemy_id: selected_enemy&.id }.compact %>
+
+<div class="battle-layout">
+  <div class="card bg-danger text-light mb-3 battle-enemy-panel">
+    <div class="card-header">敵情報</div>
+    <div class="card-body">
+      <div class="battle-enemy-grid">
+        <% battle_enemies.each do |enemy| %>
+          <% enemy_selected = selected_skill_is_area ? selected_enemy_ids.include?(enemy.id) : enemy == selected_enemy %>
+          <% target_params = if selected_skill_is_area
+               next_ids = selected_enemy_ids.dup
+               selection_error = nil
+               if next_ids.include?(enemy.id)
+                 next_ids.delete(enemy.id)
+               elsif next_ids.size < area_target_limit
+                 next_ids << enemy.id
+               else
+                 selection_error = "too_many"
+               end
+               {
+                 battle_command: "sword_skill",
+                 skill_group: "sword_skill",
+                 selected_skill: selected_skill,
+                 target_enemy_ids: next_ids.join(","),
+                 selection_error: selection_error
+               }.compact
+             else
+               {
+                 battle_command: battle_command,
+                 attack_group: selected_attack_group,
+                 attack_attribute: selected_attack_attribute,
+                 selected_skill: selected_skill,
+                 skill_group: params[:skill_group],
+                 target_enemy_id: enemy.id
+               }
+             end %>
+          <%= link_to game_path(target_params), class: enemy_selected ? "battle-enemy-card battle-target-card-active" : "battle-enemy-card" do %>
+            <h5 class="mb-2"><%= enemy.position %>. <%= enemy.display_name %></h5>
+            <p class="mb-1">
+              HP: <%= enemy.enemy_hp %> / <%= enemy.effective_max_hp %>
+              <% enemy.condition_labels.each do |label| %>
+                <span class="badge bg-warning text-dark ms-1"><%= label %></span>
+              <% end %>
+            </p>
+            <div class="progress mb-0">
+              <div class="progress-bar bg-warning" style="width: <%= [[enemy.enemy_hp.to_i * 100 / [enemy.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div class="card bg-secondary text-light mb-3 battle-status-card">
+    <div class="card-body">
+      <div class="battle-status-strip">
+        <div>
+          <strong><%= @player.name %></strong>
+          <span class="badge bg-info text-dark ms-2">Lv <%= @player.level.to_i %></span>
+        </div>
+        <div class="battle-status-hp">
+          <span>HP <%= @player.hp %> / <%= @player.effective_max_hp %></span>
+          <div class="progress battle-hp-bar">
+            <div class="progress-bar bg-success" style="width: <%= [[@player.hp.to_i * 100 / [@player.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
+          </div>
+        </div>
+        <div class="battle-status-effects">
+          <% if @player.condition_labels.any? %>
+            <% @player.condition_labels.each do |label| %>
+              <span class="badge bg-warning text-dark"><%= label %></span>
+            <% end %>
+          <% else %>
+            <span class="text-secondary small">状態異常なし</span>
+          <% end %>
+        </div>
+        <div class="small">
+          <% if equipped_weapons.any? %>
+            <% equipped_weapons.each do |weapon| %>
+              <div><%= weapon.display_name %> / 耐久 <%= weapon.durability %>/<%= weapon.max_durability %></div>
+            <% end %>
+          <% else %>
+            武器なし
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="battle-command-layout">
+    <div class="card bg-secondary text-light battle-command-card">
+      <div class="card-header">コマンド</div>
+      <div class="card-body d-grid gap-2">
+        <%= link_to "戦闘", game_path(selected_target_params.merge(battle_command: "battle")), class: battle_command == "battle" || battle_command == "attack" ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
+        <% if combat_weapon %>
+          <%= link_to "スキル", game_path(selected_target_params.merge(battle_command: "sword_skill")), class: battle_command == "sword_skill" ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
+        <% end %>
+        <%= link_to "装備", game_path(selected_target_params.merge(battle_command: "weapon")), class: battle_command == "weapon" ? "btn btn-info w-100" : "btn btn-outline-info w-100" %>
+        <%= link_to "アイテム", game_path(selected_target_params.merge(battle_command: "item")), class: battle_command == "item" ? "btn btn-success w-100" : "btn btn-outline-success w-100" %>
+        <%= button_to "逃走", escape_path, method: :post, class: "btn btn-outline-light w-100" %>
+      </div>
+    </div>
+
+    <div class="card bg-secondary text-light battle-command-card">
+      <div class="card-header">詳細</div>
+      <div class="card-body">
+        <% if battle_command.blank? %>
+          <p class="small mb-0">左のコマンドを選択してください。</p>
+        <% elsif battle_command == "battle" %>
+          <div class="d-grid gap-2">
+            <%= link_to combat_weapon ? "通常攻撃" : "素手攻撃",
+                game_path(battle_command: "attack", attack_group: combat_weapon ? nil : "unarmed", attack_attribute: combat_weapon ? nil : "打撃", target_enemy_id: selected_enemy&.id),
+                class: "btn btn-outline-warning w-100" %>
+            <div class="btn btn-outline-secondary disabled w-100">防御</div>
+            <% if combat_weapon %>
+              <div class="btn btn-outline-secondary disabled w-100">パリィを狙う</div>
+            <% end %>
+          </div>
+        <% elsif battle_command == "attack" %>
+          <% if selected_attack_group.blank? %>
+            <div class="d-grid gap-2">
+              <%= link_to combat_weapon ? "武器攻撃" : "素手攻撃",
+                  game_path(battle_command: "attack", attack_group: combat_weapon ? "weapon_attack" : "unarmed", attack_attribute: combat_weapon ? nil : "打撃", target_enemy_id: selected_enemy&.id),
+                  class: "btn btn-outline-warning w-100" %>
+            </div>
+          <% else %>
+            <h6><%= selected_attack_group == "unarmed" ? "素手攻撃" : "武器攻撃" %></h6>
+            <% if selected_attack_group == "weapon_attack" %>
+              <div class="d-grid gap-2">
+                <% AttackAttribute.normal_attack_options.each do |label, attribute| %>
+                  <%= link_to label,
+                      game_path(battle_command: "attack", attack_group: "weapon_attack", target_enemy_id: selected_enemy&.id, attack_attribute: attribute),
+                      class: selected_attack_attribute == attribute ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
+                <% end %>
+              </div>
+            <% else %>
+              <p class="small mb-0">右の敵部位から攻撃先を選択してください。</p>
+            <% end %>
+          <% end %>
+        <% elsif battle_command == "sword_skill" %>
+          <% if !combat_weapon %>
+            <p class="small mb-0">武器を装備していないため使用できません。</p>
+          <% elsif sword_skill.blank? %>
+            <p class="small mb-0"><%= skill_set %>スキルを習得していません。</p>
+          <% elsif selected_skill_definition %>
+            <h6><%= selected_skill_definition.name %></h6>
+            <p class="small mb-1">種別: <%= selected_skill_definition.target_label %></p>
+            <p class="small mb-1">威力: <%= selected_skill_definition.damage_multiplier %>% / 耐久消費: <%= selected_skill_definition.durability_cost %></p>
+            <p class="small mb-2"><%= selected_skill_definition.description %></p>
+            <% if selected_skill_is_area && selected_group.any? %>
+              <p class="small text-secondary mb-2">敵情報カードで対象を選択します。選択中: <%= selected_group.size %> / <%= area_target_limit %></p>
+              <% if params[:selection_error] == "too_many" %>
+                <p class="small text-warning mb-2">これ以上選択できません。</p>
+              <% end %>
+              <% if selected_group.one? %>
+                <p class="small text-secondary mb-0">選択中の敵が1体のため、右の敵部位から発動先を選択できます。</p>
+              <% else %>
+                <%= button_to "#{selected_group.size}体へ発動",
+                    sword_skill_path(skill: selected_skill, target_enemy_ids: selected_enemy_ids.join(",")),
+                    method: :post,
+                    class: "btn btn-danger w-100" %>
+              <% end %>
+            <% elsif selected_skill_is_area %>
+              <p class="small text-secondary mb-0">敵情報カードで対象を選択してください。最大<%= area_target_limit %>体まで選択できます。</p>
+              <% if params[:selection_error] == "too_many" %>
+                <p class="small text-warning mb-0">これ以上選択できません。</p>
+              <% end %>
+            <% else %>
+              <p class="small text-secondary mb-0">敵情報カードで対象を選び、右の敵部位から発動先を選択してください。</p>
+            <% end %>
+            <%= link_to "スキル一覧へ", game_path(battle_command: "sword_skill"), class: "btn btn-outline-light w-100 mt-2" %>
+          <% elsif sword_skill_definitions.any? %>
+            <div class="d-grid gap-2">
+              <% sword_skill_definitions.each do |skill_definition| %>
+                <%= link_to skill_definition.name,
+                    game_path(battle_command: "sword_skill", skill_group: "sword_skill", selected_skill: skill_definition.key, target_enemy_id: selected_enemy&.id),
+                    class: "btn btn-outline-danger w-100" %>
+              <% end %>
+            </div>
+          <% else %>
+            <p class="small mb-0">使用可能なスキルなし</p>
+          <% end %>
+        <% elsif battle_command == "weapon" %>
+          <% available_weapons = @player.weapons.where(equipped: false).to_a %>
+          <% if available_weapons.any? %>
+            <p class="small mb-2">装備変更には1ターン消費します。</p>
+            <div class="d-grid gap-2">
+              <% available_weapons.each do |weapon| %>
+                <div class="battle-equipment-card">
+                  <p class="mb-1"><%= weapon.display_name %></p>
+                  <p class="mb-2 small">攻撃力 <%= weapon.effective_attack_power %>（本来 <%= weapon.base_effective_attack_power %>） / 耐久 <%= weapon.durability %>/<%= weapon.max_durability %>（<%= weapon.durability_condition_label %>）</p>
+                  <%= button_to "装備する", equip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-info w-100" %>
+                </div>
+              <% end %>
+            </div>
+          <% else %>
+            <p class="small mb-0">装備できる武器がありません。</p>
+          <% end %>
+        <% elsif battle_command == "item" %>
+          <% potion = @player.items.find_by(name: "ポーション", category: "healing") || @player.items.find_by(name: "ポーション") %>
+          <div class="d-grid gap-2">
+            <% if potion&.quantity.to_i.positive? %>
+              <%= button_to "ポーション × #{potion.quantity}", use_battle_item_path(item_name: "ポーション"), method: :post, class: "btn btn-outline-success w-100" %>
+            <% else %>
+              <div class="btn btn-outline-secondary disabled w-100">使用可能なアイテムなし</div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="card bg-secondary text-light battle-command-card">
+      <div class="card-header">敵部位</div>
+      <div class="card-body">
+        <% part_target_enemy = selected_skill_is_area && selected_group.one? ? selected_group.first : selected_enemy %>
+        <% part_target_parts = part_target_enemy ? BattleService.ensure_mob_parts!(part_target_enemy.mob) : [] %>
+        <% part_target_states = part_target_enemy ? (@part_states_by_enemy || {})[part_target_enemy.id] || {} : {} %>
+        <% show_parts = part_target_enemy.present? && part_target_parts.any? && ((battle_command == "attack" && selected_attack_group.present?) || (battle_command == "sword_skill" && selected_skill.present? && (!selected_skill_is_area || selected_group.one?))) %>
+        <% if show_parts %>
+          <h6><%= part_target_enemy.mob.name %></h6>
+          <div class="d-grid gap-2">
+            <% part_target_parts.each do |part| %>
+              <% state = part_target_states[part.id.to_s] || {} %>
+              <% part_label = state["broken"] ? "#{part.name}（破壊済み）" : part.name %>
+              <% if battle_command == "sword_skill" %>
+                <%= button_to part_label,
+                    sword_skill_path(target_enemy_id: part_target_enemy.id, target_enemy_ids: selected_skill_is_area ? selected_enemy_ids.join(",") : nil, mob_part_id: part.id, skill: selected_skill),
+                    method: :post,
+                    class: "btn btn-outline-danger w-100" %>
+              <% else %>
+                <%= button_to part_label,
+                    attack_path(target_enemy_id: part_target_enemy.id, mob_part_id: part.id, attack_attribute: selected_attack_attribute, attack_group: selected_attack_group),
+                    method: :post,
+                    class: "btn btn-outline-warning w-100" %>
+              <% end %>
+            <% end %>
+          </div>
+        <% elsif selected_skill_is_area %>
+          <p class="small text-secondary mb-0">複数対象スキルは部位指定なしで発動します。敵情報カードを再度クリックすると選択解除できます。</p>
+        <% else %>
+          <p class="small text-secondary mb-0">単体攻撃を選ぶと、ここに攻撃部位が表示されます。</p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

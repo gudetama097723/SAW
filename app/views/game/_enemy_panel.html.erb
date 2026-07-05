@@ -1,10 +1,10 @@
-﻿<div class="card bg-danger text-light mb-3">
+<div class="card bg-danger text-light mb-3 battle-enemy-panel">
   <div class="card-header">敵情報</div>
   <div class="card-body">
     <% battle_enemies = @battle_enemies.presence || @battle.alive_enemies.to_a %>
-    <div class="d-flex flex-wrap gap-2">
+    <div class="battle-enemy-grid">
       <% battle_enemies.each do |enemy| %>
-        <div class="border rounded p-2 flex-fill" style="min-width: 140px;">
+        <div class="battle-enemy-card">
           <h5 class="mb-2"><%= enemy.position %>. <%= enemy.display_name %></h5>
           <p class="mb-1">
             HP: <%= enemy.enemy_hp %> / <%= enemy.effective_max_hp %>

@@ -159,7 +159,12 @@ seed_rows("mobs.csv") do |row|
     exp_reward: to_int(row["exp_reward"]),
     flee_rate: to_int(row["flee_rate"]) || 0,
     col_min: to_int(row["col_min"]) || 1,
-    col_max: to_int(row["col_max"]) || 3
+    col_max: to_int(row["col_max"]) || 3,
+    hp_growth: to_int(row["hp_growth"]) || 0,
+    atk_growth: to_int(row["atk_growth"]) || 0,
+    agility_growth: to_int(row["agility_growth"]) || 0,
+    durability_growth: to_int(row["durability_growth"]) || 0,
+    col_growth: to_int(row["col_growth"]) || 0
   )
   mobs[mob.name] = mob
 end
@@ -208,13 +213,18 @@ seed_rows("boss_mobs.csv") do |row|
     hp: to_int(row["hp"]),
     atk: to_int(row["atk"]),
     rarity: row["rarity"],
-    level: row["boss_type"] == "field_boss" ? 1 : to_int(row["level"]),
+    level: to_int(row["level"]) || 1,
     agility: to_int(row["agility"]),
     durability: to_int(row["durability"]),
     exp_reward: to_int(row["exp_reward"]),
     flee_rate: to_int(row["flee_rate"]) || 0,
     col_min: to_int(row["col_min"]) || 1,
     col_max: to_int(row["col_max"]) || 3,
+    hp_growth: to_int(row["hp_growth"]) || 0,
+    atk_growth: to_int(row["atk_growth"]) || 0,
+    agility_growth: to_int(row["agility_growth"]) || 0,
+    durability_growth: to_int(row["durability_growth"]) || 0,
+    col_growth: to_int(row["col_growth"]) || 0,
     route: route,
     field_area: area,
     boss_type: row["boss_type"],

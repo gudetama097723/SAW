@@ -16,7 +16,8 @@
     @current_field_area = FieldService.current_area_for(@player)
     @environment_location = @player.field_route.present? ? FieldService.environment_location_for(@player) : @player.location
     @current_field_area_progress = @player.progress_for_area(@current_field_area)
-    @available_treasures = ExplorationRewardService.discovered_treasures(@player)
+    @available_treasure_states = ExplorationRewardService.discovered_treasure_states(@player)
+    @available_treasures = @available_treasure_states.map(&:treasure_chest)
     @available_bosses = ExplorationRewardService.discovered_bosses(@player)
     @town_discovery = @player.town_discovery_for if @player.location&.safe_area?
     current_panel = params[:panel].presence

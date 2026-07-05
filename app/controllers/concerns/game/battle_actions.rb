@@ -69,6 +69,7 @@ module Game
         player: player,
         mob_part_id: params[:mob_part_id],
         target_enemy_id: params[:target_enemy_id],
+        target_enemy_ids: params[:target_enemy_ids],
         group_start: params[:group_start],
         label: skill_config[:label],
         damage_multiplier: skill_config[:damage_multiplier],
@@ -85,6 +86,7 @@ module Game
         battle_command: "sword_skill",
         selected_skill: skill_key,
         target_enemy_id: params[:target_enemy_id],
+        target_enemy_ids: params[:target_enemy_ids],
         group_start: params[:group_start]
       )
     end

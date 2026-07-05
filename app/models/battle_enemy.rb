@@ -25,7 +25,7 @@ class BattleEnemy < ApplicationRecord
 
   def effective_max_hp
     value = has_attribute?(:enemy_max_hp) ? enemy_max_hp : nil
-    ((value.presence || scaled_value(mob.hp)) * StatusEffectService.max_hp_multiplier(self)).round
+    ((value.presence || mob.hp_for_level(effective_level)) * StatusEffectService.max_hp_multiplier(self)).round
   end
 
   def status_value_data
@@ -49,36 +49,24 @@ class BattleEnemy < ApplicationRecord
   end
 
   def effective_atk
-    (scaled_value(mob.atk) * BuffEffectService.attack_multiplier(self)).round
+    (mob.atk_for_level(effective_level) * BuffEffectService.attack_multiplier(self)).round
   end
 
   def effective_agility
-    (scaled_value(mob.agility) * BuffEffectService.agility_multiplier(self)).round
+    (mob.agility_for_level(effective_level) * BuffEffectService.agility_multiplier(self)).round
   end
 
   def effective_durability
-    scaled_value(mob.durability)
+    mob.durability_for_level(effective_level)
   end
 
   def effective_exp_reward
-    scaled_value(mob.exp_reward)
+    [mob.exp_reward.to_i, 1].max
   end
 
   def col_reward
-    min_source = mob.has_attribute?(:col_min) ? mob.col_min : 1
-    max_source = mob.has_attribute?(:col_max) ? mob.col_max : 3
-    min = scaled_value(min_source)
-    max = [scaled_value(max_source), min].max
+    min = mob.col_min_for_level(effective_level)
+    max = [mob.col_max_for_level(effective_level), min].max
     rand(min..max)
-  end
-
-  private
-
-  def scaled_value(base)
-    base_value = [base.to_i, 1].max
-    return base_value unless level_based?
-
-    multiplier = 1.0 + ((effective_level - 1) * 0.25)
-    (base_value * multiplier).round
   end
 end
