@@ -6,6 +6,7 @@ class SkillCatalog
     :required_proficiency,
     :damage_multiplier,
     :durability_cost,
+    :cooldown,
     :skill_gain,
     :hits,
     :area,
@@ -15,8 +16,19 @@ class SkillCatalog
     :description,
     keyword_init: true
   ) do
+    HORIZONTAL_AREA_TARGET_LIMITS = {
+      "horizontal" => 2,
+      "horizontal_arc" => 2
+    }.freeze
+
     def area?
       area
+    end
+
+    def max_targets
+      return 1 unless area?
+
+      HORIZONTAL_AREA_TARGET_LIMITS.fetch(key.to_s, 4)
     end
 
     def target_label
@@ -61,6 +73,7 @@ class SkillCatalog
         required_proficiency: row["required_proficiency"].to_i,
         damage_multiplier: row["damage_multiplier"].to_i,
         durability_cost: row["durability_cost"].to_i,
+        cooldown: row["cooldown"].to_i,
         skill_gain: row["skill_gain"].to_i,
         hits: row["hits"].to_i,
         area: row["area"].to_s.casecmp?("true"),
@@ -75,7 +88,7 @@ class SkillCatalog
 
   def self.fallback_definitions
     [
-      SkillDefinition.new(key: "vertical", name: "バーチカル", skill_set: "片手直剣", required_proficiency: 0, damage_multiplier: 150, durability_cost: 2, skill_gain: 3, hits: 1, area: false, target_type: "single", attack_attribute: "斬撃", summary: "倍率150% / 単体攻撃", description: "単発の縦斬り。通常攻撃より高威力。使用後に硬直が発生します。")
+      SkillDefinition.new(key: "vertical", name: "バーチカル", skill_set: "片手直剣", required_proficiency: 0, damage_multiplier: 150, durability_cost: 2, cooldown: 1, skill_gain: 3, hits: 1, area: false, target_type: "single", attack_attribute: "斬撃", summary: "倍率150% / 単体攻撃", description: "単発の縦斬り。通常攻撃より高威力。使用後に硬直が発生します。")
     ]
   end
 end

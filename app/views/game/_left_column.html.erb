@@ -1,84 +1,7 @@
         <div class="col-md-4">
-          <% if @battle.present? %>
-            <div class="card bg-secondary text-light mb-3 battle-status-card">
-              <div class="card-header">ステータス</div>
-              <div class="card-body">
-                <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-                  <strong><%= @player.name %></strong>
-                  <span class="badge bg-info text-dark">Lv <%= @player.level.to_i %></span>
-                  <% @player.condition_labels.each do |label| %>
-                    <span class="badge bg-warning text-dark"><%= label %></span>
-                  <% end %>
-                </div>
-                <div class="d-flex justify-content-between small mb-1">
-                  <span>HP</span>
-                  <span><%= @player.hp %> / <%= @player.effective_max_hp %></span>
-                </div>
-                <div class="progress battle-hp-bar mb-3">
-                  <div class="progress-bar bg-success" style="width: <%= [[@player.hp.to_i * 100 / [@player.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
-                </div>
-                <% if equipped_weapons.any? %>
-                  <div class="small">
-                    <% equipped_weapons.each do |weapon| %>
-                      <div class="d-flex justify-content-between gap-2">
-                        <span><%= weapon.display_name %></span>
-                        <span>攻撃 <%= weapon.effective_attack_power %> / 耐久 <%= weapon.durability %>/<%= weapon.max_durability %>（<%= weapon.durability_condition_label %>）</span>
-                      </div>
-                    <% end %>
-                  </div>
-                <% else %>
-                  <p class="small text-secondary mb-0">武器なし</p>
-                <% end %>
-              </div>
-            </div>
-          <% else %>
-          <% status_panel_open = selected_panel.blank? && params[:status_collapsed] != "1" %>
-          <details class="card bg-secondary text-light mb-3 ui-collapsible" <%= "open" if status_panel_open %>>
-            <summary class="card-header ui-collapsible-summary">
-              <span>ステータス</span>
-              <span class="small ui-collapsible-mini">
-                Lv<%= @player.level.to_i %> / HP <%= @player.hp %>/<%= @player.effective_max_hp %> / <%= @player.col %> col
-              </span>
-            </summary>
-            <div class="card-body">
-              <div class="d-flex gap-3 align-items-center">
-                <p>名前: <%= @player.name %></p>
-                <p>Lv: <%= @player.level.to_i %></p>
-                <% if @player.home_base %>
-                  <p class="ms-auto">本拠点: <%= @player.home_base.location.name %></p>
-                <% end %>
-              </div>
-              <p>
-                HP: <%= @player.hp %> / <%= @player.effective_max_hp %>
-                <% @player.condition_labels.each do |label| %>
-                  <span class="badge bg-warning text-dark ms-1"><%= label %></span>
-                <% end %>
-              </p>
-              <div class="progress mb-2">
-                <div class="progress-bar bg-success" style="width: <%= [[@player.hp.to_i * 100 / [@player.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
-              </div>
-              <p>経験値: <%= @player.exp.to_i %> / <%= @player.exp_to_next_level %></p>
-              <div class="progress mb-2" style="height: 6px;">
-                <div class="progress-bar bg-info" style="width: <%= [[@player.exp.to_i * 100 / [@player.exp_to_next_level, 1].max, 0].max, 100].min %>%"></div>
-              </div>
-              <% if equipped_weapons.any? %>
-                <% equipped_weapons.each do |weapon| %>
-                  <p class="mb-1"><%= weapon.display_name %> 攻撃力: <%= weapon.effective_attack_power %> / 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %>（<%= weapon.durability_condition_label %>）</p>
-                <% end %>
-              <% end %>
-              <p>コル: <%= @player.col %></p>
-              <p>所持重量: <%= number_with_precision(@player.carry_weight, precision: 1) %> / <%= number_with_precision(@player.max_carry_weight, precision: 1) %></p>
-              <% if @player.overweight? %>
-                <p class="text-warning mb-0">重量オーバー：移動速度と回避率が低下しています</p>
-              <% end %>
-              <% if @player.sleepiness_warning_message.present? %>
-                <p class="text-warning mb-0"><%= @player.sleepiness_warning_message %></p>
-              <% end %>
-            </div>
-          </details>
-
+          <% unless @battle.present? %>
           <% if @active_player_quests.any? %>
-            <details class="card bg-secondary text-light mb-3 ui-collapsible" open>
+            <details class="card bg-secondary text-light mb-3 ui-collapsible" data-details-state-key="left-quests" open>
               <summary class="card-header ui-collapsible-summary">
                 <span>受注中クエスト</span>
                 <span class="badge bg-warning text-dark ms-auto"><%= @active_player_quests.size %></span>
@@ -103,7 +26,7 @@
             </details>
           <% end %>
 
-          <details class="card bg-secondary text-light mb-3 ui-collapsible" open>
+          <details class="card bg-secondary text-light mb-3 ui-collapsible" data-details-state-key="left-info-commands" open>
             <summary class="card-header ui-collapsible-summary">
               <span>情報コマンド</span>
               <% if selected_panel.present? %>

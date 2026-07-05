@@ -88,6 +88,7 @@
       required: skill.required_proficiency,
       damage_multiplier: skill.damage_multiplier,
       durability_cost: skill.durability_cost,
+      cooldown: skill.cooldown,
       skill_gain: skill.skill_gain,
       hits: skill.hits,
       area: skill.area?,

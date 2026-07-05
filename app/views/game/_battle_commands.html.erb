@@ -126,14 +126,15 @@
       <p class="mb-3"><%= selected_skill_definition.description %></p>
 
       <% if selected_skill_is_area %>
+        <% area_target_limit = selected_skill_definition.max_targets %>
         <% group_start = params[:group_start].to_i %>
         <% group_start = battle_enemies.first&.position.to_i if group_start <= 0 %>
-        <% selected_group = battle_enemies.select { |enemy| enemy.position >= group_start && enemy.position < group_start + 4 }.first(4) %>
+        <% selected_group = battle_enemies.select { |enemy| enemy.position >= group_start && enemy.position < group_start + area_target_limit }.first(area_target_limit) %>
         <% if battle_enemies.many? %>
           <h6>攻撃グループ</h6>
           <div class="battle-target-grid mb-3">
             <% battle_enemies.each_with_index do |enemy, index| %>
-              <% group = battle_enemies[index, 4] || [] %>
+              <% group = battle_enemies[index, area_target_limit] || [] %>
               <% next if group.empty? %>
               <% names = group.map { |group_enemy| "#{group_enemy.position}.#{group_enemy.mob.name}" }.join(" / ") %>
               <%= link_to names,

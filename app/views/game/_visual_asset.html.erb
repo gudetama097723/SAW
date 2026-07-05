@@ -1,0 +1,17 @@
+<%
+  visual_kind = local_assigns.fetch(:kind).to_sym
+  visual_key = local_assigns[:asset_key] || saw_visual_asset_key(local_assigns[:record], fallback: local_assigns[:fallback])
+  visual_path = saw_visual_asset_path(visual_kind, visual_key)
+  visual_label = local_assigns[:label].presence || saw_visual_placeholder_label(visual_kind)
+  visual_classes = ["saw-visual", "saw-visual-#{visual_kind}", local_assigns[:class_name]].compact.join(" ")
+%>
+
+<div class="<%= visual_classes %>">
+  <% if visual_path.present? %>
+    <%= image_tag visual_path, alt: visual_label, loading: "lazy", class: "saw-visual-image" %>
+  <% else %>
+    <div class="saw-visual-placeholder" aria-label="<%= visual_label %>">
+      <span><%= visual_label %></span>
+    </div>
+  <% end %>
+</div>

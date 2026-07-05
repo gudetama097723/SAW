@@ -24,7 +24,7 @@
   <% end %>
 
   <% if @talkable_npcs.present? || !in_field %>
-    <details class="card bg-secondary text-light ui-collapsible world-action-group">
+    <details class="card bg-secondary text-light ui-collapsible world-action-group" data-details-state-key="world-npc">
       <summary class="card-header ui-collapsible-summary">
         <span>NPC</span>
         <% if @talkable_npcs.present? %>
@@ -57,7 +57,7 @@
       town_discovery&.found_restaurant?
     ].count(true) %>
 
-    <details class="card bg-secondary text-light ui-collapsible world-action-group">
+    <details class="card bg-secondary text-light ui-collapsible world-action-group" data-details-state-key="world-facilities">
       <summary class="card-header ui-collapsible-summary">
         <span>施設</span>
         <% if discovered_facility_count.positive? %>
@@ -102,7 +102,7 @@
     </details>
   <% end %>
 
-  <details class="card bg-secondary text-light ui-collapsible world-action-group" <%= "open" if in_field %>>
+  <details class="card bg-secondary text-light ui-collapsible world-action-group" data-details-state-key="world-movement" <%= "open" if in_field %>>
     <summary class="card-header ui-collapsible-summary">
       <span>移動</span>
       <% if @player.field_route.present? %>
@@ -155,7 +155,7 @@
   </details>
 
   <% if @available_treasures.present? %>
-    <details class="card bg-secondary text-light ui-collapsible world-action-group">
+    <details class="card bg-secondary text-light ui-collapsible world-action-group" data-details-state-key="world-treasures">
       <summary class="card-header ui-collapsible-summary">
         <span>発見済み宝箱</span>
         <span class="badge bg-warning text-dark ms-auto"><%= @available_treasures.size %></span>
@@ -203,7 +203,7 @@
   <% end %>
 
   <% if @available_bosses.present? %>
-    <details class="card bg-secondary text-light ui-collapsible world-action-group">
+    <details class="card bg-secondary text-light ui-collapsible world-action-group" data-details-state-key="world-bosses">
       <summary class="card-header ui-collapsible-summary">
         <span>発見済みボス</span>
         <span class="badge bg-danger ms-auto"><%= @available_bosses.size %></span>

@@ -22,6 +22,7 @@
   ].freeze
 
   STATUS_LABELS = StatusEffectService::LABELS
+  SWORD_SKILL_COOLDOWNS_KEY = "sword_skill_cooldowns"
   SLEEP_DEPRIVATION_START_MINUTES = 15 * 60
   SLEEP_DEPRIVATION_INTERVAL_MINUTES = 60
   SLEEP_DEPRIVATION_GAIN = 10
@@ -320,6 +321,47 @@ def increment_skill_counter!(key, amount = 1)
   data = skill_counter_data
   data[key.to_s] = data[key.to_s].to_i + amount.to_i
   update!(skill_counters: data.to_json)
+end
+
+def sword_skill_cooldowns
+  value = skill_counter_data[SWORD_SKILL_COOLDOWNS_KEY]
+  value.is_a?(Hash) ? value : {}
+end
+
+def sword_skill_cooldown(skill_key)
+  sword_skill_cooldowns[skill_key.to_s].to_i
+end
+
+def sword_skill_on_cooldown?(skill_key)
+  sword_skill_cooldown(skill_key).positive?
+end
+
+def start_sword_skill_cooldown!(skill_key, turns)
+  cooldown = turns.to_i
+  return if skill_key.blank? || cooldown <= 0
+
+  data = skill_counter_data
+  cooldowns = data[SWORD_SKILL_COOLDOWNS_KEY].is_a?(Hash) ? data[SWORD_SKILL_COOLDOWNS_KEY] : {}
+  cooldowns[skill_key.to_s] = cooldown
+  data[SWORD_SKILL_COOLDOWNS_KEY] = cooldowns
+  self.skill_counters = data.to_json
+end
+
+def tick_sword_skill_cooldowns!
+  data = skill_counter_data
+  cooldowns = data[SWORD_SKILL_COOLDOWNS_KEY].is_a?(Hash) ? data[SWORD_SKILL_COOLDOWNS_KEY] : {}
+  cooldowns.keys.each do |key|
+    cooldowns[key] = cooldowns[key].to_i - 1
+    cooldowns.delete(key) if cooldowns[key] <= 0
+  end
+  cooldowns.empty? ? data.delete(SWORD_SKILL_COOLDOWNS_KEY) : data[SWORD_SKILL_COOLDOWNS_KEY] = cooldowns
+  self.skill_counters = data.to_json
+end
+
+def clear_sword_skill_cooldowns!
+  data = skill_counter_data
+  data.delete(SWORD_SKILL_COOLDOWNS_KEY)
+  self.skill_counters = data.to_json
 end
 
 def injury_severity

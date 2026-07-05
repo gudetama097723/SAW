@@ -101,7 +101,7 @@ class GameControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "これ以上選択できません。"
-    assert_includes response.body, "選択中: 4 / 4"
+    assert_includes response.body, "選択中: 2 / 2"
   end
 
   test "paralysis blocks battle item escape and equipment actions" do
@@ -125,6 +125,29 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to game_path(battle_command: "attack")
     assert_not weapon.reload.equipped?
     assert_includes flash[:notice], "麻痺が解けた"
+  end
+
+  test "battle equipment supports armor changes and right side details" do
+    mob = Mob.create!(name: "戦闘中装備テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    @player.battles.create!(mob: mob, enemy_hp: 10)
+    weapon = @player.weapons.create!(name: "詳細表示テスト剣", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 10, max_durability: 10)
+    armor = @player.armors.create!(name: "詳細表示テスト鎧", armor_type: "軽鎧", rarity: "common", slot: "body", defense: 3, weight: 2)
+
+    get game_path, params: { battle_command: "weapon", equipment_category: "weapons", detail_weapon_id: weapon.id }
+    assert_response :success
+    assert_includes response.body, "武器詳細"
+    assert_includes response.body, "詳細表示テスト剣"
+
+    get game_path, params: { battle_command: "weapon", equipment_category: "armors", detail_armor_id: armor.id }
+    assert_response :success
+    assert_includes response.body, "防具詳細"
+    assert_includes response.body, "詳細表示テスト鎧"
+    assert_includes response.body, "装備する"
+
+    post equip_armor_path, params: { armor_id: armor.id }
+    assert_redirected_to game_path(battle_command: "attack")
+    assert armor.reload.equipped?
+    assert_includes flash[:notice], "詳細表示テスト鎧を装備した。"
   end
 
   test "inn panel only shows facility npcs" do

@@ -1,25 +1,45 @@
-<div class="container py-4">
-  <div class="<%= class_names("card border-secondary shadow-lg", game_environment_classes(@player, @environment_location)) %>">
-    <%= render "header" %>
+<div class="game-page">
+  <header class="game-layout-header">
+    <div class="container">
+      <%= render "header" %>
+    </div>
+  </header>
 
-    <div class="card-body">
+  <main class="container game-main">
+    <div class="<%= class_names("card border-secondary shadow-lg", game_environment_classes(@player, @environment_location)) %>" style="<%= game_background_style(@player, @environment_location) %>" data-controller="details-state">
+      <div class="card-body">
+        <% selected_panel = params[:panel].presence %>
+        <% equipped_weapon = @player.equipped_weapon %>
+        <% equipped_weapons = @player.equipped_weapons %>
+        <% reward_lines = reward_message_lines(alert.presence || notice.presence) %>
+
+        <% if reward_lines.any? %>
+          <div class="battle-reward-effect" aria-live="polite">
+            <div class="battle-reward-effect-card">
+              <div class="battle-reward-effect-title">戦利品獲得</div>
+              <% reward_lines.each do |line| %>
+                <div class="battle-reward-effect-line"><%= line %></div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+
+        <% if @battle.present? %>
+          <%= render "battle_layout", equipped_weapon: equipped_weapon, equipped_weapons: equipped_weapons %>
+        <% else %>
+          <div class="row">
+            <%= render "left_column", selected_panel: selected_panel, equipped_weapons: equipped_weapons %>
+            <%= render "center_column", selected_panel: selected_panel, equipped_weapon: equipped_weapon, equipped_weapons: equipped_weapons %>
+            <%= render "right_column", selected_panel: selected_panel, equipped_weapon: equipped_weapon %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </main>
+
+  <div class="message-dock">
+    <div class="container">
       <%= render "messages" %>
-
-      <% selected_panel = params[:panel].presence %>
-      <% equipped_weapon = @player.equipped_weapon %>
-      <% equipped_weapons = @player.equipped_weapons %>
-
-      <% if @battle.present? %>
-        <%= render "battle_layout", equipped_weapon: equipped_weapon, equipped_weapons: equipped_weapons %>
-      <% else %>
-        <div class="row">
-          <%= render "left_column", selected_panel: selected_panel, equipped_weapons: equipped_weapons %>
-          <%= render "center_column", selected_panel: selected_panel, equipped_weapon: equipped_weapon, equipped_weapons: equipped_weapons %>
-          <%= render "right_column", selected_panel: selected_panel, equipped_weapon: equipped_weapon %>
-        </div>
-      <% end %>
-
-      <%= render "footer" %>
     </div>
   </div>
 </div>

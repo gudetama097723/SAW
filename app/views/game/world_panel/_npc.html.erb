@@ -15,6 +15,8 @@
 </div>
 <div class="card-body">
   <% if npc && line %>
+    <%= render "game/visual_asset", kind: :npc, record: npc, label: npc.name, class_name: "saw-visual-portrait mb-3" %>
+
     <div class="border border-secondary rounded p-3 mb-3" style="background: #0d1117; min-height: 5rem;">
       <p class="mb-1 small fw-bold text-warning"><%= npc.name %></p>
       <p class="mb-0"><%= line.text %></p>

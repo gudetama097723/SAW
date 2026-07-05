@@ -79,7 +79,9 @@ module Game
         hits: skill_config[:hits],
         sword_skill: true,
         area: skill_config[:area],
-        attack_attribute: skill_config[:attack_attribute]
+        attack_attribute: skill_config[:attack_attribute],
+        skill_key: skill_key,
+        cooldown: skill_config[:cooldown]
       )
       redirect_with_result(
         result,
@@ -122,6 +124,8 @@ module Game
       if enemy_result.status == :defeated
         redirect_to game_path(panel: "inn"), alert: "#{item_result.message}#{enemy_result.message}"
       else
+        BattleService.tick_sword_skill_cooldowns_for_turn!(player, battle)
+        player.save!
         redirect_to game_path(battle_command: "item"), notice: "#{item_result.message}#{enemy_result.message}"
       end
     end
@@ -199,6 +203,7 @@ module Game
       chance = [[50 + agility_gap * 10 - enemy_count_penalty, 5].max, 95].min
       if rand(100) < chance
         BuffEffectService.clear_battle_effects!(player)
+        player.clear_sword_skill_cooldowns!
         player.save!
         battle.destroy
         redirect_to game_path, notice: "逃走に成功した。"
@@ -208,6 +213,8 @@ module Game
         if enemy_result.status == :defeated
           redirect_to game_path(panel: "inn"), alert: "逃走に失敗した。#{enemy_result.message}"
         else
+          BattleService.tick_sword_skill_cooldowns_for_turn!(player, battle)
+          player.save!
           redirect_to game_path(battle_command: params[:battle_command].presence), alert: "逃走に失敗した。#{enemy_result.message}"
         end
       end

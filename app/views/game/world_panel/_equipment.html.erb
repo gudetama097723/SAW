@@ -19,6 +19,7 @@
               </button>
 
               <div class="collapse p-2" id="weapon-<%= weapon.id %>">
+                <%= render "game/visual_asset", kind: :weapon, record: weapon, label: weapon.display_name, class_name: "saw-visual-detail mb-2" %>
                 <p class="mb-1">種別: <%= weapon.weapon_type %></p>
                 <p class="mb-1">レアリティ: <%= weapon.rarity %></p>
                 <p class="mb-1">攻撃力: <%= weapon.effective_attack_power %>（本来 <%= weapon.base_effective_attack_power %>）</p>
@@ -60,6 +61,7 @@
               </button>
 
               <div class="collapse p-2" id="armor-<%= armor.id %>">
+                <%= render "game/visual_asset", kind: :armor, record: armor, label: armor.name, class_name: "saw-visual-detail mb-2" %>
                 <p class="mb-1">部位: <%= armor.slot_name %></p>
                 <p class="mb-1">種別: <%= armor.armor_type %></p>
                 <p class="mb-1">レアリティ: <%= armor.rarity %></p>

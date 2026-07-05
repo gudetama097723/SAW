@@ -16,7 +16,7 @@
   end
 
   def sword_skill_level(skill_key)
-    sword_skill_level_data[skill_key.to_s].to_i.clamp(1, 100)
+    sword_skill_level_data.dig(skill_key.to_s, "level").to_i.clamp(1, 100)
   end
 
   def gain_sword_skill_exp!(skill_key, amount)

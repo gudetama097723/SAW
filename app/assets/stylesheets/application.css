@@ -1,17 +1,221 @@
 
 
+.game-page {
+  min-height: 100vh;
+  padding-bottom: 7.25rem;
+  background: #080b10;
+}
+
+.game-layout-header {
+  --shell-fg: #f8f9fa;
+  --shell-muted: rgba(248, 249, 250, 0.7);
+  --shell-border: rgba(255, 255, 255, 0.22);
+
+  position: sticky;
+  top: 0;
+  z-index: 1040;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 11, 16, 0.98);
+  box-shadow: 0 0.45rem 1.4rem rgba(0, 0, 0, 0.28);
+}
+
+.game-main {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.game-header-panel {
+  display: grid;
+  gap: 0.45rem;
+  color: #f8f9fa;
+}
+
+.game-header-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.game-header-primary,
+.game-header-secondary,
+.game-session-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.game-header-secondary {
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.game-floor-badge {
+  display: grid;
+  place-items: center;
+  min-width: 3.8rem;
+  min-height: 2.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.game-location-block {
+  min-width: 0;
+}
+
+.game-header-label {
+  color: rgba(248, 249, 250, 0.58);
+  font-size: 0.68rem;
+}
+
+.game-header-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.game-header-status {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(170px, 1fr) minmax(170px, 1fr) minmax(240px, 1.6fr) minmax(110px, 0.6fr);
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.game-status-identity,
+.game-status-meter,
+.game-status-weapons,
+.game-status-col {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 0.28rem 0.45rem;
+}
+
+.game-status-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.game-status-meter {
+  display: grid;
+  align-content: center;
+  gap: 0.2rem;
+}
+
+.game-status-meter-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: rgba(248, 249, 250, 0.72);
+  font-size: 0.72rem;
+}
+
+.game-status-meter-head strong {
+  color: #f8f9fa;
+  font-weight: 700;
+}
+
+.game-header-progress {
+  height: 0.38rem;
+  background-color: rgba(0, 0, 0, 0.32);
+}
+
+.game-status-weapons {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.game-status-weapon {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+  line-height: 1.1;
+}
+
+.game-status-weapon span {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-status-weapon small {
+  color: rgba(248, 249, 250, 0.66);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.game-status-col {
+  display: grid;
+  align-content: center;
+  text-align: right;
+}
+
+.game-status-col span {
+  color: rgba(248, 249, 250, 0.62);
+  font-size: 0.68rem;
+}
+
+.game-status-col strong {
+  font-size: 0.98rem;
+}
+
+.game-session-actions form {
+  margin: 0;
+}
+
 .game-shell {
   --shell-bg: #111418;
   --shell-fg: #f8f9fa;
   --shell-muted: rgba(248, 249, 250, 0.72);
   --shell-border: rgba(255, 255, 255, 0.28);
   --weather-overlay: rgba(0, 0, 0, 0);
+  --time-overlay: rgba(255, 255, 255, 0);
+  --game-background-image: none;
 
+  position: relative;
+  overflow: hidden;
+  min-height: calc(100vh - 13rem);
   color: var(--shell-fg);
   background:
-    linear-gradient(135deg, var(--weather-overlay), rgba(0, 0, 0, 0.16)),
+    linear-gradient(var(--time-overlay), var(--time-overlay)),
+    linear-gradient(135deg, var(--weather-overlay), rgba(0, 0, 0, 0)),
+    var(--game-background-image),
     var(--shell-bg);
+  background-position: center;
+  background-size: cover;
   transition: background-color 240ms ease, color 240ms ease;
+}
+
+.game-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.session-footer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1030;
+  padding: 0.7rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(9, 12, 18, 0.96);
+  box-shadow: 0 -0.4rem 1.4rem rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.session-footer form {
+  margin: 0;
 }
 
 .game-time-dawn,
@@ -19,6 +223,7 @@
   --shell-bg: linear-gradient(135deg, #f19a3e 0%, #9f4e3d 58%, #2a2330 100%);
   --shell-fg: #fff8ed;
   --shell-muted: rgba(255, 248, 237, 0.76);
+  --time-overlay: rgba(245, 126, 51, 0.2);
 }
 
 .game-time-day {
@@ -26,51 +231,53 @@
   --shell-fg: #082433;
   --shell-muted: rgba(8, 36, 51, 0.7);
   --shell-border: rgba(8, 36, 51, 0.24);
+  --time-overlay: rgba(255, 255, 255, 0);
 }
 
 .game-time-night {
   --shell-bg: linear-gradient(135deg, #090b13 0%, #151a2f 55%, #03040a 100%);
   --shell-fg: #f4f7ff;
   --shell-muted: rgba(244, 247, 255, 0.72);
+  --time-overlay: rgba(4, 10, 34, 0.48);
 }
 
 .game-weather-cloudy {
-  --weather-overlay: rgba(107, 114, 128, 0.58);
+  --weather-overlay: rgba(107, 114, 128, 0.2);
 }
 
 .game-weather-rain {
-  --weather-overlay: rgba(42, 76, 102, 0.62);
+  --weather-overlay: rgba(42, 76, 102, 0.28);
 }
 
 .game-weather-thunderstorm,
 .game-environment-heavy_rain {
-  --weather-overlay: rgba(31, 41, 55, 0.76);
+  --weather-overlay: rgba(31, 41, 55, 0.38);
 }
 
 .game-weather-fog,
 .game-environment-deep_fog {
-  --weather-overlay: rgba(173, 181, 189, 0.5);
+  --weather-overlay: rgba(208, 216, 224, 0.28);
 }
 
 .game-weather-snow,
 .game-environment-extreme_cold {
-  --weather-overlay: rgba(225, 239, 250, 0.58);
+  --weather-overlay: rgba(225, 239, 250, 0.3);
 }
 
 .game-environment-darkness {
-  --weather-overlay: rgba(0, 0, 0, 0.58);
+  --weather-overlay: rgba(0, 0, 0, 0.38);
 }
 
 .game-environment-toxic_mist {
-  --weather-overlay: rgba(70, 102, 76, 0.5);
+  --weather-overlay: rgba(70, 102, 76, 0.24);
 }
 
 .game-environment-extreme_heat {
-  --weather-overlay: rgba(192, 88, 39, 0.42);
+  --weather-overlay: rgba(192, 88, 39, 0.22);
 }
 
 .game-environment-strong_wind {
-  --weather-overlay: rgba(118, 151, 163, 0.38);
+  --weather-overlay: rgba(118, 151, 163, 0.18);
 }
 
 .game-shell .card-header {
@@ -78,9 +285,10 @@
 }
 
 .game-shell .card.bg-secondary {
-  background-color: rgba(12, 17, 24, 0.86) !important;
+  background-color: rgba(12, 17, 24, 0.88) !important;
   border-color: rgba(255, 255, 255, 0.24) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(5px);
 }
 
 .game-shell .card.bg-secondary .card-header {
@@ -207,7 +415,62 @@
   color: #111;
 }
 
+@media (max-width: 1199.98px) {
+  .game-header-topline {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .game-header-secondary {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .game-header-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .game-status-weapons {
+    grid-column: span 2;
+  }
+}
+
 @media (max-width: 767.98px) {
+  .game-page {
+    padding-bottom: 8rem;
+  }
+
+  .game-layout-header {
+    position: static;
+  }
+
+  .game-header-topline,
+  .game-header-primary,
+  .game-header-secondary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .game-header-secondary {
+    justify-content: flex-start;
+  }
+
+  .game-session-actions {
+    justify-content: space-between;
+  }
+
+  .game-header-status {
+    grid-template-columns: 1fr;
+  }
+
+  .game-status-weapons {
+    grid-column: auto;
+  }
+
+  .game-status-col {
+    text-align: left;
+  }
+
   .game-environment-summary {
     max-width: 100%;
     text-align: left !important;
@@ -219,8 +482,8 @@
 }
 
 .message-window {
-  min-height: 72px;
-  max-height: 72px;
+  min-height: 5.5rem;
+  max-height: 22vh;
   overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 0.375rem;
@@ -228,6 +491,22 @@
   color: #f8f9fa;
   padding: 0.45rem 0.55rem !important;
   box-shadow: inset 0 1px 8px rgba(0, 0, 0, 0.36);
+}
+
+.message-dock {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1050;
+  padding: 0.65rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(5, 8, 12, 0.98);
+  box-shadow: 0 -0.45rem 1.4rem rgba(0, 0, 0, 0.36);
+}
+
+.message-dock .message-window {
+  margin-bottom: 0 !important;
 }
 
 .message-line {
@@ -241,9 +520,80 @@
   color: rgba(248, 249, 250, 0.62) !important;
 }
 
-.battle-status-card .card-body,
+.saw-visual {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.5rem;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 38%),
+    linear-gradient(135deg, rgba(18, 27, 40, 0.96), rgba(7, 10, 16, 0.96));
+}
+
+.saw-visual-image,
+.saw-visual-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.saw-visual-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: inherit;
+  color: rgba(248, 249, 250, 0.58);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.saw-visual-placeholder span {
+  padding: 0.2rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.saw-visual-portrait {
+  aspect-ratio: 3 / 2;
+  min-height: 12rem;
+}
+
+.saw-visual-detail {
+  width: min(100%, 14rem);
+  aspect-ratio: 4 / 3;
+}
+
+.saw-visual-battle-mob {
+  aspect-ratio: 4 / 3;
+  min-height: 8rem;
+  margin-bottom: 0.65rem;
+  border: 0;
+  background: transparent;
+}
+
 .battle-enemy-panel .card-body {
-  background: rgba(0, 0, 0, 0.14);
+  background: transparent !important;
+}
+
+.battle-enemy-panel {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.battle-enemy-panel .card-header {
+  border: 0;
+  background: transparent !important;
+  padding: 0 0 0.5rem;
+  text-align: center;
+}
+
+.battle-enemy-panel .card-body {
+  padding: 0;
 }
 
 .battle-layout {
@@ -251,40 +601,42 @@
   gap: 1rem;
 }
 
-.battle-status-strip {
-  display: grid;
-  grid-template-columns: minmax(140px, 0.8fr) minmax(220px, 1.4fr) minmax(140px, 1fr) minmax(180px, 1.2fr);
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.battle-status-hp {
-  display: grid;
-  gap: 0.25rem;
-}
-
-.battle-status-effects {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
 .battle-command-layout {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.15fr) minmax(220px, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
   gap: 1rem;
   align-items: start;
+  justify-content: start;
 }
 
 .battle-command-card {
+  width: 100%;
+  max-width: 280px;
   min-height: 18rem;
+}
+
+.battle-command-card .btn-outline-danger:hover {
+  color: #fff;
+}
+
+.battle-command-card .btn-outline-warning:hover,
+.battle-command-card .btn-outline-info:hover,
+.battle-command-card .btn-outline-success:hover,
+.battle-command-card .btn-outline-light:hover {
+  color: #111;
 }
 
 .battle-hp-bar {
   height: 0.8rem;
 }
 
-.battle-enemy-grid,
+.battle-enemy-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+}
+
 .battle-target-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -302,6 +654,11 @@
   background: rgba(0, 0, 0, 0.2);
   color: #f8f9fa;
   text-decoration: none;
+}
+
+.battle-enemy-card {
+  flex: 0 0 220px;
+  max-width: 100%;
 }
 
 .battle-target-card:hover {
@@ -335,13 +692,18 @@
 }
 
 @media (max-width: 991.98px) {
-  .battle-status-strip,
   .battle-command-layout {
     grid-template-columns: 1fr;
   }
 
   .battle-command-card {
     min-height: auto;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .saw-visual-detail {
+    width: 100%;
   }
 }
 
@@ -367,6 +729,61 @@
   color: #ff6347 !important;
   font-weight: bold;
   animation: boss-flash 1s ease-in-out 4;
+}
+
+.battle-reward-effect {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  pointer-events: none;
+}
+
+.battle-reward-effect-card {
+  width: min(28rem, 92vw);
+  border: 1px solid rgba(255, 214, 102, 0.62);
+  border-radius: 0.75rem;
+  background: rgba(8, 12, 18, 0.9);
+  box-shadow: 0 0 1.5rem rgba(255, 193, 7, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: #fff7d1;
+  padding: 1rem 1.25rem;
+  text-align: center;
+  backdrop-filter: blur(6px);
+  animation: reward-pop 900ms ease-out both;
+}
+
+.battle-reward-effect-title {
+  margin-bottom: 0.45rem;
+  color: #ffd766;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.battle-reward-effect-line {
+  margin: 0.15rem 0;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+@keyframes reward-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.94);
+    filter: brightness(1.5);
+  }
+
+  42% {
+    opacity: 1;
+    transform: translateY(0) scale(1.03);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
 }
 
 .starter-weapon-page {

@@ -479,6 +479,16 @@ module Game
         armor.update!(equipped: true)
       end
 
+      if battle
+        enemy_result = BattleService.apply_enemy_attack!(player, battle)
+        if enemy_result.status == :defeated
+          redirect_to game_path(panel: "inn"), alert: "#{armor.name}を装備した。#{enemy_result.message}"
+        else
+          redirect_to game_path(battle_command: "attack"), notice: "#{armor.name}を装備した。#{enemy_result.message}"
+        end
+        return
+      end
+
       redirect_to game_path(panel: "equipment"), notice: "#{armor.name}を装備した。"
     end
 

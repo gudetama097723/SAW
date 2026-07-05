@@ -48,11 +48,14 @@
     end
   end
 
-  def self.resolve_player_attack!(battle:, player:, mob_part_id:, target_enemy_id: nil, target_enemy_ids: nil, group_start: nil, label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:, area: false, attack_attribute: nil, skill_key: nil)
+  def self.resolve_player_attack!(battle:, player:, mob_part_id:, target_enemy_id: nil, target_enemy_ids: nil, group_start: nil, label:, damage_multiplier:, durability_cost:, skill_gain:, stiffness:, hits:, sword_skill:, area: false, attack_attribute: nil, skill_key: nil, cooldown: 0)
     return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
 
     weapon = combat_weapon_for(player)
     return Result.new(status: :error, message: "武器を装備していないため、ソードスキルは使用できません。") if sword_skill && !weapon
+    if sword_skill && player.sword_skill_on_cooldown?(skill_key)
+      return Result.new(status: :error, message: "#{SkillCatalog.find(skill_key).name}はクールタイム中です。あと#{player.sword_skill_cooldown(skill_key)}ターン使用できません。")
+    end
 
     ensure_battle_enemies!(battle)
     turn_messages = apply_battle_turn_start_effects!(player, battle)
@@ -64,6 +67,7 @@
     blocked_message = StatusEffectService.action_blocked_message!(player)
     if blocked_message
       BuffEffectService.tick_battle_turn!(player)
+      tick_sword_skill_cooldowns_for_turn!(player, battle)
       player.save!
       enemy_result = apply_enemy_attack!(player, battle)
       return enemy_result if enemy_result.status == :defeated
@@ -71,7 +75,7 @@
       return Result.new(status: :ok, message: "#{turn_messages.join}#{blocked_message}#{enemy_result.message}")
     end
 
-    target_enemies = target_enemies_for(battle, target_enemy_id, group_start, area, target_enemy_ids)
+    target_enemies = target_enemies_for(battle, target_enemy_id, group_start, area, target_enemy_ids, max_targets: sword_skill ? SkillCatalog.find(skill_key).max_targets : 4)
     return Result.new(status: :error, message: "攻撃対象がいません。") if target_enemies.empty?
 
     hit_messages = []
@@ -120,6 +124,8 @@
 
       stiffness_message = stiffness_result.message
     end
+
+    finish_player_cooldown_turn!(player, battle, skill_key: skill_key, cooldown: cooldown, sword_skill: sword_skill)
 
     Result.new(
       status: :ok,
@@ -181,6 +187,8 @@
 
     player.save!
     if battle.alive_enemies.reload.empty?
+      player.clear_sword_skill_cooldowns!
+      player.save!
       battle.destroy!
       messages << "敵はいなくなった。"
     end
@@ -199,6 +207,7 @@
     return nil unless blocked_message
 
     BuffEffectService.tick_battle_turn!(player)
+    tick_sword_skill_cooldowns_for_turn!(player, battle)
     player.save!
     enemy_result = apply_enemy_attack!(player, battle)
     return enemy_result if enemy_result.status == :defeated
@@ -245,17 +254,18 @@
     battle.alive_enemies.to_a
   end
 
-  def self.target_enemies_for(battle, target_enemy_id, group_start, area, target_enemy_ids = nil)
+  def self.target_enemies_for(battle, target_enemy_id, group_start, area, target_enemy_ids = nil, max_targets: 4)
     alive = battle.alive_enemies.to_a
     if area
+      limit = [max_targets.to_i, 1].max
       selected_ids = Array(target_enemy_ids).flat_map { |ids| ids.to_s.split(",") }.map(&:to_i).reject(&:zero?)
       if selected_ids.any?
-        return alive.select { |enemy| selected_ids.include?(enemy.id) }.first(4)
+        return alive.select { |enemy| selected_ids.include?(enemy.id) }.first(limit)
       end
 
       start = group_start.to_i
       start = alive.first&.position.to_i if start <= 0
-      alive.select { |enemy| enemy.position >= start && enemy.position < start + 4 }.first(4)
+      alive.select { |enemy| enemy.position >= start && enemy.position < start + limit }.first(limit)
     elsif target_enemy_id.present?
       alive.select { |enemy| enemy.id == target_enemy_id.to_i }
     else
@@ -390,6 +400,7 @@ end
   def self.handle_player_defeat!(player, battle, prefix_message)
     respawn_location = player.death_respawn_location
     StatusEffectService.clear_all!(player)
+    player.clear_sword_skill_cooldowns!
     player.hp = player.effective_max_hp
     player.floor = respawn_location&.floor || 1
     player.col = 0
@@ -440,12 +451,14 @@ end
     exp_message = gain_exp_message(player, defeated_enemies)
     skill_message = gain_weapon_skill_for_victory!(player, weapon, defeated_enemies.count, skill_gain, sword_skill, skill_key)
     BuffEffectService.clear_battle_effects!(player)
+    player.clear_sword_skill_cooldowns!
     player.save!
     battle.destroy!
 
     broken_message = destroy_weapon_if_broken!(weapon)
     victory_message = defeated_enemies.many? ? "敵を全て倒した！" : ""
-    Result.new(status: :ok, message: "#{label}！#{damage_message}！#{victory_message}#{col_reward}コル獲得！#{exp_message}#{boss_reward_message}#{dropped_item_message}#{broken_part_drop_message}#{dropped_weapon_message}#{broken_message}#{skill_message}")
+    reward_message = "#{victory_message}#{col_reward}コル獲得！#{exp_message}#{boss_reward_message}#{dropped_item_message}#{broken_part_drop_message}#{dropped_weapon_message}"
+    Result.new(status: :ok, message: "#{label}！#{damage_message}！[reward]#{reward_message}[/reward]#{broken_message}#{skill_message}")
   end
 
   def self.hit_message(index, hits, message)
@@ -709,6 +722,21 @@ def self.gain_weapon_skill!(player, weapon, amount)
 
   def self.record_normal_attack_use!(player, weapon)
     player.increment_skill_counter!(SkillUnlockService.weapon_attack_counter_key(weapon_skill_name(weapon)))
+  end
+
+  def self.finish_player_cooldown_turn!(player, battle, skill_key:, cooldown:, sword_skill:)
+    return if battle.destroyed?
+
+    tick_sword_skill_cooldowns_for_turn!(player, battle)
+    player.start_sword_skill_cooldown!(skill_key, cooldown) if sword_skill
+    player.save!
+  end
+
+  def self.tick_sword_skill_cooldowns_for_turn!(player, battle)
+    return if battle.destroyed?
+    return if battle.alive_enemies.reload.empty?
+
+    player.tick_sword_skill_cooldowns!
   end
 
   def self.destroy_weapon_if_broken!(weapon)

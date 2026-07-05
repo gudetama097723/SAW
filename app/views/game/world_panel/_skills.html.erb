@@ -23,7 +23,10 @@
                       class: "btn #{selected_sword_skill&.key == s.key ? 'btn-info' : 'btn-outline-light'} w-100" %>
                   <% if selected_sword_skill&.key == s.key %>
                     <div class="border rounded p-2 mt-2">
+                      <%= render "game/visual_asset", kind: :skill, asset_key: s.key, label: s.name, class_name: "saw-visual-detail mb-2" %>
                       <p class="mb-1">威力倍率: <%= s.damage_multiplier %>%</p>
+                      <% cooldown = @player.sword_skill_cooldown(s.key) %>
+                      <p class="mb-1">CT: <%= cooldown.positive? ? "#{cooldown}（残り）" : s.cooldown %></p>
                       <p class="mb-1">ヒット数: <%= s.hits %></p>
                       <p class="mb-1">種別: <%= s.target_label %></p>
                       <p class="mb-0"><%= s.description %></p>
