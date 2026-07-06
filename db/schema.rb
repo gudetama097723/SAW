@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_05_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_06_000000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -152,6 +152,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_000000) do
     t.datetime "created_at", null: false
     t.integer "durability", default: 0, null: false
     t.integer "durability_growth", default: 0, null: false
+    t.text "enemy_sword_skill_keys", default: "", null: false
+    t.integer "enemy_sword_skill_proficiency"
     t.integer "exp_reward", default: 10, null: false
     t.integer "field_area_id"
     t.integer "flee_rate", default: 0, null: false

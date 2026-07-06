@@ -299,7 +299,7 @@
                  target_enemy_id: enemy.id
                }
              end %>
-          <%= link_to game_path(target_params), class: enemy_selected ? "battle-enemy-card battle-target-card-active" : "battle-enemy-card" do %>
+          <%= link_to game_path(target_params), class: battle_enemy_card_classes(@player, enemy, selected: enemy_selected) do %>
             <%= render "game/visual_asset", kind: :mob, record: enemy.mob, label: enemy.display_name, class_name: "saw-visual-battle-mob" %>
             <h5 class="mb-2"><%= enemy.position %>. <%= enemy.display_name %></h5>
             <p class="mb-1">

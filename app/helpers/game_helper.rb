@@ -81,6 +81,28 @@ module GameHelper
     end
   end
 
+  def battle_enemy_card_classes(player, enemy, selected: false)
+    [
+      "battle-enemy-card",
+      ("battle-target-card-active" if selected),
+      battle_enemy_threat_class(player, enemy)
+    ].compact.join(" ")
+  end
+
+  def battle_enemy_threat_class(player, enemy)
+    level_gap = enemy.effective_level.to_i - player.effective_level.to_i
+    return nil if level_gap < 2
+
+    case level_gap
+    when 2..4
+      "battle-enemy-threat-unease"
+    when 5..7
+      "battle-enemy-threat-danger"
+    else
+      "battle-enemy-threat-nightmare"
+    end
+  end
+
   private
 
   def game_background_asset_key(player, environment_location)

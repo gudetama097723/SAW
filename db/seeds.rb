@@ -164,7 +164,9 @@ seed_rows("mobs.csv") do |row|
     atk_growth: to_int(row["atk_growth"]) || 0,
     agility_growth: to_int(row["agility_growth"]) || 0,
     durability_growth: to_int(row["durability_growth"]) || 0,
-    col_growth: to_int(row["col_growth"]) || 0
+    col_growth: to_int(row["col_growth"]) || 0,
+    enemy_sword_skill_proficiency: to_int(row["enemy_sword_skill_proficiency"]),
+    enemy_sword_skill_keys: row["enemy_sword_skill_keys"].presence || ""
   )
   mobs[mob.name] = mob
 end
@@ -225,6 +227,8 @@ seed_rows("boss_mobs.csv") do |row|
     agility_growth: to_int(row["agility_growth"]) || 0,
     durability_growth: to_int(row["durability_growth"]) || 0,
     col_growth: to_int(row["col_growth"]) || 0,
+    enemy_sword_skill_proficiency: to_int(row["enemy_sword_skill_proficiency"]),
+    enemy_sword_skill_keys: row["enemy_sword_skill_keys"].presence || "",
     route: route,
     field_area: area,
     boss_type: row["boss_type"],

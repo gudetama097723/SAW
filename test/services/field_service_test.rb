@@ -145,6 +145,118 @@ class FieldServiceTest < ActiveSupport::TestCase
     end
   end
 
+  test "encounter mobs keep player time for night spawn level bonus" do
+    player = players(:one)
+    route = routes(:one)
+    route.update!(name: "はじまりの草原")
+    player.update!(field_route: route, current_time: 23 * 60)
+    mob = mobs(:one)
+    mob.update!(name: "スライム", level: 1)
+
+    FieldService.singleton_class.define_method(:rand) do |arg = nil|
+      case arg
+      when Range
+        arg.begin
+      when Integer
+        0
+      else
+        0
+      end
+    end
+    begin
+      encounter = FieldService.encounter_mobs_for(player).first
+    ensure
+      FieldService.singleton_class.remove_method(:rand)
+    end
+
+    assert_equal "スライム", encounter.mob.name
+    assert_equal 5, encounter.level
+  end
+
+  test "wolf territory can spawn pack wolves in groups of up to five" do
+    player = players(:one)
+    route = routes(:one)
+    area = field_areas(:one)
+    route.update!(name: "はじまりの草原")
+    area.update!(route: route, name: "獣道・狼の縄張り", start_distance: 91, end_distance: 120)
+    player.update!(field_route: route, field_position: 95, current_time: 12 * 60)
+    Mob.create!(name: "群狼", hp: 55, atk: 26, rarity: "normal", level: 6, agility: 9, durability: 8, exp_reward: 55, flee_rate: 0)
+
+    FieldService.singleton_class.define_method(:rand) do |arg = nil|
+      case arg
+      when Range
+        arg.end
+      when Integer
+        0
+      else
+        0
+      end
+    end
+    begin
+      encounters = FieldService.encounter_mobs_for(player)
+    ensure
+      FieldService.singleton_class.remove_method(:rand)
+    end
+
+    assert_equal 5, encounters.size
+    assert encounters.all? { |encounter| encounter.mob.name == "群狼" }
+  end
+
+  test "pack wolf king battle includes exactly two pack wolf companions" do
+    player = players(:one)
+    route = routes(:one)
+    area = field_areas(:one)
+    route.update!(name: "はじまりの草原")
+    area.update!(route: route, name: "獣道・狼の縄張り", start_distance: 91, end_distance: 120)
+    player.update!(field_route: route, field_position: 95, current_time: 12 * 60)
+    king = Mob.create!(name: "群狼の王", hp: 240, atk: 34, rarity: "boss", boss_type: "area_boss", level: 8, agility: 12, durability: 22, exp_reward: 500, flee_rate: 0)
+    Mob.create!(name: "群狼", hp: 55, atk: 26, rarity: "normal", level: 6, agility: 9, durability: 8, exp_reward: 55, flee_rate: 0)
+
+    FieldService.singleton_class.define_method(:rand) do |arg = nil|
+      case arg
+      when Range
+        arg.end
+      when Integer
+        0
+      else
+        0
+      end
+    end
+    begin
+      battle = FieldService.create_battle!(player, [king])
+    ensure
+      FieldService.singleton_class.remove_method(:rand)
+    end
+
+    enemies = battle.battle_enemies.order(:position).to_a
+    names = enemies.map { |enemy| enemy.mob.name }
+    assert_equal 3, names.size
+    assert_equal "群狼の王", names.first
+    assert_equal 2, names.count("群狼")
+  end
+
+  test "fenrir battle includes four high level pack wolf companions" do
+    player = players(:one)
+    route = routes(:one)
+    area = field_areas(:one)
+    route.update!(name: "はじまりの草原")
+    area.update!(route: route, name: "獣道・狼の縄張り", start_distance: 91, end_distance: 120)
+    player.update!(field_route: route, field_position: 95, current_time: 12 * 60)
+    fenrir = Mob.create!(name: "蒼狼フェンリル", hp: 720, atk: 58, rarity: "boss", boss_type: "field_boss", level: 12, agility: 18, durability: 38, exp_reward: 1500, flee_rate: 0)
+    Mob.create!(name: "群狼", hp: 55, atk: 26, rarity: "normal", level: 6, agility: 9, durability: 8, exp_reward: 55, flee_rate: 0)
+
+    battle = FieldService.create_battle!(player, [fenrir])
+
+    enemies = battle.battle_enemies.order(:position).to_a
+    names = enemies.map { |enemy| enemy.mob.name }
+    wolf_levels = enemies.select { |enemy| enemy.mob.name == "群狼" }.map(&:effective_level)
+
+    assert_equal 5, names.size
+    assert_equal "蒼狼フェンリル", names.first
+    assert_equal 4, names.count("群狼")
+    assert_equal [10, 10, 10, 10], wolf_levels
+  end
+
   test "battle creation applies per-stat mob growth" do
     player = players(:one)
     route = routes(:one)

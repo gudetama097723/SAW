@@ -28,3 +28,6 @@ mob,item_name,category,weight,min_level,max_level
 コボルド斥候,コボルドの牙,drop,5,1,999
 コボルド斥候,コボルドの短刃片,drop,4,1,999
 コボルド斥候,斥候の徽章,drop,1,4,999
+群狼,群狼の牙,drop,6,1,999
+群狼,群狼の毛皮,drop,5,1,999
+群狼,群狼の爪,drop,3,6,999

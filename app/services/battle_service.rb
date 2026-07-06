@@ -1,5 +1,6 @@
 ﻿class BattleService
   Result = Struct.new(:status, :message, keyword_init: true)
+  ENEMY_SWORD_SKILL_RATE = 35
 
   def self.ensure_mob_parts!(mob)
     return [] unless mob
@@ -156,33 +157,26 @@
         next
       end
 
+      sword_skill = enemy_sword_skill_for(battle_enemy)
       if allow_evasion && evaded_enemy_attack?(player, battle_enemy)
+        start_enemy_sword_skill_cooldown!(battle_enemy, sword_skill) if sword_skill
         BuffEffectService.tick_battle_turn!(battle_enemy)
         battle_enemy.save!
-        messages << enemy_message("#{prefix}#{mob_name}の攻撃を回避した！")
+        messages << enemy_message("#{prefix}#{mob_name}の#{enemy_attack_name(sword_skill)}を回避した！")
         next
       end
 
-      raw_damage = rand(1..mob_effective_atk(battle_enemy))
-      defense_rate = 100.0 / (100 + [player.damage_cut.to_i, 0].max * 10)
-      enemy_damage = [(raw_damage * defense_rate).ceil, 1].max
-      enemy_damage = (enemy_damage * StatusEffectService.damage_dealt_multiplier(battle_enemy)).ceil
-      enemy_damage = (enemy_damage * StatusEffectService.damage_taken_multiplier(player)).ceil
-      enemy_damage = (enemy_damage * BuffEffectService.defense_damage_taken_multiplier(player)).ceil
-      critical = StatusEffectService.sleeping_critical!(player)
-      enemy_damage *= 2 if critical
+      enemy_damage = enemy_attack_damage(player, battle_enemy, sword_skill)
       player.hp = player.hp.to_i - enemy_damage
       apply_mob_status_attacks!(player, battle_enemy)
 
       if player.hp <= 0
-        critical_message = critical ? "クリティカル！" : ""
-        return handle_player_defeat!(player, battle, "#{enemy_message("#{prefix}#{mob_name}の攻撃！#{critical_message}#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。")
+        return handle_player_defeat!(player, battle, "#{enemy_message("#{prefix}#{mob_name}の#{enemy_attack_name(sword_skill)}！#{enemy_skill_hit_text(sword_skill)}#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。")
       end
 
-      critical_message = critical ? "クリティカル！" : ""
       BuffEffectService.tick_battle_turn!(battle_enemy)
       battle_enemy.save!
-      messages << enemy_message("#{prefix}#{mob_name}の攻撃！#{critical_message}#{enemy_damage}ダメージを受けた！")
+      messages << enemy_message("#{prefix}#{mob_name}の#{enemy_attack_name(sword_skill)}！#{enemy_skill_hit_text(sword_skill)}#{enemy_damage}ダメージを受けた！")
     end
 
     player.save!
@@ -577,6 +571,106 @@ end
   def self.mob_effective_atk(battle_enemy)
     penalty = broken_parts_with_effect(battle_enemy, "strength_down").count * 0.35
     [(battle_enemy.effective_atk * (1.0 - penalty)).ceil, 1].max
+  end
+
+  def self.enemy_sword_skill_for(battle_enemy)
+    return unless battle_enemy.mob.equipped_weapon
+
+    candidates = enemy_sword_skills_for(battle_enemy)
+    return if candidates.empty?
+    return candidates.sample if battle_enemy.mob.boss?
+    return unless rand(100) < ENEMY_SWORD_SKILL_RATE
+
+    candidates.sample
+  end
+
+  def self.enemy_sword_skills_for(battle_enemy)
+    weapon = battle_enemy.mob.equipped_weapon
+    return [] unless weapon
+
+    configured_keys = battle_enemy.mob.enemy_sword_skill_key_list
+    skills = SkillCatalog.sword_skills(weapon.weapon_type)
+    if configured_keys.any?
+      return skills.select do |skill|
+        configured_keys.include?(skill.key.to_s) && !enemy_sword_skill_on_cooldown?(battle_enemy, skill.key)
+      end
+    end
+
+    proficiency = enemy_sword_skill_proficiency_for(battle_enemy)
+    skills.select do |skill|
+      skill.unlocked?(proficiency) && !enemy_sword_skill_on_cooldown?(battle_enemy, skill.key)
+    end
+  end
+
+  def self.enemy_sword_skill_proficiency_for(battle_enemy)
+    override = battle_enemy.mob.has_attribute?(:enemy_sword_skill_proficiency) ? battle_enemy.mob.enemy_sword_skill_proficiency.to_i : 0
+    return override if override.positive?
+
+    enemy_sword_skill_proficiency_for_level(battle_enemy.effective_level)
+  end
+
+  def self.enemy_sword_skill_proficiency_for_level(enemy_level)
+    tier = (([enemy_level.to_i, 1].max - 1) / 10) + 1
+    tier * 100
+  end
+
+  def self.enemy_sword_skill_on_cooldown?(battle_enemy, skill_key)
+    BuffEffectService.battle_effects(battle_enemy).key?(enemy_sword_skill_cooldown_key(skill_key))
+  end
+
+  def self.start_enemy_sword_skill_cooldown!(battle_enemy, skill)
+    return unless skill&.cooldown.to_i.positive?
+
+    BuffEffectService.apply_battle_effect!(
+      battle_enemy,
+      enemy_sword_skill_cooldown_key(skill.key),
+      {},
+      turns: skill.cooldown.to_i + 1
+    )
+  end
+
+  def self.enemy_sword_skill_cooldown_key(skill_key)
+    "enemy_sword_skill:#{skill_key}"
+  end
+
+  def self.enemy_attack_name(sword_skill)
+    sword_skill ? sword_skill.name : "攻撃"
+  end
+
+  def self.enemy_skill_hit_text(sword_skill)
+    return "" unless sword_skill&.hits.to_i > 1
+
+    "#{sword_skill.hits.to_i}ヒット "
+  end
+
+  def self.enemy_attack_damage(player, battle_enemy, sword_skill)
+    start_enemy_sword_skill_cooldown!(battle_enemy, sword_skill) if sword_skill
+
+    hit_count = sword_skill ? [sword_skill.hits.to_i, 1].max : 1
+    Array.new(hit_count).sum do
+      raw_damage = rand(1..enemy_attack_power(battle_enemy, sword_skill))
+      apply_enemy_damage_mitigation(player, battle_enemy, raw_damage)
+    end
+  end
+
+  def self.enemy_attack_power(battle_enemy, sword_skill)
+    base_power = mob_effective_atk(battle_enemy)
+    if sword_skill
+      base_power += battle_enemy.mob.equipped_weapon&.effective_attack_power.to_i
+      base_power = (base_power * sword_skill.damage_multiplier.to_i / 100.0).ceil
+    end
+
+    [base_power, 1].max
+  end
+
+  def self.apply_enemy_damage_mitigation(player, battle_enemy, raw_damage)
+    defense_rate = 100.0 / (100 + [player.damage_cut.to_i, 0].max * 10)
+    enemy_damage = [(raw_damage * defense_rate).ceil, 1].max
+    enemy_damage = (enemy_damage * StatusEffectService.damage_dealt_multiplier(battle_enemy)).ceil
+    enemy_damage = (enemy_damage * StatusEffectService.damage_taken_multiplier(player)).ceil
+    enemy_damage = (enemy_damage * BuffEffectService.defense_damage_taken_multiplier(player)).ceil
+    enemy_damage *= 2 if StatusEffectService.sleeping_critical!(player)
+    enemy_damage
   end
 
   def self.mob_effective_agility(battle_enemy)

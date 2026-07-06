@@ -230,4 +230,84 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_not_includes low_level_names, "スライムコア"
     assert_includes high_level_names, "スライムコア"
   end
+
+  test "enemy sword skill proficiency scales by ten level tiers" do
+    assert_equal 100, BattleService.enemy_sword_skill_proficiency_for_level(1)
+    assert_equal 100, BattleService.enemy_sword_skill_proficiency_for_level(10)
+    assert_equal 200, BattleService.enemy_sword_skill_proficiency_for_level(11)
+    assert_equal 300, BattleService.enemy_sword_skill_proficiency_for_level(21)
+  end
+
+  test "armed enemies can use unlocked sword skills" do
+    mob = Mob.create!(name: "武装スキルmob", hp: 30, atk: 10, rarity: "normal", level: 10, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    mob.weapons.create!(name: "敵用ショートソード", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
+    battle = battles(:one)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 10, position: 1)
+
+    skill_names = BattleService.enemy_sword_skills_for(enemy).map(&:name)
+
+    assert_includes skill_names, "バーチカル"
+    assert_includes skill_names, "バーチカルアーク"
+    assert_not_includes skill_names, "ホリゾンタルアーク"
+  end
+
+  test "bosses use available sword skills without random rate gate" do
+    mob = Mob.create!(name: "武装ボスmob", hp: 30, atk: 10, rarity: "boss", boss_type: "area_boss", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    mob.weapons.create!(name: "ボス用ショートソード", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
+    battle = battles(:one)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 1, position: 1)
+
+    BattleService.singleton_class.define_method(:rand) { |arg = nil| arg.is_a?(Range) ? arg.end : 99 }
+    begin
+      skill = BattleService.enemy_sword_skill_for(enemy)
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+
+    assert_includes ["バーチカル", "ホリゾンタル", "バーチカルアーク"], skill.name
+  end
+
+  test "configured enemy sword skill keys bypass proficiency for future floor bosses" do
+    mob = Mob.create!(
+      name: "階層ボステストmob",
+      hp: 30,
+      atk: 10,
+      rarity: "boss",
+      boss_type: "floor_boss",
+      level: 1,
+      agility: 1,
+      durability: 1,
+      exp_reward: 10,
+      flee_rate: 0,
+      enemy_sword_skill_keys: "horizontal_arc"
+    )
+    mob.weapons.create!(name: "階層ボス用剣", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
+    enemy = battles(:one).battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 1, position: 1)
+
+    skill_names = BattleService.enemy_sword_skills_for(enemy).map(&:name)
+
+    assert_equal ["ホリゾンタルアーク"], skill_names
+  end
+
+  test "armed enemy randomly uses a sword skill in battle" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, agility: 0)
+    mob = Mob.create!(name: "ソードスキル使用mob", hp: 30, atk: 10, rarity: "normal", level: 10, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    mob.weapons.create!(name: "敵用ショートソード", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
+    battle = player.battles.create!(mob: mob, enemy_hp: 30)
+    battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 10, position: 1)
+
+    BattleService.singleton_class.define_method(:rand) do |arg = nil|
+      arg.is_a?(Range) ? arg.end : 0
+    end
+    begin
+      result = BattleService.apply_enemy_attack!(player, battle, allow_evasion: false)
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+
+    assert_equal :ok, result.status
+    assert_match(/ソードスキル使用mobの(バーチカル|ホリゾンタル|バーチカルアーク)！/, result.message)
+    assert_operator player.reload.hp, :<, 100
+  end
 end

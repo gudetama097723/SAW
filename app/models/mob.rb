@@ -60,6 +60,12 @@
     true
   end
 
+  def enemy_sword_skill_key_list
+    return [] unless has_attribute?(:enemy_sword_skill_keys)
+
+    enemy_sword_skill_keys.to_s.split(/[|,、]/).map(&:strip).reject(&:blank?)
+  end
+
   def reward
     JSON.parse(reward_data.presence || "{}")
   rescue JSON::ParserError

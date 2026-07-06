@@ -3,6 +3,13 @@ class FieldService
   Encounter = Struct.new(:mob, :level, keyword_init: true)
   REQUIRED_MAPPING_TO_REACH_DESTINATION = 30
   ROAMING_AREA_BOSS_ENCOUNTER_RATE = 5
+  PACK_MOB_NAME = "群狼"
+  PACK_LEADER_NAME = "群狼の王"
+  FENRIR_NAME = "蒼狼フェンリル"
+  PACK_ENCOUNTER_SIZE = 2..5
+  PACK_LEADER_COMPANION_COUNT = 2
+  FENRIR_COMPANION_COUNT = 4
+  FENRIR_COMPANION_LEVEL_OFFSET = -2
   TIME_PERIOD_MODIFIERS = {
     dawn: { encounter: 0.9, danger: 0.85, level_bonus: 0 },
     day: { encounter: 1.0, danger: 1.0, level_bonus: 0 },
@@ -213,6 +220,7 @@ class FieldService
 
   def self.create_battle!(player, mobs, ambush: false)
     encounters = Array(mobs).compact.map { |entry| normalize_encounter(entry, player) }.compact
+    encounters = expand_pack_leader_encounter(encounters, player)
     first_mob = encounters.first&.mob
     return unless first_mob
 
@@ -268,9 +276,9 @@ class FieldService
       return [roaming_boss] if roaming_boss
     end
 
-    context = field_context(player_or_route)
+    context = player_or_route
     count = encounter_count_for(context)
-    Array.new(count) { weighted_encounter_mob_for(context) }.compact
+    expand_pack_encounter(Array.new(count) { weighted_encounter_mob_for(context) }.compact, context)
   end
 
   def self.roaming_area_boss_for(player)
@@ -299,8 +307,10 @@ class FieldService
   end
 
   def self.encounter_entries_for(context)
-    field_name = field_name_for(context)
-    rows = mob_spawn_rows.select { |row| row["location"] == field_name }
+    rows = spawn_location_names_for(context).lazy.map do |field_name|
+      mob_spawn_rows.select { |row| row["location"] == field_name }
+    end.find(&:any?) || []
+
     rows.filter_map do |row|
       mob = Mob.find_by(name: row["mob"])
       weight = row["weight"].to_i
@@ -313,6 +323,45 @@ class FieldService
         max_level: row["max_level"].presence&.to_i
       }
     end
+  end
+
+  def self.spawn_location_names_for(context)
+    names = []
+    if context.respond_to?(:field_route)
+      names << current_area_for(context)&.name
+    end
+
+    names << field_name_for(context)
+    names.compact_blank.uniq
+  end
+
+  def self.expand_pack_encounter(encounters, context)
+    return encounters unless encounters.any? { |encounter| encounter.respond_to?(:mob) && encounter.mob.name == PACK_MOB_NAME }
+
+    Array.new(rand(PACK_ENCOUNTER_SIZE)) { pack_wolf_encounter(context) }.compact
+  end
+
+  def self.expand_pack_leader_encounter(encounters, context)
+    leader = encounters.find { |encounter| encounter.respond_to?(:mob) && [PACK_LEADER_NAME, FENRIR_NAME].include?(encounter.mob.name) }
+    return encounters unless leader
+
+    companion_count = leader.mob.name == FENRIR_NAME ? FENRIR_COMPANION_COUNT : PACK_LEADER_COMPANION_COUNT
+    companion_level = if leader.mob.name == FENRIR_NAME
+                        [leader.level.to_i + FENRIR_COMPANION_LEVEL_OFFSET, 1].max
+                      end
+    companions = Array.new(companion_count) { pack_wolf_encounter(context, level: companion_level) }.compact
+    (encounters + companions).first(5)
+  end
+
+  def self.pack_wolf_encounter(context, level: nil)
+    wolf_entry = encounter_entries_for(context).find { |entry| entry[:mob].name == PACK_MOB_NAME }
+    wolf = wolf_entry&.dig(:mob) || Mob.find_by(name: PACK_MOB_NAME)
+    return unless wolf
+
+    wolf_entry ||= { mob: wolf, weight: 1, min_level: wolf.level, max_level: wolf.level }
+    return Encounter.new(mob: wolf, level: level) if level
+
+    encounter_for_entry(wolf_entry, context)
   end
 
   def self.encounter_for_entry(entry, context)

@@ -80,6 +80,19 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_match(/target_enemy_id=#{left_enemy.id}.*battle_command=battle|battle_command=battle.*target_enemy_id=#{left_enemy.id}/, response.body)
   end
 
+  test "stronger battle enemies render threatening card style" do
+    @player.update!(level: 1)
+    mob = Mob.create!(name: "脅威表示テストmob", hp: 10, atk: 1, rarity: "normal", level: 9, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = @player.battles.create!(mob: mob, enemy_hp: 10)
+    BattleService.ensure_battle_enemies!(battle)
+    battle.battle_enemies.first.update!(enemy_level: 9)
+
+    get game_path
+
+    assert_response :success
+    assert_includes response.body, "battle-enemy-threat-nightmare"
+  end
+
   test "area skill selection shows limit warning" do
     mob = Mob.create!(name: "範囲選択上限テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
     battle = @player.battles.create!(mob: mob, enemy_hp: 10)
