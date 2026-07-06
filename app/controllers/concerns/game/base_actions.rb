@@ -27,7 +27,7 @@ module Game
         player.player_bases.find_or_create_by!(location: location, base_type: base_type).update!(
           active: true,
           rent: base_type == "home" ? (location.name == "はじまりの街" ? 0 : 300) : 50,
-          storage_limit: base_type == "home" ? 30 : 10
+          storage_limit: storage_limit_for_base(location, base_type)
         )
       end
       redirect_to game_path(panel: "inn", inn_menu: "base"), notice: "#{location.name}を#{base_label}にした。"
@@ -345,6 +345,12 @@ module Game
     end
 
     private
+
+    def storage_limit_for_base(location, base_type)
+      return 10 unless base_type == "home"
+
+      location.name == "はじまりの街" ? 100 : 30
+    end
 
     def current_inn_base_for(player)
       base_type = player.location&.name == "ホルンカの村" ? "temporary" : "home"

@@ -201,6 +201,18 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_includes flash[:notice], "450分経過した"
   end
 
+  test "beginning town home base has expanded storage limit" do
+    beginning_town = Location.create!(name: "はじまりの街", floor: 1, danger_level: 0, safe_area: true)
+    @player.update!(location: beginning_town)
+    @player.town_discovery_for.update!(found_inn: true)
+
+    post set_home_base_path, params: { confirm: "1" }
+
+    assert_redirected_to game_path(panel: "inn", inn_menu: "base")
+    base = @player.player_bases.find_by!(location: beginning_town, base_type: "home")
+    assert_equal 100, base.storage_limit
+  end
+
   test "can allocate some or all stat points" do
     @player.update!(stat_points: 3, strength: 10, agility: 10)
 
