@@ -6,10 +6,10 @@ class FieldService
   PACK_MOB_NAME = "群狼"
   PACK_LEADER_NAME = "群狼の王"
   FENRIR_NAME = "蒼狼フェンリル"
-  PACK_ENCOUNTER_SIZE = 2..5
+  PACK_ENCOUNTER_SIZE = 1..3
   PACK_LEADER_COMPANION_COUNT = 2
-  FENRIR_COMPANION_COUNT = 4
-  FENRIR_COMPANION_LEVEL_OFFSET = -2
+  FENRIR_COMPANION_COUNT = 2
+  FENRIR_COMPANION_LEVEL_OFFSET = -6
   TIME_PERIOD_MODIFIERS = {
     dawn: { encounter: 0.9, danger: 0.85, level_bonus: 0 },
     day: { encounter: 1.0, danger: 1.0, level_bonus: 0 },

@@ -26,6 +26,20 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "環境：通常"
   end
 
+  test "info commands hide while viewing npc or facility panels" do
+    get game_path
+    assert_response :success
+    assert_includes response.body, "情報コマンド"
+
+    get game_path, params: { panel: "inn" }
+    assert_response :success
+    assert_not_includes response.body, "情報コマンド"
+
+    get game_path, params: { panel: "npc" }
+    assert_response :success
+    assert_not_includes response.body, "情報コマンド"
+  end
+
   test "battle commands hide weapon actions without combat weapon" do
     @player.weapons.destroy_all
     mob = Mob.create!(name: "武器なし表示テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)

@@ -173,7 +173,7 @@ class FieldServiceTest < ActiveSupport::TestCase
     assert_equal 5, encounter.level
   end
 
-  test "wolf territory can spawn pack wolves in groups of up to five" do
+  test "wolf territory can spawn pack wolves in groups of up to three" do
     player = players(:one)
     route = routes(:one)
     area = field_areas(:one)
@@ -198,7 +198,7 @@ class FieldServiceTest < ActiveSupport::TestCase
       FieldService.singleton_class.remove_method(:rand)
     end
 
-    assert_equal 5, encounters.size
+    assert_equal 3, encounters.size
     assert encounters.all? { |encounter| encounter.mob.name == "群狼" }
   end
 
@@ -235,7 +235,7 @@ class FieldServiceTest < ActiveSupport::TestCase
     assert_equal 2, names.count("群狼")
   end
 
-  test "fenrir battle includes four high level pack wolf companions" do
+  test "fenrir battle includes two lower level pack wolf companions" do
     player = players(:one)
     route = routes(:one)
     area = field_areas(:one)
@@ -251,10 +251,10 @@ class FieldServiceTest < ActiveSupport::TestCase
     names = enemies.map { |enemy| enemy.mob.name }
     wolf_levels = enemies.select { |enemy| enemy.mob.name == "群狼" }.map(&:effective_level)
 
-    assert_equal 5, names.size
+    assert_equal 3, names.size
     assert_equal "蒼狼フェンリル", names.first
-    assert_equal 4, names.count("群狼")
-    assert_equal [10, 10, 10, 10], wolf_levels
+    assert_equal 2, names.count("群狼")
+    assert_equal [6, 6], wolf_levels
   end
 
   test "battle creation applies per-stat mob growth" do
