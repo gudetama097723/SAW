@@ -117,10 +117,11 @@ class ExplorationRewardServiceTest < ActiveSupport::TestCase
     assert_operator player.skills.find_by(name: "探索").skill_exp, :>, 0
   end
 
-  test "ignored treasure is hidden from discovered treasure actions" do
+  test "ignored treasure remains available while player stays in the same area" do
     player = create_player!
     route = create_route!
     area = create_area!(route)
+    player.update!(field_route: route, field_position: 0)
     treasure = TreasureChest.create!(
       route: route,
       field_area: area,
@@ -135,6 +136,28 @@ class ExplorationRewardServiceTest < ActiveSupport::TestCase
     result = ExplorationRewardService.ignore_treasure!(player, treasure)
 
     assert_equal :ok, result.status
+    assert_includes ExplorationRewardService.discovered_treasure_states(player), player.player_treasure_chests.find_by(treasure_chest: treasure)
+    assert_empty ExplorationRewardService.pending_treasure_states(player)
+  end
+
+  test "discovered treasure is only available in current area" do
+    player = create_player!
+    route = create_route!
+    area = create_area!(route)
+    other_area = create_area!(route)
+    other_area.update!(name: "別区画", start_distance: 101, end_distance: 200)
+    player.update!(field_route: route, field_position: 0)
+    treasure = TreasureChest.create!(
+      route: route,
+      field_area: other_area,
+      name: "別区画の宝箱",
+      position: 101,
+      discovery_type: "fixed",
+      required_mapping: 0,
+      reward_data: "{}"
+    )
+    player.player_treasure_chests.create!(treasure_chest: treasure, found: true)
+
     assert_empty ExplorationRewardService.discovered_treasure_states(player)
   end
 

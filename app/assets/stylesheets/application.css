@@ -109,6 +109,14 @@
   gap: 0.2rem;
 }
 
+.game-status-meter-warning .game-status-meter-head strong {
+  color: #ffd766;
+}
+
+.game-status-meter-danger .game-status-meter-head strong {
+  color: #ff8a8a;
+}
+
 .game-status-meter-head {
   display: flex;
   justify-content: space-between;
@@ -129,29 +137,113 @@
 
 .game-status-weapons {
   display: grid;
-  gap: 0.15rem;
+  align-content: center;
+  gap: 0.3rem;
 }
 
 .game-status-weapon {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
   min-width: 0;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .game-status-weapon span {
   overflow: hidden;
   font-weight: 700;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.game-status-weapon small {
-  color: rgba(248, 249, 250, 0.66);
-  font-size: 0.72rem;
+.game-status-weapon-values {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.game-status-weapon-values strong {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.55rem;
+  padding: 0.1rem 0.38rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.35rem;
+  background: rgba(0, 0, 0, 0.24);
+  color: #f8f9fa;
+  font-size: 0.88rem;
+  line-height: 1;
   white-space: nowrap;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.game-status-weapon-values strong::before {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+  width: var(--durability-percent, 0%);
+  height: 0.22rem;
+  content: "";
+  transition: width 160ms ease;
+}
+
+.weapon-durability-good {
+  border-color: rgba(74, 222, 128, 0.45) !important;
+  background: rgba(22, 101, 52, 0.18) !important;
+}
+
+.weapon-durability-good::before {
+  background: #22c55e;
+}
+
+.weapon-durability-worn {
+  border-color: rgba(250, 204, 21, 0.72) !important;
+  background: rgba(113, 63, 18, 0.34) !important;
+  color: #fff3bf !important;
+}
+
+.weapon-durability-worn::before {
+  background: #facc15;
+}
+
+.weapon-durability-damaged {
+  border-color: rgba(249, 115, 22, 0.82) !important;
+  background: rgba(124, 45, 18, 0.42) !important;
+  color: #ffddba !important;
+}
+
+.weapon-durability-damaged::before {
+  background: #f97316;
+}
+
+.weapon-durability-critical {
+  border-color: rgba(248, 113, 113, 0.9) !important;
+  background: rgba(69, 10, 10, 0.62) !important;
+  color: #ffc9c9 !important;
+  box-shadow: 0 0 0.55rem rgba(185, 28, 28, 0.35);
+}
+
+.weapon-durability-critical::before {
+  background: #ef4444;
+}
+
+.weapon-durability-broken {
+  border-color: rgba(248, 113, 113, 0.95) !important;
+  background: linear-gradient(135deg, rgba(30, 0, 0, 0.92), rgba(0, 0, 0, 0.92)) !important;
+  color: #ff8a8a !important;
+  text-decoration: line-through;
+}
+
+.weapon-durability-broken::before {
+  background: #7f1d1d;
 }
 
 .game-status-col {

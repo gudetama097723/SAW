@@ -97,14 +97,10 @@
 
   def default_status_attacks
     case name
-    when "スライム"
-      { "poison" => 12 }
     when "変異スライム"
-      { "poison" => 25 }
+      { "poison" => 10 }
     when "フォレストワスプ"
-      { "paralysis" => 25 }
-    when "蒼狼フェンリル"
-      { "curse" => 18 }
+      { "paralysis" => 14 }
     else
       {}
     end

@@ -1,7 +1,16 @@
 <div class="d-grid gap-2">
   <% in_field = @player.field_route.present? || !@player.location&.safe_area? %>
+  <% pending_treasure_states = @pending_treasure_states || [] %>
 
-  <% if @player.field_route.present? %>
+  <% if pending_treasure_states.present? %>
+    <div class="card bg-secondary text-light world-action-group">
+      <div class="card-header">発見した宝箱</div>
+      <div class="card-body d-grid gap-2">
+        <p class="small text-warning mb-0">宝箱を発見した。どうするか決めるまで、他の行動はできません。</p>
+        <%= render "game/world_panel/treasure_actions", treasure_states: pending_treasure_states %>
+      </div>
+    </div>
+  <% elsif @player.field_route.present? %>
     <div class="d-flex gap-2">
       <%= button_to "探索", explore_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-primary btn-lg w-100" %>
       <%= button_to "狩り", hunt_path, method: :post, form: { class: "flex-fill" }, class: "btn btn-danger btn-lg w-100" %>
@@ -23,6 +32,7 @@
     </div>
   <% end %>
 
+  <% unless pending_treasure_states.present? %>
   <% if @talkable_npcs.present? || !in_field %>
     <details class="card bg-secondary text-light ui-collapsible world-action-group" data-details-state-key="world-npc">
       <summary class="card-header ui-collapsible-summary">
@@ -161,43 +171,7 @@
         <span class="badge bg-warning text-dark ms-auto"><%= @available_treasures.size %></span>
       </summary>
       <div class="card-body d-grid gap-2">
-        <% @available_treasure_states.each do |treasure_state| %>
-          <% treasure = treasure_state.treasure_chest %>
-          <% if treasure_state.inspection_result.present? %>
-            <div class="small text-secondary"><%= treasure_state.inspection_result %></div>
-          <% end %>
-
-          <% if treasure.requires_inspection? %>
-            <div class="d-grid gap-2">
-              <%= button_to "#{treasure.name}を開ける",
-                  open_treasure_path(treasure_chest_id: treasure.id),
-                  method: :post,
-                  class: "btn btn-outline-warning w-100" %>
-
-              <%= button_to "#{treasure.name}を調べる",
-                  inspect_treasure_path(treasure_chest_id: treasure.id),
-                  method: :post,
-                  class: "btn btn-outline-info w-100" %>
-
-              <% if @player.skills.exists?(name: "探索") %>
-                <%= button_to "探索スキルを使う",
-                    use_treasure_skill_path(treasure_chest_id: treasure.id, skill_name: "探索"),
-                    method: :post,
-                    class: "btn btn-outline-success w-100" %>
-              <% end %>
-
-              <%= button_to "#{treasure.name}を放置する",
-                  ignore_treasure_path(treasure_chest_id: treasure.id),
-                  method: :post,
-                  class: "btn btn-outline-secondary w-100" %>
-            </div>
-          <% else %>
-            <%= button_to "#{treasure.name}を#{treasure.requires_inspection? ? "開ける" : "回収する"}",
-                open_treasure_path(treasure_chest_id: treasure.id),
-                method: :post,
-                class: "btn btn-outline-warning w-100" %>
-          <% end %>
-        <% end %>
+        <%= render "game/world_panel/treasure_actions", treasure_states: @available_treasure_states %>
       </div>
     </details>
   <% end %>
@@ -217,5 +191,6 @@
         <% end %>
       </div>
     </details>
+  <% end %>
   <% end %>
 </div>

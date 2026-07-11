@@ -18,6 +18,7 @@
     @current_field_area_progress = @player.progress_for_area(@current_field_area)
     @available_treasure_states = ExplorationRewardService.discovered_treasure_states(@player)
     @available_treasures = @available_treasure_states.map(&:treasure_chest)
+    @pending_treasure_states = @available_treasure_states.reject(&:ignored?)
     @available_bosses = ExplorationRewardService.discovered_bosses(@player)
     @town_discovery = @player.town_discovery_for if @player.location&.safe_area?
     current_panel = params[:panel].presence

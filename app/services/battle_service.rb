@@ -1,6 +1,9 @@
 ﻿class BattleService
   Result = Struct.new(:status, :message, keyword_init: true)
   ENEMY_SWORD_SKILL_RATE = 35
+  STATUS_ATTACK_VARIANCE_RANGE = 75..125
+  ENEMY_SWORD_SKILL_STIFFNESS_KEY = "enemy_sword_skill_stiffness"
+  ENEMY_SWORD_SKILL_STIFFNESS_CRITICAL_BONUS = 35
 
   def self.ensure_mob_parts!(mob)
     return [] unless mob
@@ -83,6 +86,7 @@
     actual_attack_attribute = attack_attribute_for(weapon, attack_attribute, sword_skill)
     record_normal_attack_use!(player, weapon) if weapon && !sword_skill
 
+    knockback_message = ""
     hits.times do |index|
       alive_targets = target_enemies.select(&:alive?)
       break if alive_targets.empty?
@@ -98,7 +102,12 @@
           attack_attribute: actual_attack_attribute
         )
         hit_messages << hit_message(index, hits, result)
+        if sword_skill && weapon_knockback_result?(result)
+          knockback_message = "ノックバックが発生し、互いに距離を取った！"
+          break
+        end
       end
+      break if knockback_message.present?
     end
 
     battle.update!(ambush: false) if battle.ambush?
@@ -115,11 +124,18 @@
     player.save!
     battle.save!
     broken_message = destroy_weapon_if_broken!(weapon)
-    enemy_result = apply_enemy_attack!(player, battle)
+    clear_enemy_sword_skill_stiffness_for!(target_enemies)
+
+    enemy_result =
+      if sword_skill || knockback_message.present?
+        Result.new(status: :ok, message: "")
+      else
+        apply_enemy_attack!(player, battle)
+      end
     return enemy_result if enemy_result.status == :defeated
 
     stiffness_message = ""
-    if stiffness
+    if stiffness && knockback_message.blank?
       stiffness_result = apply_enemy_attack!(player, battle, prefix: "ソードスキル後の硬直中、", allow_evasion: false)
       return stiffness_result if stiffness_result.status == :defeated
 
@@ -130,7 +146,7 @@
 
     Result.new(
       status: :ok,
-      message: "#{turn_messages.join}#{label}！#{hit_messages.join(' / ')}！#{enemy_result.message}#{stiffness_message}#{broken_message}#{skill_message}"
+      message: "#{turn_messages.join}#{label}！#{hit_messages.join(' / ')}！#{knockback_message}#{enemy_result.message}#{stiffness_message}#{broken_message}#{skill_message}"
     )
   end
 
@@ -158,6 +174,14 @@
       end
 
       sword_skill = enemy_sword_skill_for(battle_enemy)
+      if enemy_sword_skill_weapon_guarded?(player, battle_enemy, sword_skill)
+        start_enemy_sword_skill_cooldown!(battle_enemy, sword_skill)
+        battle_enemy.save!
+        player.save!
+        return Result.new(status: :ok, message: enemy_message("#{prefix}#{mob_name}の#{enemy_attack_name(sword_skill)}を#{combat_weapon_for(player).display_name}で弾いた！ノックバックが発生し、互いに距離を取った！"))
+      end
+
+      mark_enemy_sword_skill_stiffness!(battle_enemy, sword_skill) if sword_skill
       if allow_evasion && evaded_enemy_attack?(player, battle_enemy)
         start_enemy_sword_skill_cooldown!(battle_enemy, sword_skill) if sword_skill
         BuffEffectService.tick_battle_turn!(battle_enemy)
@@ -281,7 +305,7 @@
     return "#{battle_enemy.mob.name}: #{guard_result[:message]}" if guard_result[:blocked]
 
     actual_part = guard_result[:part]
-    unless player_attack_hit?(player, battle_enemy, actual_part)
+    unless guard_result[:guarded] || player_attack_hit?(player, battle_enemy, actual_part)
       return "#{battle_enemy.mob.name}: #{guard_result[:message]}ミス"
     end
 
@@ -352,6 +376,8 @@ end
 end
 
   def self.player_attack_hit?(player, battle_enemy, part)
+    return true if enemy_sword_skill_stiffness?(battle_enemy)
+
     player_agility = (player.effective_agility * BuffEffectService.agility_multiplier(player)).round
     agility_gap = player_agility - mob_effective_agility(battle_enemy)
     part_modifier = part.weakness? ? -10 : 0
@@ -429,8 +455,15 @@ end
 
   def self.apply_mob_status_attacks!(player, battle_enemy)
     battle_enemy.mob.status_attacks.each do |status, amount|
-      StatusEffectService.accumulate!(player, status, amount)
+      StatusEffectService.accumulate!(player, status, varied_status_attack_amount(amount))
     end
+  end
+
+  def self.varied_status_attack_amount(amount)
+    base_amount = amount.to_f
+    return 0 if base_amount <= 0
+
+    (base_amount * rand(STATUS_ATTACK_VARIANCE_RANGE) / 100.0).round(2)
   end
 
   def self.finish_battle_victory!(player, battle, weapon, label, damage_message, skill_gain, sword_skill, skill_key)
@@ -474,7 +507,9 @@ end
     return true if part.weakness? && part_would_break?(battle_enemy, part, damage)
 
     agility_bonus = (player.effective_agility - mob_effective_agility(battle_enemy)) / 5
-    chance = [[weapon.effective_critical_rate + agility_bonus, 1].max, 30].min
+    stiffness_bonus = enemy_sword_skill_stiffness?(battle_enemy) ? ENEMY_SWORD_SKILL_STIFFNESS_CRITICAL_BONUS : 0
+    chance_cap = enemy_sword_skill_stiffness?(battle_enemy) ? 75 : 30
+    chance = [[weapon.effective_critical_rate + agility_bonus + stiffness_bonus, 1].max, chance_cap].min
     rand(100) < chance
   end
 
@@ -486,15 +521,28 @@ end
   end
 
   def self.resolve_guarded_part(player, battle_enemy, parts, target_part)
-    return { part: target_part, message: "", blocked: false } if part_broken?(battle_enemy, target_part)
-    return { part: target_part, message: "", blocked: false } unless enemy_guard_success?(player, battle_enemy, target_part)
+    return { part: target_part, message: "", blocked: false, guarded: false } if part_broken?(battle_enemy, target_part)
+    return { part: target_part, message: "", blocked: false, guarded: false } unless enemy_guard_success?(player, battle_enemy, target_part)
 
     if battle_enemy.mob.equipped_weapon && target_part.weakness?
-      return { part: target_part, message: "#{battle_enemy.mob.equipped_weapon.name}で弾かれた！", blocked: true }
+      return { part: target_part, message: "#{battle_enemy.mob.equipped_weapon.name}で弾かれた！", blocked: true, guarded: true }
     end
 
     guard_part = guard_part_for(battle_enemy, parts, target_part)
-    guard_part ? { part: guard_part, message: "#{guard_part.name}で防がれた！", blocked: false } : { part: target_part, message: "", blocked: false }
+    guard_part ? { part: guard_part, message: "#{guard_part.name}で防がれた！", blocked: false, guarded: true } : { part: target_part, message: "", blocked: false, guarded: false }
+  end
+
+  def self.weapon_knockback_result?(message)
+    message.to_s.include?("で弾かれた！")
+  end
+
+  def self.enemy_sword_skill_weapon_guarded?(player, battle_enemy, sword_skill)
+    weapon = combat_weapon_for(player)
+    return false unless sword_skill && weapon && !weapon.broken?
+
+    agility_gap = player.effective_agility - mob_effective_agility(battle_enemy)
+    chance = (25 + (agility_gap * 4) + weapon.effective_critical_rate / 2).clamp(10, 65)
+    rand(100) < chance
   end
 
   def self.enemy_guard_success?(player, battle_enemy, target_part)
@@ -587,35 +635,52 @@ end
   def self.enemy_sword_skills_for(battle_enemy)
     weapon = battle_enemy.mob.equipped_weapon
     return [] unless weapon
+    return [] if enemy_weapon_arm_broken?(battle_enemy)
 
     configured_keys = battle_enemy.mob.enemy_sword_skill_key_list
+    return [] if configured_keys.empty?
+
     skills = SkillCatalog.sword_skills(weapon.weapon_type)
-    if configured_keys.any?
-      return skills.select do |skill|
-        configured_keys.include?(skill.key.to_s) && !enemy_sword_skill_on_cooldown?(battle_enemy, skill.key)
-      end
-    end
-
-    proficiency = enemy_sword_skill_proficiency_for(battle_enemy)
     skills.select do |skill|
-      skill.unlocked?(proficiency) && !enemy_sword_skill_on_cooldown?(battle_enemy, skill.key)
+      configured_keys.include?(skill.key.to_s) && !enemy_sword_skill_on_cooldown?(battle_enemy, skill.key)
     end
-  end
-
-  def self.enemy_sword_skill_proficiency_for(battle_enemy)
-    override = battle_enemy.mob.has_attribute?(:enemy_sword_skill_proficiency) ? battle_enemy.mob.enemy_sword_skill_proficiency.to_i : 0
-    return override if override.positive?
-
-    enemy_sword_skill_proficiency_for_level(battle_enemy.effective_level)
-  end
-
-  def self.enemy_sword_skill_proficiency_for_level(enemy_level)
-    tier = (([enemy_level.to_i, 1].max - 1) / 10) + 1
-    tier * 100
   end
 
   def self.enemy_sword_skill_on_cooldown?(battle_enemy, skill_key)
     BuffEffectService.battle_effects(battle_enemy).key?(enemy_sword_skill_cooldown_key(skill_key))
+  end
+
+  def self.enemy_weapon_arm_broken?(battle_enemy)
+    battle_enemy.mob.mob_parts.any? do |part|
+      part.break_effect == "strength_down" &&
+        part.name.match?(/手|腕|前脚/) &&
+        part_broken?(battle_enemy, part)
+    end
+  end
+
+  def self.enemy_sword_skill_stiffness?(battle_enemy)
+    BuffEffectService.battle_effects(battle_enemy).key?(ENEMY_SWORD_SKILL_STIFFNESS_KEY)
+  end
+
+  def self.mark_enemy_sword_skill_stiffness!(battle_enemy, sword_skill)
+    return unless sword_skill
+
+    BuffEffectService.apply_battle_effect!(
+      battle_enemy,
+      ENEMY_SWORD_SKILL_STIFFNESS_KEY,
+      { "enemy_sword_skill_stiffness" => true },
+      turns: 2
+    )
+  end
+
+  def self.clear_enemy_sword_skill_stiffness_for!(battle_enemies)
+    Array(battle_enemies).each do |battle_enemy|
+      data = BuffEffectService.battle_effects(battle_enemy)
+      next unless data.delete(ENEMY_SWORD_SKILL_STIFFNESS_KEY)
+
+      battle_enemy.battle_effects = data.to_json
+      battle_enemy.save!
+    end
   end
 
   def self.start_enemy_sword_skill_cooldown!(battle_enemy, skill)

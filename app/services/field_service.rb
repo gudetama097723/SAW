@@ -490,6 +490,27 @@ class FieldService
     route.field_areas.ordered.find { |area| area.include_distance?(distance) }
   end
 
+  def self.limit_position_to_adjacent_area(route, current_position, next_position)
+    areas = route&.field_areas&.ordered&.to_a || []
+    return next_position if areas.empty?
+
+    current_area = areas.find { |area| area.include_distance?(current_position) }
+    return next_position unless current_area
+
+    current_index = areas.index(current_area)
+    return next_position unless current_index
+
+    if next_position.to_i > current_area.end_distance.to_i
+      next_area = areas[current_index + 1]
+      next_area ? [next_position.to_i, next_area.start_distance.to_i].min : next_position
+    elsif next_position.to_i < current_area.start_distance.to_i
+      previous_area = current_index.positive? ? areas[current_index - 1] : nil
+      previous_area ? [next_position.to_i, previous_area.end_distance.to_i].max : next_position
+    else
+      next_position
+    end
+  end
+
   def self.field_rest_available?(player)
     return false unless player&.field_route.present?
     return true if base_rest_encounter_chance(player) <= 0

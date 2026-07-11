@@ -26,6 +26,84 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "環境：通常"
   end
 
+  test "header hp color changes by remaining rate" do
+    @player.update!(hp: 50, max_hp: 100)
+    get game_path
+    assert_response :success
+    assert_includes response.body, "game-status-meter-warning"
+    assert_includes response.body, "progress-bar bg-warning"
+
+    @player.update!(hp: 20, max_hp: 100)
+    get game_path
+    assert_response :success
+    assert_includes response.body, "game-status-meter-danger"
+    assert_includes response.body, "progress-bar bg-danger"
+  end
+
+  test "header weapon durability renders visual condition class" do
+    @player.weapons.create!(
+      name: "耐久表示テスト剣",
+      weapon_type: "片手直剣",
+      rarity: "common",
+      attack_power: 10,
+      durability: 20,
+      max_durability: 100,
+      equipped: true
+    )
+
+    get game_path
+
+    assert_response :success
+    assert_includes response.body, "weapon-durability-damaged"
+    assert_includes response.body, "--durability-percent: 20%"
+  end
+
+  test "battle enemy hp color changes by remaining rate" do
+    mob = Mob.create!(name: "敵HP色テストmob", hp: 100, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = @player.battles.create!(mob: mob, enemy_hp: 50)
+    BattleService.ensure_battle_enemies!(battle)
+    battle.battle_enemies.first.update!(enemy_hp: 50, enemy_max_hp: 100)
+
+    get game_path
+    assert_response :success
+    assert_includes response.body, "progress-bar bg-warning"
+
+    battle.battle_enemies.first.update!(enemy_hp: 20)
+    get game_path
+    assert_response :success
+    assert_includes response.body, "progress-bar bg-danger"
+  end
+
+  test "pending treasure hides field commands until handled" do
+    route = Route.create!(name: "宝箱テスト道", from_location: @location, to_location: @location, distance: 100, travel_time: 10, danger_level: 1)
+    area = FieldArea.create!(route: route, name: "宝箱テスト区画", start_distance: 0, end_distance: 100, encounter_rate: 0, rest_safety: 100)
+    treasure = TreasureChest.create!(
+      route: route,
+      field_area: area,
+      name: "宝箱テスト箱",
+      position: 0,
+      discovery_type: "fixed",
+      required_mapping: 0,
+      reward_data: "{}"
+    )
+    @player.update!(field_route: route, field_position: 0)
+    state = @player.player_treasure_chests.create!(treasure_chest: treasure, found: true)
+
+    get game_path
+    assert_response :success
+    assert_includes response.body, "宝箱を発見した"
+    assert_includes response.body, "宝箱テスト箱を開ける"
+    assert_not_includes response.body, "狩り"
+    assert_not_includes response.body, "採取"
+
+    state.update!(ignored: true)
+    get game_path
+    assert_response :success
+    assert_includes response.body, "探索"
+    assert_includes response.body, "発見済み宝箱"
+    assert_includes response.body, "宝箱テスト箱を開ける"
+  end
+
   test "info commands hide while viewing npc or facility panels" do
     get game_path
     assert_response :success

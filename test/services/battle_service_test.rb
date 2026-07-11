@@ -101,6 +101,36 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_equal 99, weapon.reload.durability
   end
 
+  test "sword skill only receives enemy attack during stiffness" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
+    player.weapons.destroy_all
+    player.weapons.create!(name: "硬直テスト剣", weapon_type: "片手直剣", attack_power: 1, durability: 100, max_durability: 100, equipped: true)
+    BuffEffectService.apply_battle_effect!(player, "test_sure_hit", { sure_hit: true }, turns: 1)
+    mob = Mob.create!(name: "硬直反撃テストmob", hp: 999, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 999)
+
+    result = BattleService.resolve_player_attack!(
+      battle: battle,
+      player: player,
+      mob_part_id: nil,
+      label: "バーチカル",
+      damage_multiplier: 100,
+      durability_cost: 1,
+      skill_gain: 1,
+      stiffness: true,
+      hits: 1,
+      sword_skill: true,
+      attack_attribute: "斬撃",
+      skill_key: "vertical",
+      cooldown: 1
+    )
+
+    assert_equal :ok, result.status
+    assert_not_includes result.message, "[enemy]硬直反撃テストmobの攻撃！"
+    assert_includes result.message, "[enemy]ソードスキル後の硬直中、硬直反撃テストmobの攻撃！"
+  end
+
   test "normal attack reduces sword skill cooldown" do
     player = players(:one)
     player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
@@ -160,6 +190,39 @@ class BattleServiceTest < ActiveSupport::TestCase
     )
 
     assert_equal enemies.first(2).map(&:id), targets.map(&:id)
+  end
+
+  test "guarded player attack does not roll miss after guard succeeds" do
+    player = players(:one)
+    player.update!(strength: 10, agility: 1)
+    weapon = player.weapons.create!(name: "ガード確認剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+    mob = Mob.create!(name: "ガード確認mob", hp: 100, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    weak_part = mob.mob_parts.create!(name: "核", damage_multiplier: 100, weakness: true)
+    mob.mob_parts.create!(name: "胴体", damage_multiplier: 100, weakness: false)
+    battle = player.battles.create!(mob: mob, enemy_hp: 100)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 100, enemy_level: 1, position: 1)
+    rolls = 0
+
+    BattleService.singleton_class.define_method(:rand) do |range|
+      rolls += 1
+      rolls == 1 ? 0 : (range.is_a?(Range) ? range.end : 99)
+    end
+    begin
+      result = BattleService.resolve_hit!(
+        player: player,
+        weapon: weapon,
+        battle_enemy: enemy,
+        mob_part_id: weak_part.id,
+        damage_multiplier: 100,
+        attack_attribute: "斬撃"
+      )
+
+      assert_includes result, "胴体で防がれた！"
+      assert_includes result, "胴体へ"
+      assert_not_includes result, "ミス"
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
   end
 
   test "enemy with flee rate can flee instead of attacking" do
@@ -231,28 +294,52 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_includes high_level_names, "スライムコア"
   end
 
-  test "enemy sword skill proficiency scales by ten level tiers" do
-    assert_equal 100, BattleService.enemy_sword_skill_proficiency_for_level(1)
-    assert_equal 100, BattleService.enemy_sword_skill_proficiency_for_level(10)
-    assert_equal 200, BattleService.enemy_sword_skill_proficiency_for_level(11)
-    assert_equal 300, BattleService.enemy_sword_skill_proficiency_for_level(21)
+  test "default mob status attacks are limited to intended enemies" do
+    assert_empty Mob.new(name: "スライム").status_attacks
+    assert_empty Mob.new(name: "蒼狼フェンリル").status_attacks
+    assert_equal({ "poison" => 10 }, Mob.new(name: "変異スライム").status_attacks)
+    assert_equal({ "paralysis" => 14 }, Mob.new(name: "フォレストワスプ").status_attacks)
   end
 
-  test "armed enemies can use unlocked sword skills" do
-    mob = Mob.create!(name: "武装スキルmob", hp: 30, atk: 10, rarity: "normal", level: 10, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+  test "mob status accumulation amount varies per hit" do
+    BattleService.singleton_class.define_method(:rand) { |range| range.begin }
+    begin
+      assert_equal 7.5, BattleService.varied_status_attack_amount(10)
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+
+    BattleService.singleton_class.define_method(:rand) { |range| range.end }
+    begin
+      assert_equal 12.5, BattleService.varied_status_attack_amount(10)
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+  end
+
+  test "armed enemies only use learned sword skills" do
+    mob = Mob.create!(name: "武装スキルmob", hp: 30, atk: 10, rarity: "normal", level: 30, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0, enemy_sword_skill_keys: "vertical|horizontal")
     mob.weapons.create!(name: "敵用ショートソード", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
     battle = battles(:one)
-    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 10, position: 1)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 30, position: 1)
 
     skill_names = BattleService.enemy_sword_skills_for(enemy).map(&:name)
 
-    assert_includes skill_names, "バーチカル"
-    assert_includes skill_names, "バーチカルアーク"
+    assert_equal ["バーチカル", "ホリゾンタル"], skill_names
+    assert_not_includes skill_names, "バーチカルアーク"
     assert_not_includes skill_names, "ホリゾンタルアーク"
   end
 
+  test "armed enemies without learned sword skills do not use sword skills" do
+    mob = Mob.create!(name: "未習得武装mob", hp: 30, atk: 10, rarity: "normal", level: 50, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    mob.weapons.create!(name: "未習得敵用剣", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
+    enemy = battles(:one).battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 50, position: 1)
+
+    assert_empty BattleService.enemy_sword_skills_for(enemy)
+  end
+
   test "bosses use available sword skills without random rate gate" do
-    mob = Mob.create!(name: "武装ボスmob", hp: 30, atk: 10, rarity: "boss", boss_type: "area_boss", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    mob = Mob.create!(name: "武装ボスmob", hp: 30, atk: 10, rarity: "boss", boss_type: "area_boss", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0, enemy_sword_skill_keys: "vertical|horizontal")
     mob.weapons.create!(name: "ボス用ショートソード", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
     battle = battles(:one)
     enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 1, position: 1)
@@ -264,10 +351,10 @@ class BattleServiceTest < ActiveSupport::TestCase
       BattleService.singleton_class.remove_method(:rand)
     end
 
-    assert_includes ["バーチカル", "ホリゾンタル", "バーチカルアーク"], skill.name
+    assert_includes ["バーチカル", "ホリゾンタル"], skill.name
   end
 
-  test "configured enemy sword skill keys bypass proficiency for future floor bosses" do
+  test "configured enemy sword skill keys define learned skills for future floor bosses" do
     mob = Mob.create!(
       name: "階層ボステストmob",
       hp: 30,
@@ -289,10 +376,36 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_equal ["ホリゾンタルアーク"], skill_names
   end
 
+  test "armed enemy cannot use sword skills when weapon arm is broken" do
+    mob = Mob.create!(
+      name: "腕破壊スキルmob",
+      hp: 30,
+      atk: 10,
+      rarity: "boss",
+      boss_type: "floor_boss",
+      level: 1,
+      agility: 1,
+      durability: 1,
+      exp_reward: 10,
+      flee_rate: 0,
+      enemy_sword_skill_keys: "vertical"
+    )
+    mob.weapons.create!(name: "腕破壊テスト剣", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
+    arm = mob.mob_parts.create!(name: "腕", damage_multiplier: 80, weakness: false, max_durability: 10, break_effect: "strength_down")
+    enemy = battles(:one).battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 1, position: 1)
+    enemy.part_states = { arm.id.to_s => { durability: 0, broken: true } }.to_json
+    enemy.save!
+
+    assert BattleService.enemy_weapon_arm_broken?(enemy)
+    assert_empty BattleService.enemy_sword_skills_for(enemy)
+    assert_nil BattleService.enemy_sword_skill_for(enemy)
+  end
+
   test "armed enemy randomly uses a sword skill in battle" do
     player = players(:one)
     player.update!(hp: 100, max_hp: 100, agility: 0)
-    mob = Mob.create!(name: "ソードスキル使用mob", hp: 30, atk: 10, rarity: "normal", level: 10, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    player.weapons.destroy_all
+    mob = Mob.create!(name: "ソードスキル使用mob", hp: 30, atk: 10, rarity: "normal", level: 10, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0, enemy_sword_skill_keys: "vertical|horizontal")
     mob.weapons.create!(name: "敵用ショートソード", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
     battle = player.battles.create!(mob: mob, enemy_hp: 30)
     battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 10, position: 1)
@@ -307,7 +420,89 @@ class BattleServiceTest < ActiveSupport::TestCase
     end
 
     assert_equal :ok, result.status
-    assert_match(/ソードスキル使用mobの(バーチカル|ホリゾンタル|バーチカルアーク)！/, result.message)
+    assert_match(/ソードスキル使用mobの(バーチカル|ホリゾンタル)！/, result.message)
     assert_operator player.reload.hp, :<, 100
+  end
+
+  test "enemy sword skill stiffness makes next player attack sure hit with higher critical chance" do
+    player = players(:one)
+    player.update!(strength: 10, agility: 1)
+    weapon = player.weapons.create!(name: "硬直追撃剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true, critical_rate: 0)
+    mob = Mob.create!(name: "敵硬直テストmob", hp: 100, atk: 1, rarity: "normal", level: 1, agility: 20, durability: 1, exp_reward: 10, flee_rate: 0)
+    part = mob.mob_parts.create!(name: "胴体", damage_multiplier: 100, weakness: false, max_durability: 999)
+    battle = player.battles.create!(mob: mob, enemy_hp: 100)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 100, enemy_level: 1, position: 1)
+    BattleService.mark_enemy_sword_skill_stiffness!(enemy, SkillCatalog.find("vertical"))
+    enemy.save!
+
+    BattleService.singleton_class.define_method(:rand) { |arg = nil| arg.is_a?(Range) ? arg.end : 10 }
+    begin
+      assert BattleService.player_attack_hit?(player, enemy, part)
+      assert BattleService.critical_hit?(player, weapon, enemy, part, 1)
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+  end
+
+  test "player weapon guard against enemy sword skill causes knockback without stiffness" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, agility: 10)
+    player.weapons.destroy_all
+    player.weapons.create!(name: "受け止め剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+    mob = Mob.create!(name: "武器受け敵mob", hp: 30, atk: 10, rarity: "boss", boss_type: "area_boss", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0, enemy_sword_skill_keys: "vertical")
+    mob.weapons.create!(name: "敵ソードスキル剣", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
+    battle = player.battles.create!(mob: mob, enemy_hp: 30)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 1, position: 1)
+
+    BattleService.singleton_class.define_method(:rand) { |arg = nil| arg.is_a?(Range) ? arg.end : 0 }
+    begin
+      result = BattleService.apply_enemy_attack!(player, battle, allow_evasion: false)
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+
+    assert_equal :ok, result.status
+    assert_includes result.message, "受け止め剣で弾いた！"
+    assert_includes result.message, "ノックバックが発生"
+    assert_equal 100, player.reload.hp
+    assert_not BattleService.enemy_sword_skill_stiffness?(enemy.reload)
+  end
+
+  test "enemy weapon block against player sword skill causes knockback and skips stiffness attack" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
+    player.weapons.destroy_all
+    player.weapons.create!(name: "ノックバック確認剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+    mob = Mob.create!(name: "敵武器防御mob", hp: 100, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    mob.weapons.create!(name: "敵防御剣", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
+    weak_part = mob.mob_parts.create!(name: "核", damage_multiplier: 100, weakness: true)
+    battle = player.battles.create!(mob: mob, enemy_hp: 100)
+    battle.battle_enemies.create!(mob: mob, enemy_hp: 100, enemy_level: 1, position: 1)
+
+    BattleService.singleton_class.define_method(:rand) { |arg = nil| arg.is_a?(Range) ? arg.end : 0 }
+    begin
+      result = BattleService.resolve_player_attack!(
+        battle: battle,
+        player: player,
+        mob_part_id: weak_part.id,
+        label: "バーチカル",
+        damage_multiplier: 100,
+        durability_cost: 1,
+        skill_gain: 1,
+        stiffness: true,
+        hits: 1,
+        sword_skill: true,
+        attack_attribute: "斬撃",
+        skill_key: "vertical",
+        cooldown: 1
+      )
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+
+    assert_equal :ok, result.status
+    assert_includes result.message, "敵防御剣で弾かれた！"
+    assert_includes result.message, "ノックバックが発生"
+    assert_not_includes result.message, "ソードスキル後の硬直中"
   end
 end

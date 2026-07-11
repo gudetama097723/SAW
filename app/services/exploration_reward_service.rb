@@ -151,7 +151,24 @@ class ExplorationRewardService
   end
 
   def self.discovered_treasure_states(player)
-    player.player_treasure_chests.includes(:treasure_chest).where(found: true, opened: false, ignored: false)
+    player.player_treasure_chests.includes(:treasure_chest).where(found: true, opened: false).select do |state|
+      treasure_accessible_here?(player, state.treasure_chest)
+    end
+  end
+
+  def self.pending_treasure_states(player)
+    discovered_treasure_states(player).reject(&:ignored?)
+  end
+
+  def self.treasure_accessible_here?(player, treasure_chest)
+    return false unless treasure_chest
+
+    current_area = FieldService.current_area_for(player)
+    if treasure_chest.field_area_id.present?
+      current_area.present? && treasure_chest.field_area_id == current_area.id
+    else
+      player.field_route_id.present? && treasure_chest.route_id == player.field_route_id
+    end
   end
 
   def self.discovered_bosses(player)

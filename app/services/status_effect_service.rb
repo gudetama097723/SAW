@@ -10,6 +10,7 @@ class StatusEffectService
   }.freeze
   DEFAULT_THRESHOLD = 100
   VALUE_DECAY_PER_MINUTE = 0.2
+  VALUE_DECAY_PER_BATTLE_TURN = 3
   SLEEP_ACTIVATION_VALUE_REMAINING_RATE = 0.5
 
   def self.labels_for(entity)
@@ -81,16 +82,7 @@ class StatusEffectService
 
   def self.decay_values!(entity, minutes)
     amount = minutes.to_i * VALUE_DECAY_PER_MINUTE
-    return if amount <= 0
-
-    values = value_data(entity)
-    values.keys.each do |key|
-      next if entity.is_a?(Player) && key == "sleep"
-
-      values[key] = [values[key].to_f - amount, 0].max
-      values.delete(key) if values[key].zero?
-    end
-    write_value_data(entity, values)
+    decay_values_by!(entity, amount)
   end
 
   def self.recover_values_percent!(entity, percent)
@@ -160,6 +152,7 @@ class StatusEffectService
   end
 
   def self.apply_battle_turn_start!(entity)
+    decay_values_by!(entity, VALUE_DECAY_PER_BATTLE_TURN)
     return "" unless active?(entity, "poison")
 
     damage = apply_poison_damage!(entity, max_hp_for(entity) * 0.05)
@@ -223,6 +216,21 @@ class StatusEffectService
 
   def self.write_effect_data(entity, data)
     entity.status_effects = data.to_json
+  end
+
+  def self.decay_values_by!(entity, amount)
+    recovery = amount.to_f
+    return if recovery <= 0
+
+    values = value_data(entity)
+    values.keys.each do |key|
+      next if entity.is_a?(Player) && key == "sleep"
+      next if active?(entity, key)
+
+      values[key] = [values[key].to_f - recovery, 0].max
+      values.delete(key) if values[key].zero?
+    end
+    write_value_data(entity, values)
   end
 
   def self.threshold_for(entity, status)

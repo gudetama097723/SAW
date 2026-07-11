@@ -92,6 +92,16 @@ class PlayerTest < ActiveSupport::TestCase
     assert_equal 1, player.status_value_data["paralysis"]
   end
 
+  test "battle turn start decays inactive status accumulation" do
+    player = players(:one)
+    player.update!(status_values: { poison: 10, sleep: 10 }.to_json, status_effects: "{}")
+
+    StatusEffectService.apply_battle_turn_start!(player)
+
+    assert_equal 7, player.status_value_data["poison"]
+    assert_equal 10, player.status_value_data["sleep"]
+  end
+
   test "sleep value rises after fifteen awake hours" do
     player = players(:one)
     player.update!(awake_minutes_since_sleep: 15 * 60)

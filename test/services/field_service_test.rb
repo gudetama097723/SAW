@@ -116,6 +116,31 @@ class FieldServiceTest < ActiveSupport::TestCase
     end
   end
 
+  test "movement cannot skip over the next field area when moving forward" do
+    route = routes(:one)
+    first_area = field_areas(:one)
+    second_area = field_areas(:two)
+    route.update!(distance: 100)
+    first_area.update!(route: route, start_distance: 0, end_distance: 20)
+    second_area.update!(route: route, start_distance: 21, end_distance: 50)
+    FieldArea.create!(route: route, name: "third", start_distance: 51, end_distance: 100)
+
+    assert_equal 21, FieldService.limit_position_to_adjacent_area(route, 10, 70)
+  end
+
+  test "movement cannot skip over the previous field area when moving backward" do
+    route = routes(:one)
+    first_area = field_areas(:one)
+    second_area = field_areas(:two)
+    third_area = FieldArea.create!(route: route, name: "third", start_distance: 51, end_distance: 100)
+    route.update!(distance: 100)
+    first_area.update!(route: route, start_distance: 0, end_distance: 20)
+    second_area.update!(route: route, start_distance: 21, end_distance: 50)
+    third_area.update!(route: route, start_distance: 51, end_distance: 100)
+
+    assert_equal 50, FieldService.limit_position_to_adjacent_area(route, 80, 10)
+  end
+
   test "night raises roaming enemy levels" do
     player = players(:one)
     route = routes(:one)

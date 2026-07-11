@@ -173,6 +173,7 @@ module Game
           else
             player.field_position.to_i + advance
           end
+        next_position = FieldService.limit_position_to_adjacent_area(route, player.field_position.to_i, next_position)
       end
 
       if direction != "backward" &&

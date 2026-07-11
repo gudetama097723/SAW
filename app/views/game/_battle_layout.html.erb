@@ -272,6 +272,9 @@
       <div class="battle-enemy-grid">
         <% battle_enemies.each do |enemy| %>
           <% enemy_selected = selected_skill_is_area ? selected_enemy_ids.include?(enemy.id) : enemy == selected_enemy %>
+          <% enemy_hp_percent = [[enemy.enemy_hp.to_i * 100 / [enemy.effective_max_hp, 1].max, 0].max, 100].min %>
+          <% enemy_hp_bar_class = enemy_hp_percent <= 20 ? "bg-danger" : (enemy_hp_percent <= 50 ? "bg-warning" : "bg-success") %>
+          <% enemy_hp_text_class = enemy_hp_percent <= 20 ? "text-danger" : (enemy_hp_percent <= 50 ? "text-warning" : nil) %>
           <% target_params = if selected_skill_is_area
                next_ids = selected_enemy_ids.dup
                selection_error = nil
@@ -302,14 +305,14 @@
           <%= link_to game_path(target_params), class: battle_enemy_card_classes(@player, enemy, selected: enemy_selected) do %>
             <%= render "game/visual_asset", kind: :mob, record: enemy.mob, label: enemy.display_name, class_name: "saw-visual-battle-mob" %>
             <h5 class="mb-2"><%= enemy.position %>. <%= enemy.display_name %></h5>
-            <p class="mb-1">
+            <p class="<%= ["mb-1", enemy_hp_text_class].compact.join(" ") %>">
               HP: <%= enemy.enemy_hp %> / <%= enemy.effective_max_hp %>
               <% enemy.condition_labels.each do |label| %>
                 <span class="badge bg-warning text-dark ms-1"><%= label %></span>
               <% end %>
             </p>
             <div class="progress mb-0">
-              <div class="progress-bar bg-warning" style="width: <%= [[enemy.enemy_hp.to_i * 100 / [enemy.effective_max_hp, 1].max, 0].max, 100].min %>%"></div>
+              <div class="progress-bar <%= enemy_hp_bar_class %>" style="width: <%= enemy_hp_percent %>%"></div>
             </div>
           <% end %>
         <% end %>

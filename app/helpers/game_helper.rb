@@ -103,6 +103,21 @@ module GameHelper
     end
   end
 
+  def weapon_durability_state_class(weapon)
+    return "weapon-durability-broken" if weapon.broken?
+
+    case weapon.durability_percent
+    when 0..10
+      "weapon-durability-critical"
+    when 11..25
+      "weapon-durability-damaged"
+    when 26..50
+      "weapon-durability-worn"
+    else
+      "weapon-durability-good"
+    end
+  end
+
   private
 
   def game_background_asset_key(player, environment_location)

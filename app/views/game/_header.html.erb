@@ -1,6 +1,8 @@
 <%
   header_weapons = @player.equipped_weapons
   hp_percent = [[@player.hp.to_i * 100 / [@player.effective_max_hp, 1].max, 0].max, 100].min
+  hp_bar_class = hp_percent <= 20 ? "bg-danger" : (hp_percent <= 50 ? "bg-warning" : "bg-success")
+  hp_meter_class = hp_percent <= 20 ? "game-status-meter-danger" : (hp_percent <= 50 ? "game-status-meter-warning" : nil)
   exp_percent = [[@player.exp.to_i * 100 / [@player.exp_to_next_level, 1].max, 0].max, 100].min
 %>
 
@@ -65,13 +67,13 @@
       <% end %>
     </div>
 
-    <div class="game-status-meter">
+    <div class="<%= ["game-status-meter", hp_meter_class].compact.join(" ") %>">
       <div class="game-status-meter-head">
         <span>HP</span>
         <strong><%= @player.hp %>/<%= @player.effective_max_hp %></strong>
       </div>
       <div class="progress game-header-progress">
-        <div class="progress-bar bg-success" style="width: <%= hp_percent %>%"></div>
+        <div class="progress-bar <%= hp_bar_class %>" style="width: <%= hp_percent %>%"></div>
       </div>
     </div>
 
@@ -90,13 +92,20 @@
         <% header_weapons.each do |weapon| %>
           <div class="game-status-weapon">
             <span><%= weapon.display_name %></span>
-            <small>ATK <%= weapon.effective_attack_power %> / DUR <%= weapon.durability %>/<%= weapon.max_durability %></small>
+            <div class="game-status-weapon-values">
+              <strong>ATK <%= weapon.effective_attack_power %></strong>
+              <strong class="game-status-weapon-durability <%= weapon_durability_state_class(weapon) %>" style="--durability-percent: <%= weapon.durability_percent %>%">
+                DUR <%= weapon.durability %>/<%= weapon.max_durability %>
+              </strong>
+            </div>
           </div>
         <% end %>
       <% else %>
         <div class="game-status-weapon">
           <span>武器なし</span>
-          <small>素手</small>
+          <div class="game-status-weapon-values">
+            <strong>素手</strong>
+          </div>
         </div>
       <% end %>
     </div>
