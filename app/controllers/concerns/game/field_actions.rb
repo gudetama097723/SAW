@@ -25,6 +25,10 @@ module Game
         discovery.found_blacksmith = true
         ActiveRecord::Base.transaction { discovery.save!; player.save! }
         redirect_to game_path, notice: append_npc_discovery_message("路地裏で鍛冶屋を見つけた！", npc_discovery)
+      elsif !discovery.found_weapon_shop? && result < 92
+        discovery.update!(found_weapon_shop: true)
+        player.save!
+        redirect_to game_path, notice: append_npc_discovery_message("大通りで武具店を見つけた！", npc_discovery)
       elsif discovery.has_attribute?(:found_restaurant) && !discovery.found_restaurant? && result < 95
         discovery.found_restaurant = true
         ActiveRecord::Base.transaction { discovery.save!; player.save! }

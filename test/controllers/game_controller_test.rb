@@ -58,6 +58,38 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "--durability-percent: 20%"
   end
 
+  test "status info shows carry weight limit" do
+    @player.update!(strength: 10, agility: 10)
+    @player.items.create!(name: "重量表示テスト素材", category: "gathered", quantity: 3, weight: 2)
+    @player.weapons.create!(name: "重量表示テスト剣", weapon_type: "片手直剣", rarity: "common", attack_power: 1, durability: 10, max_durability: 10, weight: 4.5)
+    @player.armors.create!(name: "重量表示テスト鎧", armor_type: "軽鎧", rarity: "common", slot: "body", defense: 1, weight: 1.5)
+
+    get game_path, params: { panel: "growth" }
+
+    assert_response :success
+    assert_includes response.body, "所持重量:"
+    assert_match(/11\.5\s*\/\s*50/, response.body)
+  end
+
+  test "equipment info shows equipped armor durability" do
+    @player.armors.create!(
+      name: "耐久表示テスト鎧",
+      armor_type: "軽鎧",
+      rarity: "common",
+      slot: "body",
+      defense: 3,
+      durability: 42,
+      max_durability: 100,
+      equipped: true
+    )
+
+    get game_path, params: { panel: "equipment" }
+
+    assert_response :success
+    assert_includes response.body, "耐久表示テスト鎧"
+    assert_match(/耐久\s*42\s*\/\s*100/, response.body)
+  end
+
   test "battle enemy hp color changes by remaining rate" do
     mob = Mob.create!(name: "敵HP色テストmob", hp: 100, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
     battle = @player.battles.create!(mob: mob, enemy_hp: 50)
@@ -102,6 +134,30 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "探索"
     assert_includes response.body, "発見済み宝箱"
     assert_includes response.body, "宝箱テスト箱を開ける"
+  end
+
+  test "treasure rewards render in center reward panel" do
+    route = Route.create!(name: "中央宝箱テスト道", from_location: @location, to_location: @location, distance: 100, travel_time: 10, danger_level: 1)
+    area = FieldArea.create!(route: route, name: "中央宝箱テスト区画", start_distance: 0, end_distance: 100, encounter_rate: 0, rest_safety: 100)
+    treasure = TreasureChest.create!(
+      route: route,
+      field_area: area,
+      name: "中央表示の宝箱",
+      position: 0,
+      discovery_type: "fixed",
+      required_mapping: 0,
+      reward_data: { col: 25, items: [{ name: "薬草", category: "gathered", quantity: 2 }] }.to_json
+    )
+    @player.player_treasure_chests.create!(treasure_chest: treasure, found: true)
+
+    post open_treasure_path, params: { treasure_chest_id: treasure.id }
+    follow_redirect!
+
+    assert_response :success
+    assert_includes response.body, "battle-reward-effect"
+    assert_includes response.body, "宝箱獲得"
+    assert_includes response.body, "25コルを入手した。"
+    assert_includes response.body, "薬草を2個入手した。"
   end
 
   test "info commands hide while viewing npc or facility panels" do
@@ -305,6 +361,32 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_equal 100, base.storage_limit
   end
 
+  test "home base col management can deposit and withdraw all col" do
+    @player.town_discovery_for.update!(found_inn: true)
+    @player.player_bases.create!(location: @location, base_type: "home", active: true, rent: 0, storage_limit: 30)
+    @player.update!(col: 250, base_col: 0)
+
+    get game_path, params: { panel: "inn", inn_menu: "col" }
+
+    assert_response :success
+    assert_includes response.body, "すべて預ける"
+    assert_includes response.body, "すべて引き出す"
+
+    post deposit_base_col_path, params: { amount: @player.col }
+
+    assert_redirected_to game_path(panel: "inn", inn_menu: "col")
+    @player.reload
+    assert_equal 0, @player.col
+    assert_equal 250, @player.base_col
+
+    post withdraw_base_col_path, params: { amount: @player.base_col }
+
+    assert_redirected_to game_path(panel: "inn", inn_menu: "col")
+    @player.reload
+    assert_equal 250, @player.col
+    assert_equal 0, @player.base_col
+  end
+
   test "can allocate some or all stat points" do
     @player.update!(stat_points: 3, strength: 10, agility: 10)
 
@@ -418,5 +500,25 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_not discovery.reload.talkable?
     assert_equal 2, discovery.affinity
     assert discovery.last_spoken_at.present?
+  end
+
+  test "shield requires a one handed weapon and is removed by a two handed weapon" do
+    shield = @player.armors.create!(name: "盾装備テスト", armor_type: "盾", slot: "shield", defense: 3)
+    one_handed = @player.weapons.create!(name: "片手テスト剣", weapon_type: "片手直剣", attack_power: 1, durability: 10, max_durability: 10)
+    two_handed = @player.weapons.create!(name: "両手テスト剣", weapon_type: "両手剣", attack_power: 2, durability: 10, max_durability: 10)
+
+    post equip_armor_path, params: { armor_id: shield.id }
+    assert_not shield.reload.equipped?
+    assert_equal "盾は片手武器を装備している場合のみ装備できます。", flash[:alert]
+
+    post equip_weapon_path, params: { weapon_id: one_handed.id }
+    post equip_armor_path, params: { armor_id: shield.id }
+    assert shield.reload.equipped?
+
+    post equip_weapon_path, params: { weapon_id: two_handed.id }
+    assert_not shield.reload.equipped?
+
+    get game_path, params: { panel: "equipment" }
+    assert_match(/盾:\s*装備不能/, response.body)
   end
 end

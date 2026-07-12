@@ -3,11 +3,27 @@
             <p>預け金: <%= @player.base_col.to_i %>コル</p>
             <%= form_with url: deposit_base_col_path, method: :post, class: "d-grid gap-2 mb-3" do %>
               <%= number_field_tag :amount, 100, min: 1, max: @player.col.to_i, class: "form-control form-control-sm" %>
-              <%= submit_tag "コルを預ける", class: "btn btn-outline-info w-100" %>
+              <div class="d-flex gap-2">
+                <%= submit_tag "コルを預ける", class: "btn btn-outline-info flex-fill" %>
+                <%= button_tag "すべて預ける",
+                    type: "submit",
+                    name: "amount",
+                    value: @player.col.to_i,
+                    class: "btn btn-info flex-fill",
+                    disabled: @player.col.to_i <= 0 %>
+              </div>
             <% end %>
             <%= form_with url: withdraw_base_col_path, method: :post, class: "d-grid gap-2" do %>
               <%= number_field_tag :amount, 100, min: 1, max: @player.base_col.to_i, class: "form-control form-control-sm" %>
-              <%= submit_tag "コルを引き出す", class: "btn btn-outline-light w-100" %>
+              <div class="d-flex gap-2">
+                <%= submit_tag "コルを引き出す", class: "btn btn-outline-light flex-fill" %>
+                <%= button_tag "すべて引き出す",
+                    type: "submit",
+                    name: "amount",
+                    value: @player.base_col.to_i,
+                    class: "btn btn-warning flex-fill",
+                    disabled: @player.base_col.to_i <= 0 %>
+              </div>
             <% end %>
           <% else %>
             <p class="text-secondary small mb-0">この宿屋は本拠点ではないため、所持金管理は使えません。</p>

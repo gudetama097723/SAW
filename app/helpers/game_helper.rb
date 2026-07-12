@@ -81,6 +81,19 @@ module GameHelper
     end
   end
 
+  def treasure_reward_message_text(message)
+    tagged_message_content(message, "treasure_reward")
+  end
+
+  def treasure_reward_message_lines(message)
+    treasure_reward_message_text(message).to_s
+                                         .split("。")
+                                         .filter_map do |line|
+      text = line.strip
+      text.present? ? "#{text}。" : nil
+    end
+  end
+
   def battle_enemy_card_classes(player, enemy, selected: false)
     [
       "battle-enemy-card",
@@ -116,6 +129,18 @@ module GameHelper
     else
       "weapon-durability-good"
     end
+  end
+
+  def owned_item_quantity(player, name)
+    player.items.where(name: name).sum(:quantity).to_i
+  end
+
+  def owned_weapon_count(player, name)
+    player.weapons.where(name: name).count
+  end
+
+  def owned_armor_count(player, name)
+    player.armors.where(name: name).count
   end
 
   private

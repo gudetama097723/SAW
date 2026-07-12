@@ -1,4 +1,4 @@
-key,name,skill_set,required_proficiency,damage_multiplier,durability_cost,cooldown,skill_gain,hits,area,target_type,attack_attribute,summary,description
+﻿key,name,skill_set,required_proficiency,damage_multiplier,durability_cost,cooldown,skill_gain,hits,area,target_type,attack_attribute,summary,description
 vertical,バーチカル,片手直剣,0,150,2,1,3,1,FALSE,single,斬撃,倍率150% / 単体攻撃,単発の縦斬り。通常攻撃より高威力。使用後に硬直が発生します。
 horizontal,ホリゾンタル,片手直剣,50,105,3,2,4,1,TRUE,area,斬撃,倍率105% / 全体攻撃,横薙ぎで隣接する敵を最大4体まで巻き込む範囲技。対象数が増えるほど1体あたりの威力は下がります。
 vertical_arc,バーチカルアーク,片手直剣,100,120,4,2,5,2,FALSE,single,斬撃,倍率120%×2 / 単体攻撃,バーチカルを二連撃に発展させた技。一撃ごとに命中・回避・乱数判定を行い、途中で倒した場合は以降の攻撃を止めます。

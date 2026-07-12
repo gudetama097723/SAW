@@ -11,6 +11,35 @@ class ItemTest < ActiveSupport::TestCase
     assert_operator item.sell_price, :>=, Item::UNIQUE_ITEM_MIN_SELL_PRICE
   end
 
+  test "known monster drops have rarity based sell prices" do
+    common_drop = Item.new(name: "スライムの粘液", category: "drop")
+    rare_drop = Item.new(name: "小さな魔石", category: "drop")
+    boss_drop = Item.new(name: "蒼狼の牙", category: "drop")
+
+    assert_equal 4, common_drop.sell_price
+    assert_equal 45, rare_drop.sell_price
+    assert_equal 600, boss_drop.sell_price
+  end
+
+  test "all catalog monster drops sell for more than one col" do
+    drop_names = MobDropCatalog.definitions.map(&:item_name).uniq
+
+    drop_names.each do |name|
+      assert_operator Item.new(name: name, category: "drop").sell_price, :>, 1, "#{name} should not use fallback sell price"
+    end
+  end
+
+  test "valuable item is sell only and has its own category label" do
+    item = Item.new(name: "磨かれた銀貨", category: "valuable", quantity: 1)
+    item.apply_item_defaults
+
+    assert item.valuable?
+    assert_equal "換金アイテム", item.category_name
+    assert_equal 90, item.sell_price
+    assert_equal 0, item.total_weight
+    assert_not item.food?
+  end
+
   test "boss drop rewards become protected unique items" do
     player = players(:one)
 

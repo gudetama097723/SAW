@@ -151,18 +151,18 @@ module Game
       amount = params[:amount].to_i
 
       unless base
-        redirect_to game_path(panel: "inn"), alert: "この場所は本拠点ではありません。"
+        redirect_to game_path(panel: "inn", inn_menu: "col"), alert: "この場所は本拠点ではありません。"
         return
       end
       if amount <= 0 || player.col.to_i < amount
-        redirect_to game_path(panel: "inn"), alert: "預けるコルが足りません。"
+        redirect_to game_path(panel: "inn", inn_menu: "col"), alert: "預けるコルが足りません。"
         return
       end
 
       player.col = player.col.to_i - amount
       player.base_col = player.base_col.to_i + amount
       player.save!
-      redirect_to game_path(panel: "inn"), notice: "#{amount}コルを預けた。"
+      redirect_to game_path(panel: "inn", inn_menu: "col"), notice: "#{amount}コルを預けた。"
     end
 
     def withdraw_base_col
@@ -171,18 +171,18 @@ module Game
       amount = params[:amount].to_i
 
       unless base
-        redirect_to game_path(panel: "inn"), alert: "この場所は本拠点ではありません。"
+        redirect_to game_path(panel: "inn", inn_menu: "col"), alert: "この場所は本拠点ではありません。"
         return
       end
       if amount <= 0 || player.base_col.to_i < amount
-        redirect_to game_path(panel: "inn"), alert: "引き出すコルが足りません。"
+        redirect_to game_path(panel: "inn", inn_menu: "col"), alert: "引き出すコルが足りません。"
         return
       end
 
       player.base_col = player.base_col.to_i - amount
       player.col = player.col.to_i + amount
       player.save!
-      redirect_to game_path(panel: "inn"), notice: "#{amount}コルを引き出した。"
+      redirect_to game_path(panel: "inn", inn_menu: "col"), notice: "#{amount}コルを引き出した。"
     end
 
     def withdraw_item

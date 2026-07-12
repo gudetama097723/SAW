@@ -1,4 +1,5 @@
 class Weapon < ApplicationRecord
+  ONE_HANDED_TYPES = %w[片手直剣 細剣 短剣 棍 斧 片手棍 片手斧].freeze
   MAX_ENHANCEMENT_LEVEL = 10
   MAJOR_DAMAGE_DURABILITY = -40
   LOST_DURABILITY_THRESHOLD = -50
@@ -26,6 +27,10 @@ class Weapon < ApplicationRecord
 
   def broken?
     durability.to_i <= 0
+  end
+
+  def one_handed?
+    ONE_HANDED_TYPES.include?(weapon_type)
   end
 
   def major_damage?
@@ -122,11 +127,11 @@ def protected_item?
 end
 
 def sellable_by_player?
-  !starter_weapon? && !equipped? && !favorite? && discardable? && !protected_from_death_penalty?
+  !equipped? && !favorite? && discardable? && !protected_from_death_penalty?
 end
 
 def discardable_by_player?
-  !starter_weapon? && !equipped? && !favorite? && discardable? && !unique_item?
+  !equipped? && !favorite? && discardable? && !unique_item?
 end
 
 def stat_attack_power(player)
@@ -136,9 +141,6 @@ def stat_attack_power(player)
 end
 
 def sell_price
-
-    return 0 if starter_weapon?
-
     base = effective_attack_power.to_i * 4
     durability_rate = max_durability.to_i.positive? ? durability.to_i.to_f / max_durability.to_i : 0.5
     [(base * durability_rate * rarity_cost_multiplier / 2.0).floor, 1].max

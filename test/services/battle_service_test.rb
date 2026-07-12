@@ -225,6 +225,33 @@ class BattleServiceTest < ActiveSupport::TestCase
     end
   end
 
+  test "missed player attack says enemy dodged" do
+    player = players(:one)
+    player.update!(strength: 10, agility: 1)
+    weapon = player.weapons.create!(name: "回避表示確認剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+    mob = Mob.create!(name: "回避表示mob", hp: 100, atk: 1, rarity: "normal", level: 1, agility: 50, durability: 1, exp_reward: 10, flee_rate: 0)
+    part = mob.mob_parts.create!(name: "胴体", damage_multiplier: 100, weakness: false)
+    battle = player.battles.create!(mob: mob, enemy_hp: 100)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 100, enemy_level: 1, position: 1)
+
+    BattleService.singleton_class.define_method(:rand) { |arg = nil| arg.is_a?(Range) ? arg.end : 99 }
+    begin
+      result = BattleService.resolve_hit!(
+        player: player,
+        weapon: weapon,
+        battle_enemy: enemy,
+        mob_part_id: part.id,
+        damage_multiplier: 100,
+        attack_attribute: "斬撃"
+      )
+
+      assert_includes result, "躱された！"
+      assert_not_includes result, "ミス"
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+  end
+
   test "enemy with flee rate can flee instead of attacking" do
     player = players(:one)
     player.update!(hp: 100, max_hp: 100)

@@ -59,7 +59,7 @@ class FieldService
     current_area = current_area_for(player)
 
     event = rand(100)
-    encounter_rate = field_encounter_chance(current_area_for(player)&.encounter_rate || effective_field_danger_level(player), player)
+    encounter_rate = stealth_adjusted_encounter_chance(current_area_for(player)&.encounter_rate || effective_field_danger_level(player), player)
     message =
       if event < encounter_rate
         battle = create_battle!(player, encounter_mobs_for(player))
@@ -129,8 +129,10 @@ class FieldService
     player.advance_time!(15)
 
     if rand(100) < 85
-      battle = create_battle!(player, encounter_mobs_for(player), ambush: true)
-      message = "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}を発見した！先制攻撃のチャンス！"
+      ambush = hunt_ambush?(player)
+      battle = create_battle!(player, encounter_mobs_for(player), ambush: ambush)
+      message = "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}を発見した！"
+      message += "先制攻撃のチャンス！" if ambush
     else
       message = "周辺を探したが、獲物は見つからなかった。"
     end
@@ -416,7 +418,7 @@ class FieldService
 
   def self.gather_encounter_chance(context)
     base_chance = [[effective_field_danger_level(context) / 2, 10].max, 65].min
-    field_encounter_chance(base_chance, context)
+    stealth_adjusted_encounter_chance(base_chance, context)
   end
 
   def self.gatherable_items_for(context)
@@ -443,6 +445,19 @@ class FieldService
 
   def self.field_encounter_chance(base_chance, context)
     modified_chance(base_chance.to_i * time_period_modifier_for(context, :encounter), encounter_modifier_for(context))
+  end
+
+  def self.stealth_adjusted_encounter_chance(base_chance, context)
+    chance = field_encounter_chance(base_chance, context)
+    (chance / stealth_effectiveness_for(context)).round.clamp(0, 100)
+  end
+
+  def self.hunt_ambush?(player)
+    rand(100) < hunt_ambush_chance(player)
+  end
+
+  def self.hunt_ambush_chance(player)
+    modified_chance(65, stealth_effectiveness_for(player))
   end
 
   def self.time_period_key_for(context)
@@ -476,6 +491,19 @@ class FieldService
 
   def self.stealth_modifier_for(context)
     environment_location_for(context)&.stealth_modifier || 1.0
+  end
+
+  def self.stealth_effectiveness_for(context)
+    (stealth_modifier_for(context) * stealth_skill_modifier_for(context)).round(2)
+  end
+
+  def self.stealth_skill_modifier_for(context)
+    return 1.0 unless context.respond_to?(:skills)
+
+    skill = context.skills.find_by(name: "隠蔽")
+    return 1.0 unless skill
+
+    (1.0 + (skill.proficiency.to_i.clamp(0, 1000) / 1000.0 * 0.5)).round(2)
   end
 
   def self.search_modifier_for(context)

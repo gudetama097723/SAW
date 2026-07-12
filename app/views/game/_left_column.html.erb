@@ -1,6 +1,6 @@
         <div class="col-md-4">
           <% unless @battle.present? %>
-          <% hide_info_commands = selected_panel.in?(%w[npc npc_menu npc_quests npc_quest_accept inn item_shop blacksmith restaurant]) %>
+          <% hide_info_commands = selected_panel.in?(%w[npc npc_menu npc_quests npc_quest_accept inn item_shop weapon_shop blacksmith restaurant]) %>
           <% if @active_player_quests.any? %>
             <details class="card bg-secondary text-light mb-3 ui-collapsible" data-details-state-key="left-quests" open>
               <summary class="card-header ui-collapsible-summary">

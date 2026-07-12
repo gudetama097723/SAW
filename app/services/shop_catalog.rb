@@ -23,6 +23,11 @@ class ShopCatalog
     :production_only,
     keyword_init: true
   )
+  ArmorDefinition = Struct.new(
+    :location, :name, :armor_type, :slot, :rarity, :price, :defense, :weight,
+    :hp_bonus, :strength_bonus, :agility_bonus, :durability, :max_durability,
+    :description, keyword_init: true
+  )
 
   def self.item_shop_items(location)
     item_definitions.select { |item| item.location == location&.name }
@@ -32,13 +37,16 @@ class ShopCatalog
     item_shop_items(location).find { |item| item.item_name == item_name }
   end
 
-  def self.blacksmith_weapons(location)
+  def self.weapon_shop_weapons(location)
     weapon_definitions.select { |weapon| weapon.location == location&.name && !weapon.production_only }
   end
 
-  def self.blacksmith_weapon(location, weapon_name)
-    blacksmith_weapons(location).find { |weapon| weapon.name == weapon_name }
+  def self.weapon_shop_armors(location)
+    armor_definitions.select { |armor| armor.location == location&.name }
   end
+
+  def self.weapon_shop_weapon(location, name) = weapon_shop_weapons(location).find { |weapon| weapon.name == name }
+  def self.weapon_shop_armor(location, name) = weapon_shop_armors(location).find { |armor| armor.name == name }
 
   def self.blacksmith_production_weapons(location)
     weapon_definitions.select { |weapon| weapon.location == location&.name }
@@ -54,6 +62,10 @@ class ShopCatalog
 
   def self.weapon_definitions
     @weapon_definitions ||= load_weapon_definitions
+  end
+
+  def self.armor_definitions
+    @armor_definitions ||= load_armor_definitions
   end
 
   def self.load_item_definitions
@@ -96,6 +108,23 @@ class ShopCatalog
         agility_ratio: row["agility_ratio"].presence&.to_i || 30,
         description: row["description"].presence || "",
         production_only: ActiveModel::Type::Boolean.new.cast(row["production_only"])
+      )
+    end
+  end
+
+
+  def self.load_armor_definitions
+    path = Rails.root.join("db", "seeds", "weapon_shop_armors.csv")
+    rows = []
+    SimpleCsv.foreach(path) { |row| rows << row } if File.exist?(path)
+    rows.map do |row|
+      ArmorDefinition.new(
+        location: row["location"], name: row["name"], armor_type: row["armor_type"],
+        slot: row["slot"], rarity: row["rarity"], price: row["price"].to_i,
+        defense: row["defense"].to_i, weight: row["weight"].to_d,
+        hp_bonus: row["hp_bonus"].to_i, strength_bonus: row["strength_bonus"].to_i,
+        agility_bonus: row["agility_bonus"].to_i, durability: row["durability"].to_i,
+        max_durability: row["max_durability"].to_i, description: row["description"].to_s
       )
     end
   end

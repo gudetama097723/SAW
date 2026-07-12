@@ -7,11 +7,13 @@
           <% if selected_shop_item %>
             <% purchase_quantity = [params[:quantity].to_i, 1].max %>
             <% purchase_total_price = selected_shop_item.price * purchase_quantity %>
+            <% owned_quantity = owned_item_quantity(@player, selected_shop_item.item_name) %>
             <%= link_to "販売一覧に戻る", game_path(panel: "item_shop", shop_menu: "buy"), class: "btn btn-outline-light w-100 mb-3" %>
             <h6><%= selected_shop_item.item_name %></h6>
             <p class="mb-1">価格: <%= selected_shop_item.price %>コル</p>
             <p class="mb-1">種別: <%= selected_shop_item.category %></p>
             <p class="mb-1">重さ: <%= Item.new(name: selected_shop_item.item_name, category: selected_shop_item.category).weight %></p>
+            <p class="mb-1">現所持数: <%= owned_quantity %>個</p>
             <% if selected_shop_item.item_name == "ポーション" %>
               <p class="mb-2">効果: HPを100回復</p>
             <% elsif selected_shop_item.item_name == "解毒ポーション" %>
@@ -61,6 +63,7 @@
           <% end %>
         <% elsif shop_menu == "produce" %>
           <% herb = @player.items.find_by(name: "薬草", category: "gathered") || @player.items.find_by(name: "薬草") %>
+          <% owned_potion_quantity = owned_item_quantity(@player, "ポーション") %>
           <% production_quantity = [params[:quantity].to_i, 1].max %>
           <% required_herbs = ItemService::HERBS_PER_POTION * production_quantity %>
           <% production_total_cost = ItemService::POTION_PRODUCTION_COST * production_quantity %>
@@ -68,6 +71,7 @@
           <h6>ポーション</h6>
           <p class="mb-1">必要素材: 薬草 10個</p>
           <p class="mb-1">費用: 20コル</p>
+          <p class="mb-1">現所持数: <%= owned_potion_quantity %>個</p>
           <p class="mb-2">所持薬草: <%= (herb&.quantity || 0).to_i %></p>
           <% if params[:confirm_production] == "1" %>
             <div class="border rounded p-2">
@@ -105,7 +109,10 @@
             <div class="border rounded p-2">
               <h6><%= selected_sell_item.name %></h6>
               <p class="mb-1">所持数: <%= selected_sell_item.quantity %></p>
-              <p class="mb-1">種別: <%= selected_sell_item.category %></p>
+              <p class="mb-1">種別: <%= selected_sell_item.category_name %></p>
+              <% if selected_sell_item.valuable? %>
+                <p class="mb-1 text-warning">用途: 換金専用</p>
+              <% end %>
               <p class="mb-2">売却価格: 1個 <%= selected_sell_item.sell_price %>コル</p>
               <% if selected_sell_item.unique_item? && params[:confirm_item_id].to_i != selected_sell_item.id %>
                 <%= link_to "売却確認へ", game_path(panel: "item_shop", shop_menu: "sell", item_id: selected_sell_item.id, confirm_item_id: selected_sell_item.id, item_category: sell_category), class: "btn btn-outline-danger w-100" %>
@@ -131,6 +138,7 @@
               <%= link_to "回復", game_path(panel: "item_shop", shop_menu: "sell", item_category: "healing"), class: "btn btn-sm #{sell_category == 'healing' ? 'btn-warning' : 'btn-outline-light'}" %>
               <%= link_to "採取", game_path(panel: "item_shop", shop_menu: "sell", item_category: "gathered"), class: "btn btn-sm #{sell_category == 'gathered' ? 'btn-warning' : 'btn-outline-light'}" %>
               <%= link_to "ドロップ", game_path(panel: "item_shop", shop_menu: "sell", item_category: "drop"), class: "btn btn-sm #{sell_category == 'drop' ? 'btn-warning' : 'btn-outline-light'}" %>
+              <%= link_to "換金", game_path(panel: "item_shop", shop_menu: "sell", item_category: "valuable"), class: "btn btn-sm #{sell_category == 'valuable' ? 'btn-warning' : 'btn-outline-light'}" %>
             </div>
             <% if listed_sell_items.any? %>
               <div class="d-grid gap-2">

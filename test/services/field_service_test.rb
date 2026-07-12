@@ -73,6 +73,50 @@ class FieldServiceTest < ActiveSupport::TestCase
     assert_equal 72, FieldService.field_encounter_chance(40, player)
   end
 
+  test "hunt encounter is not guaranteed to be an ambush" do
+    player = players(:one)
+    route = routes(:one)
+    route.update!(name: "はじまりの草原")
+    player.update!(field_route: route, current_time: 12 * 60)
+    rolls = 0
+
+    FieldService.singleton_class.define_method(:rand) do |arg = nil|
+      rolls += 1
+      if rolls == 1
+        0
+      elsif rolls == 2
+        99
+      else
+        arg.is_a?(Range) ? arg.begin : 0
+      end
+    end
+    begin
+      result = FieldService.hunt!(player)
+    ensure
+      FieldService.singleton_class.remove_method(:rand)
+    end
+
+    assert_equal :ok, result.status
+    assert result.battle
+    assert_not result.battle.ambush?
+    assert_not_includes result.message, "先制攻撃のチャンス"
+  end
+
+  test "stealth skill lowers field detection and raises hunt ambush chance" do
+    player = players(:one)
+    route = routes(:one)
+    player.skills.destroy_all
+    player.update!(field_route: route, current_time: 12 * 60)
+
+    detection_without_stealth = FieldService.stealth_adjusted_encounter_chance(40, player)
+    ambush_without_stealth = FieldService.hunt_ambush_chance(player)
+
+    player.skills.create!(name: "隠蔽", proficiency: 1000, skill_exp: 0)
+
+    assert_operator FieldService.stealth_adjusted_encounter_chance(40, player), :<, detection_without_stealth
+    assert_operator FieldService.hunt_ambush_chance(player), :>, ambush_without_stealth
+  end
+
   test "mapping gain is lower in dangerous areas" do
     player = players(:one)
     route = routes(:one)

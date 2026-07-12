@@ -160,7 +160,7 @@
             <p class="mb-0">キーアイテムはまだありません。</p>
           <% end %>
 
-        <% elsif params[:item_category].in?(%w[healing gathered drop]) %>
+        <% elsif params[:item_category].in?(%w[healing gathered drop valuable]) %>
 
           <div class="d-flex gap-1 mb-2 flex-wrap">
             <%= sort_link.call("名前", "name", "asc") %>
@@ -206,6 +206,9 @@
                 <p class="mb-1">合計重量: <%= item.total_weight %></p>
                 <p class="mb-1">売却価格: <%= item.sell_price %>コル / 個</p>
                 <p class="mb-1">売却合計: <%= item.sell_price * item.quantity.to_i %>コル</p>
+                <% if item.valuable? %>
+                  <p class="mb-1 text-warning">用途: 換金専用</p>
+                <% end %>
                 <% if item.food? %>
                   <p class="mb-1">食材: おいしさ <%= item.effective_tastiness %></p>
                 <% end %>

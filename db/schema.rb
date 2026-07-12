@@ -10,16 +10,18 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_06_001000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_12_002000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
     t.datetime "created_at", null: false
     t.integer "defense", default: 0, null: false
     t.boolean "discardable", default: true, null: false
+    t.integer "durability", default: 100, null: false
     t.boolean "equipped", default: false, null: false
     t.boolean "favorite", default: false, null: false
     t.integer "hp_bonus", default: 0, null: false
+    t.integer "max_durability", default: 100, null: false
     t.string "name", null: false
     t.integer "player_base_id"
     t.integer "player_id"
@@ -307,6 +309,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_001000) do
     t.datetime "created_at", null: false
     t.boolean "defeated", default: false, null: false
     t.datetime "defeated_at"
+    t.integer "defeated_count", default: 0, null: false
     t.boolean "found", default: false, null: false
     t.integer "mob_id", null: false
     t.integer "player_id", null: false
@@ -362,6 +365,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_001000) do
     t.boolean "found_inn", default: false, null: false
     t.boolean "found_item_shop", default: false, null: false
     t.boolean "found_restaurant", default: false, null: false
+    t.boolean "found_weapon_shop", default: false, null: false
     t.integer "location_id", null: false
     t.integer "player_id", null: false
     t.datetime "updated_at", null: false
@@ -405,6 +409,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_001000) do
     t.boolean "found_inn", default: false, null: false
     t.boolean "found_item_shop", default: false, null: false
     t.boolean "found_restaurant", default: false, null: false
+    t.boolean "found_weapon_shop", default: false, null: false
     t.integer "hp"
     t.text "injury_states", default: "{}", null: false
     t.integer "level", default: 1, null: false

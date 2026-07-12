@@ -69,6 +69,8 @@ class PlayerInitializer
         hp_bonus: to_int(row["hp_bonus"]),
         strength_bonus: to_int(row["strength_bonus"]),
         agility_bonus: to_int(row["agility_bonus"]),
+        durability: to_int(row["durability"]),
+        max_durability: to_int(row["max_durability"]),
         equipped: to_bool(row["equipped"])
       )
     end

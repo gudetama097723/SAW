@@ -1,3 +1,4 @@
-﻿name,armor_type,slot,rarity,defense,weight,hp_bonus,strength_bonus,agility_bonus,equipped
-レザーチュニック,体防具,body,common,2,2,0,0,0,TRUE
-レザーブーツ,ブーツ,feet,common,0,1,0,0,1,TRUE
+﻿name,armor_type,slot,rarity,defense,weight,hp_bonus,strength_bonus,agility_bonus,durability,max_durability,equipped
+レザーチュニック,革鎧,body,common,2,2,0,0,1,120,120,TRUE
+レザートラウザー,革鎧,legs,common,1,1,0,0,1,100,100,TRUE
+レザーブーツ,革鎧,feet,common,1,1,0,0,1,100,100,TRUE

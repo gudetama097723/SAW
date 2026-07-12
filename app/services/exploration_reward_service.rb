@@ -1,5 +1,8 @@
 class ExplorationRewardService
   Result = Struct.new(:status, :message, :battle, keyword_init: true)
+  FENRIR_NAME = "蒼狼フェンリル"
+  PACK_LEADER_NAME = "群狼の王"
+  FENRIR_REQUIRED_PACK_LEADER_DEFEATS = 5
 
   def self.discoveries_after_explore!(player, area, mapping_before, mapping_after)
     messages = []
@@ -17,7 +20,8 @@ class ExplorationRewardService
 
     message = apply_reward!(player, treasure_chest.reward)
     state.update!(opened: true, opened_at: Time.current)
-    Result.new(status: :ok, message: "#{treasure_chest.name}を#{treasure_chest.requires_inspection? ? "開けた" : "回収した"}。#{message}")
+    action = treasure_chest.requires_inspection? ? "開けた" : "回収した"
+    Result.new(status: :ok, message: "#{treasure_chest.name}を#{action}。[treasure_reward]#{message}[/treasure_reward]")
   end
 
   def self.inspect_treasure!(player, treasure_chest)
@@ -140,10 +144,17 @@ class ExplorationRewardService
     return "" unless mob&.boss?
 
     state = player.player_boss_kills.find_or_create_by!(mob: mob)
-    return "" if state.defeated?
+    first_defeat = !state.defeated?
 
-    state.update!(found: true, defeated: true, defeated_at: Time.current)
-    " [boss]#{mob.name}を討伐した！[/boss]#{apply_reward!(player, mob.reward, unique_drops: true)}"
+    state.defeated_count = state.defeated_count.to_i + 1 if state.has_attribute?(:defeated_count)
+    state.found = true
+    state.defeated = true
+    state.defeated_at ||= Time.current
+    state.save!
+
+    message = " [boss]#{mob.name}を討伐した！[/boss]"
+    message += apply_reward!(player, mob.reward, unique_drops: true) if first_defeat
+    message
   end
 
   def self.discovered_treasures(player)
@@ -209,9 +220,10 @@ class ExplorationRewardService
   def self.discover_field_boss!(player)
     route = player.field_route
     return unless route
-    return unless player.field_route_mapping_progress >= 100
 
     boss = Mob.find_by(route: route, boss_type: "field_boss")
+    return unless field_boss_discoverable?(player, boss)
+
     mark_boss_found!(player, boss, "#{route.name}のマッピング率が100%に到達した。")
   end
 
@@ -237,10 +249,31 @@ class ExplorationRewardService
     when "field_boss"
       player.field_route.present? &&
         mob.route_id == player.field_route_id &&
-        player.field_route_mapping_progress >= 100
+        field_boss_discoverable?(player, mob)
     else
       false
     end
+  end
+
+  def self.field_boss_discoverable?(player, mob)
+    return false unless mob&.field_boss?
+    return false unless player.field_route.present?
+    return false unless mob.route_id == player.field_route_id
+    return false unless player.field_route_mapping_progress >= 100
+    return true unless mob.name == FENRIR_NAME
+
+    pack_leader_defeat_count(player) >= FENRIR_REQUIRED_PACK_LEADER_DEFEATS
+  end
+
+  def self.pack_leader_defeat_count(player)
+    pack_leader = Mob.find_by(name: PACK_LEADER_NAME)
+    return 0 unless pack_leader
+
+    state = player.player_boss_kills.find_by(mob: pack_leader)
+    return 0 unless state
+    return state.defeated_count.to_i if state.has_attribute?(:defeated_count)
+
+    state.defeated? ? 1 : 0
   end
 
   def self.mark_treasure_found!(player, chest)

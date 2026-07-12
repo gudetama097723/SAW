@@ -171,11 +171,15 @@
                         class: "link-light fw-semibold" %>
                     <span class="small text-secondary ms-1"><%= armor.slot_name %></span>
                   </div>
-                  <%= button_to "装備する",
-                      equip_armor_path(armor_id: armor.id),
-                      method: :post,
-                      class: "btn btn-outline-info btn-sm text-nowrap",
-                      form: { class: "m-0" } %>
+                  <% if armor.slot == "shield" && !@player.shield_equippable? %>
+                    <button class="btn btn-outline-secondary btn-sm text-nowrap" disabled>装備不能</button>
+                  <% else %>
+                    <%= button_to "装備する",
+                        equip_armor_path(armor_id: armor.id),
+                        method: :post,
+                        class: "btn btn-outline-info btn-sm text-nowrap",
+                        form: { class: "m-0" } %>
+                  <% end %>
                 </div>
               <% end %>
             </div>
@@ -226,6 +230,7 @@
           <p class="mb-1">種別: <%= selected_detail_armor.armor_type %></p>
           <p class="mb-1">レアリティ: <%= selected_detail_armor.rarity %></p>
           <p class="mb-1">防御: <%= selected_detail_armor.defense %></p>
+          <p class="mb-1">耐久力: <%= selected_detail_armor.durability %> / <%= selected_detail_armor.max_durability %>（<%= selected_detail_armor.durability_condition_label %>）</p>
           <p class="mb-1">重量: <%= selected_detail_armor.weight %></p>
           <p class="mb-1">補正: HP <%= signed_bonus(selected_detail_armor.hp_bonus) %>% / 筋力 <%= signed_bonus(selected_detail_armor.strength_bonus) %> / 敏捷 <%= signed_bonus(selected_detail_armor.agility_bonus) %></p>
           <% if selected_detail_armor.status_resistance.any? %>

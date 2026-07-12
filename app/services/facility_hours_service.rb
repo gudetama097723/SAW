@@ -3,6 +3,7 @@ class FacilityHoursService
     "inn" => { label: "宿屋", always_open: true },
     "item_shop" => { label: "道具屋", opens_at: 8 * 60, closes_at: 20 * 60 },
     "blacksmith" => { label: "鍛冶屋", opens_at: 9 * 60, closes_at: 18 * 60 },
+    "weapon_shop" => { label: "武具店", opens_at: 8 * 60, closes_at: 20 * 60 },
     "restaurant" => { label: "飲食店", opens_at: 7 * 60, closes_at: 22 * 60 }
   }.freeze
 

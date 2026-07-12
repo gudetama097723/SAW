@@ -11,12 +11,15 @@
         <% selected_panel = params[:panel].presence %>
         <% equipped_weapon = @player.equipped_weapon %>
         <% equipped_weapons = @player.equipped_weapons %>
-        <% reward_lines = reward_message_lines(alert.presence || notice.presence) %>
+        <% message_text = alert.presence || notice.presence %>
+        <% treasure_reward_lines = treasure_reward_message_lines(message_text) %>
+        <% battle_reward_lines = reward_message_lines(message_text) %>
+        <% reward_lines = treasure_reward_lines.presence || battle_reward_lines %>
 
         <% if reward_lines.any? %>
           <div class="battle-reward-effect" aria-live="polite">
             <div class="battle-reward-effect-card">
-              <div class="battle-reward-effect-title">戦利品獲得</div>
+              <div class="battle-reward-effect-title"><%= treasure_reward_lines.any? ? "宝箱獲得" : "戦利品獲得" %></div>
               <% reward_lines.each do |line| %>
                 <div class="battle-reward-effect-line"><%= line %></div>
               <% end %>

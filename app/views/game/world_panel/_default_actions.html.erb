@@ -64,10 +64,11 @@
       town_discovery&.found_inn?,
       town_discovery&.found_item_shop?,
       town_discovery&.found_blacksmith?,
+      town_discovery&.found_weapon_shop?,
       town_discovery&.found_restaurant?
     ].count(true) %>
 
-    <details class="card bg-secondary text-light ui-collapsible world-action-group" data-details-state-key="world-facilities">
+    <details class="card bg-secondary text-light ui-collapsible world-action-group" data-details-state-key="world-facilities" <%= "open" if discovered_facility_count.positive? %>>
       <summary class="card-header ui-collapsible-summary">
         <span>施設</span>
         <% if discovered_facility_count.positive? %>
@@ -94,6 +95,14 @@
             <%= link_to "鍛冶屋に入る", game_path(panel: "blacksmith"), class: "btn btn-outline-warning w-100" %>
           <% else %>
             <button class="btn btn-outline-secondary w-100" disabled>鍛冶屋（閉店中 / <%= FacilityHoursService.hours_text("blacksmith") %>）</button>
+          <% end %>
+        <% end %>
+
+        <% if town_discovery&.found_weapon_shop? %>
+          <% if FacilityHoursService.open?("weapon_shop", @player) %>
+            <%= link_to "武具店に入る", game_path(panel: "weapon_shop"), class: "btn btn-outline-warning w-100" %>
+          <% else %>
+            <button class="btn btn-outline-secondary w-100" disabled>武具店（閉店中 / <%= FacilityHoursService.hours_text("weapon_shop") %>）</button>
           <% end %>
         <% end %>
 

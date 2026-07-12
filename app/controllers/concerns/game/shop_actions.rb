@@ -241,24 +241,26 @@ module Game
         return
       end
 
-      weapons = if params[:repair_all] == "1"
-                  player.weapons.select { |owned_weapon| owned_weapon.repair_cost.positive? }
+      equipment = if params[:repair_all] == "1"
+                  player.weapons.select { |item| item.repair_cost.positive? } + player.armors.select { |item| item.repair_cost.positive? }
                 else
-                  weapon = player.weapons.find_by(id: params[:weapon_id]) || player.equipped_weapon
-                  weapon && weapon.repair_cost.to_i.positive? ? [weapon] : []
+                  item = params[:armor_id].present? ? player.armors.find_by(id: params[:armor_id]) : player.weapons.find_by(id: params[:weapon_id])
+                  item ||= player.equipped_weapon
+                  item && item.repair_cost.to_i.positive? ? [item] : []
                 end
 
-      if weapons.empty?
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "整備できる武器がありません。"
+      if equipment.empty?
+        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "整備できる装備がありません。"
         return
       end
 
-      total_price = weapons.sum(&:repair_cost)
+      total_price = equipment.sum(&:repair_cost)
       if player.col.to_i < total_price
         redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "コルが足りません。整備には#{total_price}コル必要です。"
         return
       end
 
+      weapons = equipment.grep(Weapon)
       required_materials = repair_materials_for(weapons)
       missing_materials = missing_repair_materials_for(player, required_materials)
       if missing_materials.any?
@@ -268,67 +270,53 @@ module Game
 
       ActiveRecord::Base.transaction do
         player.col = player.col.to_i - total_price
-        player.advance_time!(20 * weapons.size)
+        player.advance_time!(20 * equipment.size)
         consume_repair_materials!(player, required_materials)
-        weapons.each do |weapon|
-          weapon.durability = weapon.max_durability
-          weapon.save!
+        equipment.each do |item|
+          item.update!(durability: item.max_durability)
         end
         player.save!
       end
 
-      repaired_names = weapons.map(&:display_name).join("、")
+      repaired_names = equipment.map { |item| item.respond_to?(:display_name) ? item.display_name : item.name }.join("、")
       redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), notice: "鍛冶屋で#{repaired_names}を整備した。#{total_price}コル支払った。"
     end
 
-    def buy_bronze_sword
+    def weapon_shop
       player = current_player
-
-      unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
-        redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
+      unless player.location&.safe_area? && player.town_discovery_for&.found_weapon_shop?
+        redirect_to game_path, alert: "武具店はまだ利用できません。"
+        return
+      end
+      unless facility_open_for?(player, "weapon_shop")
+        redirect_to game_path, alert: FacilityHoursService.closed_message("weapon_shop", player)
         return
       end
 
-      unless facility_open_for?(player, "blacksmith")
-        redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
+      kind = params[:equipment_type].to_s
+      definition = kind == "armor" ? ShopCatalog.weapon_shop_armor(player.location, params[:equipment_name]) : ShopCatalog.weapon_shop_weapon(player.location, params[:equipment_name])
+      unless definition
+        redirect_to game_path(panel: "weapon_shop"), alert: "この町ではその装備を購入できません。"
+        return
+      end
+      unless params[:confirm_purchase] == "1"
+        redirect_to game_path(panel: "weapon_shop", shop_menu: kind == "armor" ? "armors" : "weapons", equipment_name: definition.name), alert: "購入内容を確認してください。"
+        return
+      end
+      if player.col.to_i < definition.price
+        redirect_to game_path(panel: "weapon_shop"), alert: "コルが足りません。#{definition.name}は#{definition.price}コルです。"
         return
       end
 
-      weapon_definition = ShopCatalog.blacksmith_weapon(player.location, params[:weapon_name].presence || "ブロンズソード")
-      unless weapon_definition
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "buy"), alert: "この町ではその武器を購入できません。"
-        return
+      ActiveRecord::Base.transaction do
+        player.update!(col: player.col.to_i - definition.price)
+        if kind == "armor"
+          player.armors.create!(definition.to_h.except(:location, :price, :description).merge(equipped: false))
+        else
+          player.weapons.create!(definition.to_h.except(:location, :price, :production_only).merge(equipped: false))
+        end
       end
-
-      price = weapon_definition.price
-      if player.col.to_i < price
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "buy"), alert: "コルが足りません。#{weapon_definition.name}は#{price}コルです。"
-        return
-      end
-
-      player.col = player.col.to_i - price
-      player.weapons.create!(
-        name: weapon_definition.name,
-        weapon_type: weapon_definition.weapon_type,
-        rarity: weapon_definition.rarity,
-        attack_power: weapon_definition.attack_power,
-        durability: weapon_definition.durability,
-        max_durability: weapon_definition.max_durability,
-        hp_bonus: weapon_definition.hp_bonus,
-        strength_bonus: weapon_definition.strength_bonus,
-        agility_bonus: weapon_definition.agility_bonus,
-        critical_rate: weapon_definition.critical_rate,
-        part_break_power: weapon_definition.part_break_power,
-        attack_attributes: weapon_definition.attack_attributes,
-        weight: weapon_definition.weight,
-        strength_ratio: weapon_definition.strength_ratio,
-        agility_ratio: weapon_definition.agility_ratio,
-        description: weapon_definition.description,
-        equipped: false
-      )
-      player.save!
-
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "buy"), notice: "#{weapon_definition.name}を購入した。"
+      redirect_to game_path(panel: "weapon_shop", shop_menu: kind == "armor" ? "armors" : "weapons"), notice: "#{definition.name}を購入した。"
     end
 
     def produce_weapon
@@ -351,28 +339,32 @@ module Game
     def sell_weapon
       player = current_player
 
-      unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
-        redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
+      unless player.location&.safe_area? && player.town_discovery_for&.found_weapon_shop?
+        redirect_to game_path, alert: "武具店はまだ利用できません。"
         return
       end
 
-      unless facility_open_for?(player, "blacksmith")
-        redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
+      unless facility_open_for?(player, "weapon_shop")
+        redirect_to game_path, alert: FacilityHoursService.closed_message("weapon_shop", player)
         return
       end
 
       weapon = player.weapons.find_by(id: params[:weapon_id])
       unless weapon
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "sell"), alert: "その武器は所持していません。"
+        redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "weapons"), alert: "その武器は所持していません。"
         return
       end
 
       unless weapon.sellable_by_player?
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "sell"), alert: "装備中・お気に入り・保護対象の武器は売却できません。"
+        redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "weapons"), alert: "装備中・お気に入り・保護対象の武器は売却できません。"
+        return
+      end
+      unless params[:confirm_sell] == "1"
+        redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "weapons", weapon_id: weapon.id, confirm_sell: "1"), alert: "売却内容を確認してください。"
         return
       end
       if weapon.unique_item? && params[:confirm_unique] != "1"
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "sell", confirm_weapon_id: weapon.id),
+        redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "weapons", weapon_id: weapon.id, confirm_sell: "1"),
                     alert: "この武器は二度と手には入らないかもしれません。本当に売却しますか？"
         return
       end
@@ -386,7 +378,32 @@ module Game
         player.save!
       end
 
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "sell"), notice: "#{weapon.name}を#{price}コルで売却した。"
+      redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "weapons"), notice: "#{weapon.name}を#{price}コルで売却した。"
+    end
+
+    def sell_armor
+      player = current_player
+      unless player.location&.safe_area? && player.town_discovery_for&.found_weapon_shop? && facility_open_for?(player, "weapon_shop")
+        redirect_to game_path, alert: "武具店は利用できません。"
+        return
+      end
+      armor = player.armors.find_by(id: params[:armor_id])
+      unless armor&.sellable_by_player?
+        redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "armors"), alert: "装備中・お気に入り・保護対象の防具は売却できません。"
+        return
+      end
+      unless params[:confirm_sell] == "1"
+        redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "armors", armor_id: armor.id, confirm_sell: "1"), alert: "売却内容を確認してください。"
+        return
+      end
+      price = armor.sell_price
+      ActiveRecord::Base.transaction do
+        armor.destroy!
+        player.col = player.col.to_i + price
+        player.advance_time!(10)
+        player.save!
+      end
+      redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "armors"), notice: "#{armor.name}を#{price}コルで売却した。"
     end
 
     def equip_weapon
@@ -422,6 +439,7 @@ module Game
         end
 
         weapon.update!(equipped: true)
+        player.armors.where(slot: "shield").update_all(equipped: false) unless player.shield_equippable?
       end
 
       if battle
@@ -473,12 +491,15 @@ module Game
         redirect_to game_path(panel: "equipment"), alert: "その防具は所持していません。"
         return
       end
+      if armor.slot == "shield" && !player.shield_equippable?
+        redirect_to game_path(panel: "equipment"), alert: "盾は片手武器を装備している場合のみ装備できます。"
+        return
+      end
 
       ActiveRecord::Base.transaction do
         player.armors.where(slot: armor.slot).update_all(equipped: false)
         armor.update!(equipped: true)
       end
-
       if battle
         enemy_result = BattleService.apply_enemy_attack!(player, battle)
         if enemy_result.status == :defeated

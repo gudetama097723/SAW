@@ -1,6 +1,13 @@
 require "test_helper"
 
 class WeaponTest < ActiveSupport::TestCase
+  test "one handed weapon types are identified for shields" do
+    assert Weapon.new(weapon_type: "片手直剣").one_handed?
+    assert Weapon.new(weapon_type: "細剣").one_handed?
+    refute Weapon.new(weapon_type: "両手剣").one_handed?
+    refute Weapon.new(weapon_type: "槍").one_handed?
+  end
+
   test "durability condition reduces effective attack power" do
     weapon = Weapon.new(name: "テスト剣", weapon_type: "片手直剣", attack_power: 100, max_durability: 200)
 
@@ -43,5 +50,35 @@ class WeaponTest < ActiveSupport::TestCase
     assert_equal({ "狼王の牙" => 1 }, wolf_sword.repair_materials_required)
     assert_equal({ "薄羽蜂の針" => 1 }, rapier.repair_materials_required)
     assert_empty damaged.repair_materials_required
+  end
+
+  test "small sword is sellable like a normal unequipped weapon" do
+    weapon = Weapon.new(
+      name: "スモールソード",
+      weapon_type: "片手直剣",
+      rarity: "common",
+      attack_power: 6,
+      durability: 200,
+      max_durability: 200,
+      equipped: false
+    )
+
+    assert weapon.starter_weapon?
+    assert weapon.sellable_by_player?
+    assert weapon.discardable_by_player?
+    assert_operator weapon.sell_price, :>, 0
+  end
+
+  test "small sword is available cheaply at weapon shops" do
+    beginning_town = Location.new(name: "はじまりの街")
+    hornka = Location.new(name: "ホルンカの村")
+
+    beginning_definition = ShopCatalog.weapon_shop_weapon(beginning_town, "スモールソード")
+    hornka_definition = ShopCatalog.weapon_shop_weapon(hornka, "スモールソード")
+
+    assert_equal 35, beginning_definition.price
+    assert_equal 30, hornka_definition.price
+    assert_operator beginning_definition.price, :<, ShopCatalog.weapon_shop_weapon(beginning_town, "ブロンズソード").price
+    assert_operator hornka_definition.price, :<, ShopCatalog.weapon_shop_weapon(hornka, "ブロンズソード").price
   end
 end

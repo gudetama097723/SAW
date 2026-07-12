@@ -20,6 +20,7 @@ class ExplorationRewardServiceTest < ActiveSupport::TestCase
 
     assert_equal :ok, result.status
     assert_equal 10, player.reload.col
+    assert_includes result.message, "[treasure_reward]10コルを入手した。[/treasure_reward]"
   end
 
   test "inspected box treasure can be opened" do
@@ -161,6 +162,41 @@ class ExplorationRewardServiceTest < ActiveSupport::TestCase
     assert_empty ExplorationRewardService.discovered_treasure_states(player)
   end
 
+  test "fenrir is discovered after full mapping and five pack leader defeats" do
+    player = create_player!
+    route = create_route!
+    area = create_area!(route)
+    player.update!(field_route: route, field_position: 0)
+    player.progress_for_area(area).update!(mapping_progress: 100)
+    pack_leader = create_boss!(name: "群狼の王", route: route, field_area: area, boss_type: "area_boss")
+    fenrir = create_boss!(name: "蒼狼フェンリル", route: route, boss_type: "field_boss")
+    player.player_boss_kills.create!(mob: pack_leader, found: true, defeated: true, defeated_count: 4)
+
+    assert_nil ExplorationRewardService.discover_field_boss!(player)
+    assert_nil player.player_boss_kills.find_by(mob: fenrir)
+
+    player.player_boss_kills.find_by(mob: pack_leader).update!(defeated_count: 5)
+    message = ExplorationRewardService.discover_field_boss!(player)
+
+    assert_includes message, "フィールドボス「蒼狼フェンリル」を発見した"
+    assert player.player_boss_kills.find_by(mob: fenrir).found?
+  end
+
+  test "boss victories count repeated defeats after the first clear" do
+    player = create_player!
+    route = create_route!
+    area = create_area!(route)
+    boss = create_boss!(name: "群狼の王", route: route, field_area: area, boss_type: "area_boss", reward_data: { col: 10 }.to_json)
+
+    first_message = ExplorationRewardService.boss_victory_message!(player, boss)
+    second_message = ExplorationRewardService.boss_victory_message!(player, boss)
+    state = player.player_boss_kills.find_by!(mob: boss)
+
+    assert_equal 2, state.defeated_count
+    assert_includes first_message, "10コルを入手した"
+    assert_not_includes second_message, "10コルを入手した"
+  end
+
   private
 
   def create_player!
@@ -182,6 +218,24 @@ class ExplorationRewardServiceTest < ActiveSupport::TestCase
       end_distance: 100,
       encounter_rate: 0,
       rest_safety: 100
+    )
+  end
+
+  def create_boss!(name:, route:, boss_type:, field_area: nil, reward_data: "{}")
+    Mob.create!(
+      name: name,
+      route: route,
+      field_area: field_area,
+      boss_type: boss_type,
+      hp: 100,
+      atk: 10,
+      rarity: "boss",
+      level: 1,
+      agility: 1,
+      durability: 1,
+      exp_reward: 10,
+      flee_rate: 0,
+      reward_data: reward_data
     )
   end
 end

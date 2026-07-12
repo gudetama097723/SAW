@@ -1,0 +1,89 @@
+<% shop_menu = params[:shop_menu].presence %>
+<% equipment_name = params[:equipment_name].presence %>
+<div class="card-header">武具店</div>
+<div class="card-body">
+  <% if shop_menu == "weapons" %>
+    <% products = ShopCatalog.weapon_shop_weapons(@player.location) %>
+    <% selected = products.find { |item| item.name == equipment_name } %>
+    <% if selected %>
+      <% owned_count = owned_weapon_count(@player, selected.name) %>
+      <%= link_to "一覧に戻る", game_path(panel: "weapon_shop", shop_menu: "weapons"), class: "btn btn-outline-light w-100 mb-3" %>
+      <h6><%= selected.name %></h6>
+      <p>武器種: <%= selected.weapon_type %> / 攻撃: <%= selected.attack_power %></p>
+      <p>耐久: <%= selected.max_durability %> / 重量: <%= selected.weight %> / 価格: <%= selected.price %>コル</p>
+      <p>現所持数: <%= owned_count %>本</p>
+      <p><%= selected.description %></p>
+      <% if params[:confirm_purchase] == "1" %>
+        <p class="fw-bold">購入しますか？</p>
+        <div class="d-flex gap-2">
+          <%= button_to "はい", weapon_shop_path(equipment_type: "weapon", equipment_name: selected.name, confirm_purchase: "1"), method: :post, class: "btn btn-warning flex-fill" %>
+          <%= link_to "いいえ", game_path(panel: "weapon_shop", shop_menu: "weapons", equipment_name: selected.name), class: "btn btn-outline-light flex-fill" %>
+        </div>
+      <% else %>
+        <%= link_to "購入確認へ", game_path(panel: "weapon_shop", shop_menu: "weapons", equipment_name: selected.name, confirm_purchase: "1"), class: "btn btn-warning w-100" %>
+      <% end %>
+    <% else %>
+      <div class="d-grid gap-2"><% products.each do |item| %><%= link_to item.name, game_path(panel: "weapon_shop", shop_menu: "weapons", equipment_name: item.name), class: "btn btn-outline-warning w-100" %><% end %></div>
+    <% end %>
+  <% elsif shop_menu == "armors" %>
+    <% slot = params[:slot].presence %>
+    <% products = ShopCatalog.weapon_shop_armors(@player.location) %>
+    <% products = products.select { |item| item.slot == slot } if slot %>
+    <% selected = ShopCatalog.weapon_shop_armor(@player.location, equipment_name) %>
+    <div class="d-flex gap-1 flex-wrap mb-3">
+      <%= link_to "全部", game_path(panel: "weapon_shop", shop_menu: "armors"), class: "btn btn-sm #{slot.blank? ? 'btn-warning' : 'btn-outline-light'}" %>
+      <% Armor::EQUIPPABLE_SLOTS.each do |armor_slot| %>
+        <% next unless ShopCatalog.weapon_shop_armors(@player.location).any? { |item| item.slot == armor_slot } %>
+        <%= link_to Armor.slot_name(armor_slot), game_path(panel: "weapon_shop", shop_menu: "armors", slot: armor_slot), class: "btn btn-sm #{slot == armor_slot ? 'btn-warning' : 'btn-outline-light'}" %>
+      <% end %>
+    </div>
+    <% if selected %>
+      <% owned_count = owned_armor_count(@player, selected.name) %>
+      <%= link_to "一覧に戻る", game_path(panel: "weapon_shop", shop_menu: "armors", slot: slot), class: "btn btn-outline-light w-100 mb-3" %>
+      <h6><%= selected.name %></h6>
+      <p><%= selected.armor_type %> / 部位: <%= Armor.slot_name(selected.slot) %> / 防御: <%= selected.defense %></p>
+      <p>耐久: <%= selected.max_durability %> / 重量: <%= selected.weight %> / 敏捷: <%= signed_bonus(selected.agility_bonus) %></p>
+      <p>現所持数: <%= owned_count %>個</p>
+      <p>価格: <%= selected.price %>コル / <%= selected.description %></p>
+      <% if params[:confirm_purchase] == "1" %>
+        <p class="fw-bold">購入しますか？</p>
+        <div class="d-flex gap-2">
+          <%= button_to "はい", weapon_shop_path(equipment_type: "armor", equipment_name: selected.name, confirm_purchase: "1"), method: :post, class: "btn btn-warning flex-fill" %>
+          <%= link_to "いいえ", game_path(panel: "weapon_shop", shop_menu: "armors", equipment_name: selected.name, slot: slot), class: "btn btn-outline-light flex-fill" %>
+        </div>
+      <% else %>
+        <%= link_to "購入確認へ", game_path(panel: "weapon_shop", shop_menu: "armors", equipment_name: selected.name, slot: slot, confirm_purchase: "1"), class: "btn btn-warning w-100" %>
+      <% end %>
+    <% else %>
+      <div class="d-grid gap-2"><% products.sort_by { |item| [Armor::EQUIPPABLE_SLOTS.index(item.slot) || 99, item.name] }.each do |item| %><%= link_to item.name, game_path(panel: "weapon_shop", shop_menu: "armors", slot: slot, equipment_name: item.name), class: "btn btn-outline-warning w-100" %><% end %></div>
+    <% end %>
+  <% elsif shop_menu == "sell" %>
+    <% sell_type = params[:sell_type].presence || "weapons" %>
+    <div class="d-flex gap-2 mb-3">
+      <%= link_to "武器", game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "weapons"), class: "btn flex-fill #{sell_type == 'weapons' ? 'btn-warning' : 'btn-outline-light'}" %>
+      <%= link_to "防具", game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "armors"), class: "btn flex-fill #{sell_type == 'armors' ? 'btn-warning' : 'btn-outline-light'}" %>
+    </div>
+    <% items = sell_type == "armors" ? @player.armors.select(&:sellable_by_player?) : @player.weapons.select(&:sellable_by_player?) %>
+    <% selected = sell_type == "armors" ? items.find { |item| item.id == params[:armor_id].to_i } : items.find { |item| item.id == params[:weapon_id].to_i } %>
+    <% if selected %>
+      <%= link_to "一覧に戻る", game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: sell_type), class: "btn btn-outline-light w-100 mb-3" %>
+      <h6><%= selected.name %></h6><p>売却額: <%= selected.sell_price %>コル</p>
+      <% if params[:confirm_sell] == "1" %>
+        <p class="fw-bold">売却しますか？</p>
+        <% if sell_type == "armors" %>
+          <%= button_to "はい", sell_armor_path(armor_id: selected.id, confirm_sell: "1"), method: :post, class: "btn btn-warning w-100 mb-2" %>
+        <% else %>
+          <%= button_to "はい", sell_weapon_path(weapon_id: selected.id, confirm_sell: "1", confirm_unique: selected.unique_item? ? "1" : nil), method: :post, class: "btn btn-warning w-100 mb-2" %>
+        <% end %>
+        <%= link_to "いいえ", game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: sell_type), class: "btn btn-outline-light w-100" %>
+      <% else %>
+        <%= link_to "売却確認へ", game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: sell_type, (sell_type == "armors" ? :armor_id : :weapon_id) => selected.id, confirm_sell: "1"), class: "btn btn-warning w-100" %>
+      <% end %>
+    <% else %>
+      <div class="d-grid gap-2"><% items.each do |item| %><%= link_to item.name, game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: sell_type, (sell_type == "armors" ? :armor_id : :weapon_id) => item.id), class: "btn btn-outline-warning w-100" %><% end %></div>
+      <p class="mt-2 mb-0" <% if items.any? %>hidden<% end %>>売却できる装備がありません。</p>
+    <% end %>
+  <% else %>
+    <p class="mb-0">左のメニューから行動を選択してください。</p>
+  <% end %>
+</div>

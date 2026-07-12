@@ -1,4 +1,4 @@
-mob,item_name,category,weight,min_level,max_level
+﻿mob,item_name,category,weight,min_level,max_level
 スライム,スライムの粘液,drop,8,1,5
 スライム,上質なスライムの粘液,drop,6,6,15
 スライム,スライムコア,drop,3,16,30

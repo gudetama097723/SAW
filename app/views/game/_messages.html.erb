@@ -3,8 +3,8 @@
         <% message_class = alert.present? ? "text-warning" : "text-success" %>
         <div class="message-line <%= message_text.present? ? "" : "text-secondary" %>" style="line-height: 1.35;">
           <% if message_text.present? %>
-            <% message_text.to_s.split(/(\[reward\].*?\[\/reward\]|\[enemy\].*?\[\/enemy\]|\[mapping\].*?\[\/mapping\]|\[levelup\].*?\[\/levelup\]|\[boss\].*?\[\/boss\])/m).each do |segment| %>
-              <% if segment.start_with?("[reward]") %>
+            <% message_text.to_s.split(/(\[reward\].*?\[\/reward\]|\[treasure_reward\].*?\[\/treasure_reward\]|\[enemy\].*?\[\/enemy\]|\[mapping\].*?\[\/mapping\]|\[levelup\].*?\[\/levelup\]|\[boss\].*?\[\/boss\])/m).each do |segment| %>
+              <% if segment.start_with?("[reward]", "[treasure_reward]") %>
                 <% next %>
               <% elsif segment.start_with?("[enemy]") %>
                 <span class="text-danger"><%= segment.delete_prefix("[enemy]").delete_suffix("[/enemy]") %></span>

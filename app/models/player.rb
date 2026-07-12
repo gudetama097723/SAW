@@ -253,6 +253,10 @@ end
     equipped_armors.find_by(slot: slot)
   end
 
+  def shield_equippable?
+    equipped_weapons.any? && equipped_weapons.all?(&:one_handed?)
+  end
+
   def town_discovery_for(target_location = location)
     return unless target_location
 
@@ -460,7 +464,7 @@ end
   end
 
   def damage_cut
-    equipped_armors.sum(:defense).to_i
+    equipped_armors.sum(&:effective_defense)
   end
 
   def used_skill_slots

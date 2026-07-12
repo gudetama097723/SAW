@@ -306,7 +306,7 @@
 
     actual_part = guard_result[:part]
     unless guard_result[:guarded] || player_attack_hit?(player, battle_enemy, actual_part)
-      return "#{battle_enemy.mob.name}: #{guard_result[:message]}ミス"
+      return "#{battle_enemy.mob.name}: #{guard_result[:message]}躱された！"
     end
 
     base_hit_damage = (calculate_player_damage(player, weapon, battle_enemy, actual_part, attack_attribute) * damage_multiplier / 100.0).ceil
@@ -729,6 +729,7 @@ end
   end
 
   def self.apply_enemy_damage_mitigation(player, battle_enemy, raw_damage)
+    player.equipped_armors.each { |armor| armor.apply_durability_loss!(1) }
     defense_rate = 100.0 / (100 + [player.damage_cut.to_i, 0].max * 10)
     enemy_damage = [(raw_damage * defense_rate).ceil, 1].max
     enemy_damage = (enemy_damage * StatusEffectService.damage_dealt_multiplier(battle_enemy)).ceil

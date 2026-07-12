@@ -25,7 +25,17 @@
   <p>防御: <%= @player.damage_cut %></p>
   <% Armor::EQUIPPABLE_SLOTS.each do |slot| %>
     <% armor = @player.armor_for(slot) %>
-    <p class="mb-1"><%= Armor.slot_name(slot) %>: <%= armor ? armor.name : "未装備" %></p>
+    <p class="mb-1">
+      <%= Armor.slot_name(slot) %>:
+      <% if slot == "shield" && !@player.shield_equippable? %>
+        装備不能
+      <% elsif armor %>
+        <%= armor.name %>
+        <span class="text-secondary ms-1">耐久 <%= armor.durability %> / <%= armor.max_durability %></span>
+      <% else %>
+        未装備
+      <% end %>
+    </p>
   <% end %>
 <% elsif selected_panel == "items" %>
   <% item_category = params[:item_category].presence %>
@@ -36,6 +46,7 @@
     <%= link_to "回復アイテム", game_path(panel: "items", item_category: "healing"), class: "btn btn-outline-light w-100" %>
     <%= link_to "採取アイテム", game_path(panel: "items", item_category: "gathered"), class: "btn btn-outline-light w-100" %>
     <%= link_to "ドロップアイテム", game_path(panel: "items", item_category: "drop"), class: "btn btn-outline-light w-100" %>
+    <%= link_to "換金アイテム", game_path(panel: "items", item_category: "valuable"), class: "btn btn-outline-warning w-100" %>
     <%= link_to "キーアイテム", game_path(panel: "items", item_category: "key_items"), class: "btn btn-outline-warning w-100" %>
   </div>
 
@@ -81,6 +92,11 @@
   <p>敏捷: <%= @player.effective_agility %>（基礎 <%= @player.agility.to_i %> / 武器 <%= signed_bonus(@player.weapon_agility_bonus) %> / 防具 <%= signed_bonus(@player.armor_agility_bonus) %> / 重量 <%= signed_bonus(-@player.equipment_weight_penalty) %>）</p>
   <p>防御: <%= @player.damage_cut %></p>
   <p>装備重量: <%= @player.equipment_weight %></p>
+  <p>
+    所持重量:
+    <%= number_with_precision(@player.carry_weight, precision: 1, strip_insignificant_zeros: true) %> /
+    <%= number_with_precision(@player.max_carry_weight, precision: 1, strip_insignificant_zeros: true) %>
+  </p>
   <p>経験値: <%= @player.exp.to_i %> / <%= @player.exp_to_next_level %></p>
   <p>スキルスロット: <%= @player.used_skill_slots %> / <%= @player.skill_slots.to_i %>（空き <%= @player.remaining_skill_slots %>）</p>
   <h6 class="mt-3">ポイント振り分け</h6>
@@ -122,8 +138,9 @@
         <%= hidden_field_tag :strength_points, strength_points %>
         <%= hidden_field_tag :agility_points, agility_points %>
         <p class="mb-1">最大HP: <%= before_hp %> → <%= after_hp %>（+<%= after_hp - before_hp %>）</p>
-        <p class="mb-1">筋力: <%= before_strength %> → <%= after_strength %></p>
-        <p class="mb-1">敏捷: <%= before_agility %> → <%= after_agility %></p>
+        <p class="mb-1">基礎筋力: <%= original_strength %> → <%= original_strength + strength_points %>（+<%= strength_points %>）</p>
+        <p class="mb-1">基礎敏捷: <%= original_agility %> → <%= original_agility + agility_points %>（+<%= agility_points %>）</p>
+        <p class="mb-1 small text-secondary">補正込み: 筋力 <%= before_strength %> → <%= after_strength %> / 敏捷 <%= before_agility %> → <%= after_agility %></p>
         <% unless @player.skip_stat_allocate_confirm? %>
           <p class="mb-1 text-warning">本当に振り分けますか？ 振り直しはできません。</p>
           <label class="small">
@@ -207,6 +224,21 @@
       <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
     </div>
   <% end %>
+<% elsif selected_panel == "weapon_shop" %>
+  <h5>武具店</h5>
+  <% if !@player.town_discovery_for&.found_weapon_shop? %>
+    <p class="mb-0">武具店はまだ見つけていません。</p>
+  <% elsif !FacilityHoursService.open?("weapon_shop", @player) %>
+    <p class="mb-2"><%= FacilityHoursService.closed_message("weapon_shop", @player) %></p>
+    <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
+  <% else %>
+    <div class="d-grid gap-2 mb-3">
+      <%= link_to "武器を購入", game_path(panel: "weapon_shop", shop_menu: "weapons"), class: "btn btn-outline-warning w-100" %>
+      <%= link_to "防具を購入", game_path(panel: "weapon_shop", shop_menu: "armors"), class: "btn btn-outline-warning w-100" %>
+      <%= link_to "武具を売却", game_path(panel: "weapon_shop", shop_menu: "sell"), class: "btn btn-outline-warning w-100" %>
+      <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
+    </div>
+  <% end %>
 <% elsif selected_panel == "blacksmith" %>
   <% blacksmith_menu = params[:blacksmith_menu].presence %>
   <h5>鍛冶屋</h5>
@@ -217,12 +249,10 @@
     <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
   <% else %>
     <div class="d-grid gap-2 mb-3">
-      <%= link_to "武器を購入する", game_path(panel: "blacksmith", blacksmith_menu: "buy"), class: "btn btn-outline-warning w-100" %>
       <%= link_to "武器を生産する", game_path(panel: "blacksmith", blacksmith_menu: "produce"), class: "btn btn-outline-warning w-100" %>
-      <%= link_to "武器を整備する", game_path(panel: "blacksmith", blacksmith_menu: "repair"), class: "btn btn-outline-warning w-100" %>
+      <%= link_to "装備を整備する", game_path(panel: "blacksmith", blacksmith_menu: "repair"), class: "btn btn-outline-warning w-100" %>
       <%= link_to "武器を強化する", game_path(panel: "blacksmith", blacksmith_menu: "upgrade"), class: "btn btn-outline-warning w-100" %>
       <%= link_to "武器を進化する", game_path(panel: "blacksmith", blacksmith_menu: "evolve"), class: "btn btn-outline-warning w-100" %>
-      <%= link_to "武器を売却する", game_path(panel: "blacksmith", blacksmith_menu: "sell"), class: "btn btn-outline-warning w-100" %>
       <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
     </div>
   <% end %>
