@@ -1,6 +1,13 @@
 class Weapon < ApplicationRecord
   ONE_HANDED_TYPES = %w[片手直剣 細剣 短剣 棍 斧 片手棍 片手斧].freeze
   MAX_ENHANCEMENT_LEVEL = 10
+  ENHANCEMENT_TYPES = {
+    "S" => { attribute: :sharpness_level, name: "鋭さ", effect: "攻撃力 +4% / 部位破壊力 +0.5pt" },
+    "Q" => { attribute: :quickness_level, name: "速さ", effect: "ソードスキル倍率 +2% × 連撃係数" },
+    "A" => { attribute: :accuracy_level, name: "正確さ", effect: "ソードスキル命中率 +3pt / クリティカル率 +1pt" },
+    "H" => { attribute: :heaviness_level, name: "重さ", effect: "部位破壊力 +4pt / 攻撃力 +1%" },
+    "D" => { attribute: :durability_level, name: "丈夫さ", effect: "最大耐久値 +10% / 耐久消費率 -3%" }
+  }.freeze
   MAJOR_DAMAGE_DURABILITY = -40
   LOST_DURABILITY_THRESHOLD = -50
 
@@ -21,12 +28,24 @@ class Weapon < ApplicationRecord
   belongs_to :mob, optional: true
   belongs_to :player_base, optional: true
 
+  validates :enhance_limit, :enhance_attempts,
+    :sharpness_level, :quickness_level, :accuracy_level, :heaviness_level, :durability_level,
+    numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+  validates :enhancement_difficulty, numericality: { greater_than: 0 }
+  validates :maintenance_level, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+
   def stored?
     player_base_id.present?
   end
 
   def broken?
     durability.to_i <= 0
+  end
+
+  def craft_details
+    JSON.parse(craft_data.presence || "{}")
+  rescue JSON::ParserError
+    {}
   end
 
   def one_handed?
@@ -46,15 +65,18 @@ class Weapon < ApplicationRecord
   end
 
   def apply_durability_loss!(amount)
-    self.durability = durability.to_i - amount.to_i
+    adjusted_loss = amount.to_f * durability_cost_multiplier + durability_loss_remainder.to_f
+    whole_loss = adjusted_loss.floor
+    self.durability = durability.to_i - whole_loss
+    self.durability_loss_remainder = adjusted_loss - whole_loss
   end
 
   def repair_cost
-    missing = [max_durability.to_i - durability.to_i, 0].max
+    missing = [effective_max_durability - durability.to_i, 0].max
     return 0 if missing <= 0
 
-    missing_rate = missing.to_f / [max_durability.to_i, 1].max
-    estimated_price = [attack_power.to_i * 12 + max_durability.to_i / 20 + enhancement_level.to_i * 120, 100].max
+    missing_rate = missing.to_f / [effective_max_durability, 1].max
+    estimated_price = [attack_power.to_i * 12 + effective_max_durability / 20 + enhancement_level.to_i * 120, 100].max
     full_repair_cost = (estimated_price * rarity_cost_multiplier * 0.5).ceil
     [(full_repair_cost * missing_rate * repair_condition_cost_multiplier).ceil, 1].max
   end
@@ -86,9 +108,9 @@ class Weapon < ApplicationRecord
   end
 
   def durability_rate
-    return 0.0 unless max_durability.to_i.positive?
+    return 0.0 unless effective_max_durability.positive?
 
-    (durability.to_i.to_f / max_durability.to_i).clamp(0.0, 1.0)
+    (durability.to_i.to_f / effective_max_durability).clamp(0.0, 1.0)
   end
 
   def durability_percent
@@ -119,7 +141,7 @@ class Weapon < ApplicationRecord
   end
 
 def display_name
-  enhancement_level.to_i.positive? ? "#{name} +#{enhancement_level}" : name
+  enhancement_level.positive? ? "#{name} +#{enhancement_level}" : name
 end
 
 def protected_item?
@@ -158,8 +180,13 @@ def sell_price
     attack_attribute_list.include?(AttackAttribute.normalize(attribute))
   end
 
+  def enhancement_level
+    directional_level = ENHANCEMENT_TYPES.sum { |_key, config| public_send(config[:attribute]).to_i }
+    directional_level.positive? ? directional_level : super.to_i
+  end
+
   def enhancement_level=(value)
-    super(value.to_i.clamp(0, MAX_ENHANCEMENT_LEVEL))
+    super(value.to_i.clamp(0, [enhance_limit.to_i, MAX_ENHANCEMENT_LEVEL].max))
   end
 
   def effective_attack_power
@@ -167,15 +194,51 @@ def sell_price
   end
 
   def base_effective_attack_power
-    attack_power.to_i + enhancement_attack_bonus
+    (attack_power.to_i * (1.0 + sharpness_level.to_i * 0.04 + heaviness_level.to_i * 0.01)).floor
   end
 
   def enhancement_attack_bonus
-    (attack_power.to_i * enhancement_level.to_i * 0.06).floor
+    base_effective_attack_power - attack_power.to_i
   end
 
   def max_enhancement?
-    enhancement_level.to_i >= MAX_ENHANCEMENT_LEVEL
+    enhance_attempts.to_i >= enhance_limit.to_i
+  end
+
+  def fully_enhanced?
+    max_enhancement? && enhancement_level == enhance_limit.to_i
+  end
+
+  def remaining_enhance_attempts
+    [ enhance_limit.to_i - enhance_attempts.to_i, 0 ].max
+  end
+
+  def enhancement_breakdown
+    ENHANCEMENT_TYPES.filter_map do |key, config|
+      level = public_send(config[:attribute]).to_i
+      "#{level}#{key}" if level.positive?
+    end.join(" ").presence || "未強化"
+  end
+
+  def effective_max_durability
+    (max_durability.to_i * (1.0 + durability_level.to_i * 0.10)).floor
+  end
+
+  def durability_cost_multiplier
+    0.97**durability_level.to_i
+  end
+
+  def sword_skill_damage_multiplier(base_multiplier, hit_count)
+    coefficient = { 1 => 1.0, 2 => 1.2, 3 => 1.4, 4 => 1.6 }.fetch([ hit_count.to_i, 1 ].max, 1.8)
+    (base_multiplier.to_f * (1.0 + quickness_level.to_i * 0.02 * coefficient)).round
+  end
+
+  def sword_skill_accuracy_bonus
+    accuracy_level.to_i * 3
+  end
+
+  def sword_skill_critical_rate
+    (effective_critical_rate + accuracy_level.to_i).clamp(0, 100)
   end
 
   def enhancement_requirements
@@ -199,7 +262,8 @@ def sell_price
   end
 
   def effective_part_break_power
-    [[part_break_power.to_i, 0].max, 300].min
+    bonus = sharpness_level.to_i * 0.5 + heaviness_level.to_i * 4.0
+    [ [ part_break_power.to_f + bonus, 0 ].max, 300 ].min
   end
 
   def rarity_cost_multiplier

@@ -81,4 +81,42 @@ class WeaponTest < ActiveSupport::TestCase
     assert_operator beginning_definition.price, :<, ShopCatalog.weapon_shop_weapon(beginning_town, "ブロンズソード").price
     assert_operator hornka_definition.price, :<, ShopCatalog.weapon_shop_weapon(hornka, "ブロンズソード").price
   end
+
+  test "directional enhancement levels calculate their independent effects" do
+    weapon = Weapon.new(
+      name: "強化効果テスト剣",
+      weapon_type: "片手直剣",
+      attack_power: 100,
+      durability: 150,
+      max_durability: 100,
+      enhance_limit: 13,
+      sharpness_level: 2,
+      quickness_level: 2,
+      accuracy_level: 2,
+      heaviness_level: 2,
+      durability_level: 5
+    )
+
+    assert_equal 13, weapon.enhancement_level
+    assert_equal 110, weapon.base_effective_attack_power
+    assert_equal 109, weapon.effective_part_break_power
+    assert_equal 150, weapon.effective_max_durability
+    assert_equal 6, weapon.sword_skill_accuracy_bonus
+    assert_equal 213, weapon.sword_skill_damage_multiplier(200, 4)
+  end
+
+  test "durability enhancement accumulates fractional durability savings" do
+    weapon = Weapon.new(
+      name: "耐久強化テスト剣",
+      weapon_type: "片手直剣",
+      durability: 10,
+      max_durability: 10,
+      durability_level: 1
+    )
+
+    2.times { weapon.apply_durability_loss!(1) }
+
+    assert_equal 9, weapon.durability
+    assert_in_delta 0.94, weapon.durability_loss_remainder.to_f, 0.001
+  end
 end

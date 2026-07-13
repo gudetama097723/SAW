@@ -1,2 +1,3 @@
 ﻿name,proficiency,skill_exp,skill_category,weapon_skill
 片手直剣,0,0,weapon,TRUE
+鍛冶,0,0,production,FALSE

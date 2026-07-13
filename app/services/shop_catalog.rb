@@ -16,6 +16,9 @@ class ShopCatalog
     :part_break_power,
     :attack_attributes,
     :enhancement_level,
+    :enhance_limit,
+    :enhancement_difficulty,
+    :required_blacksmith_proficiency,
     :weight,
     :strength_ratio,
     :agility_ratio,
@@ -47,14 +50,6 @@ class ShopCatalog
 
   def self.weapon_shop_weapon(location, name) = weapon_shop_weapons(location).find { |weapon| weapon.name == name }
   def self.weapon_shop_armor(location, name) = weapon_shop_armors(location).find { |armor| armor.name == name }
-
-  def self.blacksmith_production_weapons(location)
-    weapon_definitions.select { |weapon| weapon.location == location&.name }
-  end
-
-  def self.blacksmith_production_weapon(location, weapon_name)
-    blacksmith_production_weapons(location).find { |weapon| weapon.name == weapon_name }
-  end
 
   def self.item_definitions
     @item_definitions ||= load_item_definitions
@@ -103,6 +98,9 @@ class ShopCatalog
         part_break_power: row["part_break_power"].presence&.to_i || 100,
         attack_attributes: row["attack_attributes"].presence || "斬撃",
         enhancement_level: row["enhancement_level"].presence&.to_i || 0,
+        enhance_limit: row["enhance_limit"].presence&.to_i || 3,
+        enhancement_difficulty: row["enhancement_difficulty"].presence&.to_d || 1.to_d,
+        required_blacksmith_proficiency: row["required_blacksmith_proficiency"].presence&.to_i || 0,
         weight: row["weight"].presence&.to_d || 5.to_d,
         strength_ratio: row["strength_ratio"].presence&.to_i || 70,
         agility_ratio: row["agility_ratio"].presence&.to_i || 30,

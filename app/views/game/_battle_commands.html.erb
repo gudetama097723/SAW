@@ -206,7 +206,7 @@
         <% available_weapons.each do |weapon| %>
           <div class="battle-equipment-card">
             <p class="mb-1"><%= weapon.display_name %></p>
-            <p class="mb-1">攻撃力: <%= weapon.effective_attack_power %>（本来 <%= weapon.base_effective_attack_power %>） / 耐久力: <%= weapon.durability %> / <%= weapon.max_durability %>（<%= weapon.durability_condition_label %>）</p>
+            <p class="mb-1">攻撃力: <%= weapon.effective_attack_power %>（本来 <%= weapon.base_effective_attack_power %>） / 耐久力: <%= weapon.durability %> / <%= weapon.effective_max_durability %>（<%= weapon.durability_condition_label %>）</p>
             <% if weapon.effective_part_break_power > 100 %>
               <p class="mb-1">特性: 部位破壊率が高い</p>
             <% end %>

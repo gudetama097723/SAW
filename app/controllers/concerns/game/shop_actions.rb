@@ -176,6 +176,11 @@ module Game
   def upgrade_weapon
     player = current_player
 
+    unless BlacksmithFacilityAccessService.available?(player)
+      redirect_to game_path, alert: BlacksmithFacilityAccessService.message_for(:enhance)
+      return
+    end
+
     unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
       redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
       return
@@ -187,8 +192,8 @@ module Game
     end
 
     weapon = player.weapons.find_by(id: params[:weapon_id])
-    result = WeaponUpgradeService.upgrade!(player, weapon)
-    redirect_to game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: weapon&.id), flash_for(result)
+    result = WeaponUpgradeService.upgrade!(player, weapon, params[:enhancement_type], blacksmith_mode: params[:smith_mode])
+    redirect_to game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: weapon&.id, smith_mode: params[:smith_mode]), flash_for(result)
   end
 
   def evolve_weapon
@@ -210,8 +215,8 @@ module Game
       redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve"), alert: "進化できる武器ではありません。"
       return
     end
-    unless weapon.max_enhancement?
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve", weapon_id: weapon.id), alert: "+10まで強化した武器のみ進化できます。"
+    unless weapon.enhancement_level >= rule.required_enhancement_level.to_i
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve", weapon_id: weapon.id), alert: "+#{rule.required_enhancement_level}まで強化した武器のみ進化できます。"
       return
     end
     if current_player.level.to_i < rule.required_player_level.to_i
@@ -219,67 +224,66 @@ module Game
       return
     end
 
-    weapon.update!(name: rule.target_weapon_name, enhancement_level: 0)
+    weapon.update!(
+      name: rule.target_weapon_name,
+      enhancement_level: 0,
+      enhance_attempts: 0,
+      sharpness_level: 0,
+      quickness_level: 0,
+      accuracy_level: 0,
+      heaviness_level: 0,
+      durability_level: 0,
+      durability_loss_remainder: 0,
+      durability: [ weapon.durability.to_i, weapon.max_durability.to_i ].min
+    )
     redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve"), notice: "#{rule.target_weapon_name}へ進化した。"
   end
 
     def blacksmith
       player = current_player
+      self_maintenance = params[:smith_mode].to_s == "player"
 
-      unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
-        redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
-        return
-      end
-
-      unless facility_open_for?(player, "blacksmith")
-        redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
-        return
-      end
-
-      unless params[:confirm_repair] == "1"
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "整備する内容を確認してください。"
-        return
-      end
-
-      equipment = if params[:repair_all] == "1"
-                  player.weapons.select { |item| item.repair_cost.positive? } + player.armors.select { |item| item.repair_cost.positive? }
-                else
-                  item = params[:armor_id].present? ? player.armors.find_by(id: params[:armor_id]) : player.weapons.find_by(id: params[:weapon_id])
-                  item ||= player.equipped_weapon
-                  item && item.repair_cost.to_i.positive? ? [item] : []
-                end
-
-      if equipment.empty?
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "整備できる装備がありません。"
-        return
-      end
-
-      total_price = equipment.sum(&:repair_cost)
-      if player.col.to_i < total_price
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "コルが足りません。整備には#{total_price}コル必要です。"
-        return
-      end
-
-      weapons = equipment.grep(Weapon)
-      required_materials = repair_materials_for(weapons)
-      missing_materials = missing_repair_materials_for(player, required_materials)
-      if missing_materials.any?
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "破損武器の修繕素材が足りません。#{format_materials(missing_materials)}が必要です。"
-        return
-      end
-
-      ActiveRecord::Base.transaction do
-        player.col = player.col.to_i - total_price
-        player.advance_time!(20 * equipment.size)
-        consume_repair_materials!(player, required_materials)
-        equipment.each do |item|
-          item.update!(durability: item.max_durability)
+      unless self_maintenance
+        unless BlacksmithFacilityAccessService.available?(player)
+          redirect_to game_path, alert: BlacksmithFacilityAccessService.message_for(:npc_maintenance)
+          return
         end
-        player.save!
+
+        unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
+          redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
+          return
+        end
+
+        unless facility_open_for?(player, "blacksmith")
+          redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
+          return
+        end
       end
 
-      repaired_names = equipment.map { |item| item.respond_to?(:display_name) ? item.display_name : item.name }.join("、")
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), notice: "鍛冶屋で#{repaired_names}を整備した。#{total_price}コル支払った。"
+      if params[:armor_id].present? && params[:smith_mode].to_s != "player"
+        armor = player.armors.find_by(id: params[:armor_id])
+        unless armor&.repair_cost.to_i&.positive?
+          redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "整備できる防具がありません。"
+          return
+        end
+        fee = armor.repair_cost
+        if player.col.to_i < fee
+          redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "コルが足りません。整備には#{fee}コル必要です。"
+          return
+        end
+        ActiveRecord::Base.transaction do
+          player.update!(col: player.col.to_i - fee)
+          armor.update!(durability: armor.max_durability)
+        end
+        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), notice: "鍛冶屋で#{armor.name}を整備した。#{fee}コル支払った。"
+        return
+      end
+
+      weapon = player.weapons.find_by(id: params[:weapon_id])
+      context = BlacksmithService.context_for(player, mode: params[:smith_mode])
+      result = WeaponMaintenanceService.call(player: player, weapon: weapon, blacksmith: context)
+      destination = self_maintenance ? game_path(panel: "equipment") : game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: params[:smith_mode])
+      redirect_to destination, flash_for(result)
     end
 
     def weapon_shop
@@ -322,6 +326,11 @@ module Game
     def produce_weapon
       player = current_player
 
+      unless BlacksmithFacilityAccessService.available?(player)
+        redirect_to game_path, alert: BlacksmithFacilityAccessService.message_for(:craft)
+        return
+      end
+
       unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
         redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
         return
@@ -332,8 +341,16 @@ module Game
         return
       end
 
-      result = WeaponProductionService.produce!(player, params[:weapon_name].to_s)
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "produce", weapon_name: params[:weapon_name].presence), flash_for(result)
+      context = BlacksmithService.context_for(player, mode: params[:smith_mode])
+      result = WeaponCraftService.call(
+        player: player,
+        blacksmith: context,
+        weapon_type: params[:weapon_type],
+        ore_material: params[:ore_material],
+        monster_material: params[:monster_material],
+        support_material: params[:support_material]
+      )
+      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "produce", smith_mode: params[:smith_mode]), flash_for(result)
     end
 
     def sell_weapon

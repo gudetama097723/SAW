@@ -1,6 +1,8 @@
 ﻿route,item_name,category,weight
 はじまりの草原,薬草,gathered,9
 はじまりの草原,毒キノコ,gathered,1
+はじまりの草原,鉄鉱,gathered,3
 静寂の森,薬草,gathered,1
 静寂の森,しなる枝,gathered,1
+静寂の森,鋭鉄鉱,gathered,1
 default,薬草,gathered,1

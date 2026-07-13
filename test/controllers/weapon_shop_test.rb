@@ -2,7 +2,7 @@ require "test_helper"
 
 class WeaponShopTest < ActionDispatch::IntegrationTest
   setup do
-    @location = Location.create!(name: "はじまりの街", floor: 1, danger_level: 0, safe_area: true)
+    @location = Location.create!(name: "はじまりの街", floor: 1, danger_level: 0, safe_area: true, has_blacksmith_facility: true)
     @user = User.create!(username: "weapon_shop_#{SecureRandom.hex(4)}", password: "password")
     @player = Player.create!(user: @user, name: "武具店テスト", hp: 100, max_hp: 100, col: 1_000, floor: 1, location: @location, current_time: 600)
     @player.town_discovery_for.update!(found_weapon_shop: true)
@@ -104,5 +104,84 @@ class WeaponShopTest < ActionDispatch::IntegrationTest
     post blacksmith_path, params: { armor_id: armor.id, confirm_repair: "1" }
     assert_redirected_to game_path(panel: "blacksmith", blacksmith_menu: "repair")
     assert_equal 100, armor.reload.durability
+  end
+
+  test "blacksmith information can enter conversation with its facility npc" do
+    @player.town_discovery_for.update!(found_blacksmith: true)
+    npc = Npc.create!(
+      code: "weapon_shop_blacksmith_npc",
+      name: "会話試験鍛冶師",
+      npc_type: "blacksmith",
+      placement_type: "facility",
+      facility_key: "blacksmith",
+      location: @location,
+      discovery_rate: 100,
+      blacksmith_base_proficiency: 80,
+      blacksmith_max_proficiency: 120
+    )
+
+    get game_path, params: { panel: "blacksmith" }
+
+    assert_response :success
+    assert_includes response.body, "会話試験鍛冶師に話しかける"
+
+    post talk_to_npc_path, params: { npc_id: npc.id }
+    assert_redirected_to game_path(panel: "npc_menu", npc_id: npc.id)
+  end
+
+  test "self blacksmithing is shown and accepted only with the blacksmith skill" do
+    @player.town_discovery_for.update!(found_blacksmith: true)
+
+    get game_path, params: { panel: "blacksmith" }
+    assert_not_includes response.body, "自分で鍛冶を行う"
+    assert_nil BlacksmithService.context_for(@player, mode: "player")
+    assert_no_difference -> { @player.weapons.count } do
+      post produce_weapon_path, params: {
+        smith_mode: "player",
+        weapon_type: "片手直剣",
+        ore_material: "鉄鉱",
+        monster_material: "ホーンラビットの角",
+        support_material: "精錬石"
+      }
+    end
+    assert_includes flash[:alert], "鍛冶を行える実行者がいません"
+
+    @player.skills.create!(name: "鍛冶", proficiency: 0, skill_exp: 0, skill_category: "production")
+    get game_path, params: { panel: "blacksmith" }
+
+    assert_includes response.body, "自分で鍛冶を行う"
+    assert BlacksmithService.context_for(@player, mode: "player").player?
+  end
+
+  test "direct blacksmith access is rejected where no facility exists" do
+    @player.location.update!(has_blacksmith_facility: false)
+
+    get game_path, params: { panel: "blacksmith", blacksmith_menu: "produce" }
+
+    assert_redirected_to game_path
+    assert_includes flash[:alert], "鍛造できる設備がない"
+  end
+
+  test "self maintenance is available from equipment while traveling" do
+    @player.skills.create!(name: "鍛冶", proficiency: 0, skill_exp: 0, skill_category: "production")
+    @player.items.create!(
+      name: WeaponMaintenanceService::KIT_NAME, category: "misc", quantity: 1,
+      durability: 30, max_durability: 30
+    )
+    weapon = @player.weapons.create!(
+      name: "街道整備試験剣", weapon_type: "片手直剣", attack_power: 10,
+      durability: 40, max_durability: 100, maintenance_level: 0
+    )
+    destination = Location.create!(name: "街道整備の行先", floor: 1, safe_area: true)
+    route = Route.create!(from_location: @location, to_location: destination, name: "街道整備ルート")
+    @player.update!(field_route: route)
+
+    get game_path, params: { panel: "equipment" }
+    assert_response :success
+    assert_includes response.body, "整備キットで自己整備"
+
+    post blacksmith_path, params: { weapon_id: weapon.id, smith_mode: "player" }
+    assert_redirected_to game_path(panel: "equipment")
+    assert_equal 100, weapon.reload.durability
   end
 end

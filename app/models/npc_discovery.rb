@@ -42,6 +42,16 @@
     NpcAffinityService.stage_for(affinity)
   end
 
+  def gain_blacksmith_proficiency!(amount)
+    return 0 unless npc&.blacksmith?
+
+    maximum_bonus = [ npc.blacksmith_max_proficiency.to_i - npc.blacksmith_base_proficiency.to_i, 0 ].max
+    before = blacksmith_proficiency_bonus.to_i
+    self.blacksmith_proficiency_bonus = (before + amount.to_i).clamp(0, maximum_bonus)
+    save!
+    blacksmith_proficiency_bonus - before
+  end
+
   def cap_flags
     JSON.parse(affinity_cap_flags.presence || "{}")
   rescue JSON::ParserError

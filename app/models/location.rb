@@ -67,6 +67,10 @@ class Location < ApplicationRecord
   has_many :field_areas, through: :outgoing_routes, source: :field_areas
   has_many :npcs, dependent: :nullify
 
+  def blacksmithing_available?
+    has_blacksmith_facility?
+  end
+
   def weather_label
     WEATHER_LABELS.fetch(weather_value, WEATHER_LABELS["clear"])
   end

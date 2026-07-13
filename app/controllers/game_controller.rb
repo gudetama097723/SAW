@@ -22,6 +22,10 @@
     @available_bosses = ExplorationRewardService.discovered_bosses(@player)
     @town_discovery = @player.town_discovery_for if @player.location&.safe_area?
     current_panel = params[:panel].presence
+    if current_panel == "blacksmith" && !BlacksmithFacilityAccessService.available?(@player)
+      redirect_to game_path, alert: BlacksmithFacilityAccessService.message_for(:facility)
+      return
+    end
     if current_panel.in?(%w[inn item_shop blacksmith restaurant]) &&
        @player.field_route.blank? && @player.location&.safe_area?
       NpcDiscoveryService.discover_during_facility_visit!(@player, current_panel)

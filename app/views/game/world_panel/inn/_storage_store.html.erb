@@ -9,7 +9,7 @@
                 <div class="d-grid gap-2 mb-2">
                   <% carried_weapons.each do |weapon| %>
                     <div class="border rounded p-2">
-                      <p class="mb-1"><%= weapon.display_name %> / 耐久 <%= weapon.durability %> / <%= weapon.max_durability %></p>
+                      <p class="mb-1"><%= weapon.display_name %> / 耐久 <%= weapon.durability %> / <%= weapon.effective_max_durability %></p>
                       <%= button_to "預ける", store_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-light btn-sm w-100" %>
                     </div>
                   <% end %>

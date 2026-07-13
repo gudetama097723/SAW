@@ -7,7 +7,7 @@
         <p class="mb-1">種別: <%= weapon.weapon_type %></p>
         <p class="mb-1">攻撃力: <%= weapon.effective_attack_power %>（本来 <%= weapon.base_effective_attack_power %>）</p>
         <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
-        <p class="mb-1">耐久力: <%= weapon.durability %> / <%= weapon.max_durability %>（<%= weapon.durability_condition_label %>）</p>
+        <p class="mb-1">耐久力: <%= weapon.durability %> / <%= weapon.effective_max_durability %>（<%= weapon.durability_condition_label %>）</p>
         <% if weapon.effective_part_break_power > 100 %>
           <p class="mb-1">特性: 部位破壊率が高い</p>
         <% end %>
@@ -249,10 +249,16 @@
     <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
   <% else %>
     <div class="d-grid gap-2 mb-3">
-      <%= link_to "武器を生産する", game_path(panel: "blacksmith", blacksmith_menu: "produce"), class: "btn btn-outline-warning w-100" %>
-      <%= link_to "装備を整備する", game_path(panel: "blacksmith", blacksmith_menu: "repair"), class: "btn btn-outline-warning w-100" %>
-      <%= link_to "武器を強化する", game_path(panel: "blacksmith", blacksmith_menu: "upgrade"), class: "btn btn-outline-warning w-100" %>
+      <% @talkable_npcs.each do |npc| %>
+        <%= button_to "#{npc.name}に話しかける", talk_to_npc_path(npc_id: npc.id), method: :post, class: "btn btn-outline-info w-100" %>
+      <% end %>
+      <%= link_to "武器を生産する", game_path(panel: "blacksmith", blacksmith_menu: "produce", smith_mode: "npc"), class: "btn btn-outline-warning w-100" %>
+      <%= link_to "装備を整備する", game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), class: "btn btn-outline-warning w-100" %>
+      <%= link_to "武器を強化する", game_path(panel: "blacksmith", blacksmith_menu: "upgrade", smith_mode: "npc"), class: "btn btn-outline-warning w-100" %>
       <%= link_to "武器を進化する", game_path(panel: "blacksmith", blacksmith_menu: "evolve"), class: "btn btn-outline-warning w-100" %>
+      <% if BlacksmithService.blacksmith_skill_for(@player) %>
+        <%= link_to "自分で鍛冶を行う", game_path(panel: "blacksmith", blacksmith_menu: "produce", smith_mode: "player"), class: "btn btn-outline-light w-100" %>
+      <% end %>
       <%= link_to "施設から出る", game_path, class: "btn btn-outline-light w-100" %>
     </div>
   <% end %>

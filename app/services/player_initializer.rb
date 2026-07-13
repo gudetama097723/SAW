@@ -47,6 +47,8 @@ class PlayerInitializer
       part_break_power: choice.part_break_power,
       attack_attributes: choice.attack_attributes,
       enhancement_level: 0,
+      enhance_limit: 10,
+      enhancement_difficulty: 0.7,
       equipped: true,
       weight: choice.weight,
       strength_ratio: choice.strength_ratio,

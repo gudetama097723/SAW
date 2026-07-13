@@ -72,7 +72,7 @@ class NpcQuestService
     reward_message = nil
     ActiveRecord::Base.transaction do
       consume_quest_items!(player, quest.completion_conditions)
-      reward_message = apply_quest_reward!(player, quest.reward)
+      reward_message = apply_quest_reward!(player, quest.reward, npc: quest.npc)
       progress_data = pq.progress
       progress_data["last_completed_game_day"] = game_day_key(player) if quest.repeatable?
       pq.update!(
@@ -165,6 +165,7 @@ class NpcQuestService
     parts << "#{r["col"]}コル"   if r["col"].to_i.positive?
     parts << "#{r["exp"]}EXP"   if r["exp"].to_i.positive?
     parts << "親密度+#{r["affinity"]}" if r["affinity"].to_i.positive?
+    parts << "鍛冶熟練度+#{r["blacksmith_proficiency"]}" if r["blacksmith_proficiency"].to_i.positive?
     Array(r["items"]).each do |e|
       name = e.is_a?(Hash) ? e["name"] : e
       qty  = e.is_a?(Hash) ? e["quantity"].to_i : 1
@@ -207,7 +208,7 @@ class NpcQuestService
       next if pq&.completed? && !quest.repeatable?
 
       ActiveRecord::Base.transaction do
-        reward_message = apply_quest_reward!(player, quest.reward)
+        reward_message = apply_quest_reward!(player, quest.reward, npc: npc)
         if pq
           pq.update!(
             status: "completed",
@@ -281,7 +282,7 @@ class NpcQuestService
   end
   private_class_method :consume_quest_items!
 
-  def self.apply_quest_reward!(player, reward)
+  def self.apply_quest_reward!(player, reward, npc: nil)
     messages = []
 
     col = reward["col"].to_i
@@ -325,6 +326,13 @@ class NpcQuestService
       next if player.skills.exists?(name: skill_name)
       player.skills.create!(name: skill_name, proficiency: 0, skill_exp: 0)
       messages << "スキル「#{skill_name}」を習得した。"
+    end
+
+    blacksmith_gain = reward["blacksmith_proficiency"].to_i
+    if blacksmith_gain.positive? && npc&.blacksmith?
+      discovery = player.npc_discoveries.find_or_create_by!(npc: npc)
+      actual_gain = discovery.gain_blacksmith_proficiency!(blacksmith_gain)
+      messages << "#{npc.name}の鍛冶熟練度が#{actual_gain}上昇した。" if actual_gain.positive?
     end
 
     player.save!

@@ -26,6 +26,10 @@
       <p class="small text-secondary mb-3"><%= npc.description %></p>
     <% end %>
 
+    <% if npc.blacksmith? %>
+      <p class="mb-3">鍛冶熟練度: <%= npc.blacksmith_proficiency_for(@player) %> / <%= npc.blacksmith_max_proficiency %></p>
+    <% end %>
+
     <div class="d-grid gap-2">
       <%= button_to "雑談する",
           npc_gossip_path(npc_id: npc.id),

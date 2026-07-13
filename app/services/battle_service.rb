@@ -84,6 +84,7 @@
 
     hit_messages = []
     actual_attack_attribute = attack_attribute_for(weapon, attack_attribute, sword_skill)
+    damage_multiplier = weapon.sword_skill_damage_multiplier(damage_multiplier, hits) if sword_skill && weapon
     record_normal_attack_use!(player, weapon) if weapon && !sword_skill
 
     knockback_message = ""
@@ -99,7 +100,8 @@
           battle_enemy: battle_enemy,
           mob_part_id: (alive_targets.one? ? mob_part_id : nil),
           damage_multiplier: per_target_multiplier,
-          attack_attribute: actual_attack_attribute
+          attack_attribute: actual_attack_attribute,
+          sword_skill: sword_skill
         )
         hit_messages << hit_message(index, hits, result)
         if sword_skill && weapon_knockback_result?(result)
@@ -291,28 +293,28 @@
     end
   end
 
-  def self.resolve_hit!(player:, weapon:, battle_enemy:, mob_part_id:, damage_multiplier:, attack_attribute:)
+  def self.resolve_hit!(player:, weapon:, battle_enemy:, mob_part_id:, damage_multiplier:, attack_attribute:, sword_skill: false)
     parts = ensure_mob_parts!(battle_enemy.mob)
     ensure_part_states!(battle_enemy, parts)
     target_part = if mob_part_id.present?
-                    parts.find { |mob_part| mob_part.id == mob_part_id.to_i } || parts.first
-                  else
-                    weighted_random_part(parts, battle_enemy)
-                  end
+      parts.find { |mob_part| mob_part.id == mob_part_id.to_i } || parts.first
+    else
+      weighted_random_part(parts, battle_enemy)
+    end
     return "#{battle_enemy.mob.name}に攻撃可能部位がない" unless target_part
 
     guard_result = resolve_guarded_part(player, battle_enemy, parts, target_part)
     return "#{battle_enemy.mob.name}: #{guard_result[:message]}" if guard_result[:blocked]
 
     actual_part = guard_result[:part]
-    unless guard_result[:guarded] || player_attack_hit?(player, battle_enemy, actual_part)
+    unless guard_result[:guarded] || player_attack_hit?(player, battle_enemy, actual_part, weapon: weapon, sword_skill: sword_skill)
       return "#{battle_enemy.mob.name}: #{guard_result[:message]}躱された！"
     end
 
     base_hit_damage = (calculate_player_damage(player, weapon, battle_enemy, actual_part, attack_attribute) * damage_multiplier / 100.0).ceil
     varied_damage = apply_player_damage_variance(base_hit_damage)
     part_damage = calculate_part_damage(varied_damage, weapon, actual_part)
-    critical = StatusEffectService.sleeping_critical!(battle_enemy) || critical_hit?(player, weapon, battle_enemy, actual_part, part_damage)
+    critical = StatusEffectService.sleeping_critical!(battle_enemy) || critical_hit?(player, weapon, battle_enemy, actual_part, part_damage, sword_skill: sword_skill)
     hit_damage = critical ? varied_damage * 2 : varied_damage
     battle_enemy.enemy_hp = [battle_enemy.enemy_hp.to_i - hit_damage, 0].max
     break_message = apply_part_damage!(player, battle_enemy, actual_part, part_damage)
@@ -375,7 +377,7 @@ end
   1.0 + (skill&.proficiency.to_i / 1000.0 * 0.15)
 end
 
-  def self.player_attack_hit?(player, battle_enemy, part)
+  def self.player_attack_hit?(player, battle_enemy, part, weapon: nil, sword_skill: false)
     return true if enemy_sword_skill_stiffness?(battle_enemy)
 
     player_agility = (player.effective_agility * BuffEffectService.agility_multiplier(player)).round
@@ -388,7 +390,8 @@ end
     chance = 85 + (agility_gap * 3) + part_modifier + ambush_bonus
     chance += BuffEffectService.accuracy_modifier(player)
     chance -= BuffEffectService.accuracy_modifier(battle_enemy)
-    chance = chance.clamp(55, 98)
+    chance += weapon.sword_skill_accuracy_bonus if sword_skill && weapon
+    chance = chance.clamp(55, sword_skill ? 100 : 98)
 
     rand(100) < chance
   end
@@ -502,14 +505,16 @@ end
     [(hp_damage.to_i * 0.35 * weapon_break_power / 100.0 * part_modifier).ceil, 1].max
   end
 
-  def self.critical_hit?(player, weapon, battle_enemy, part, damage)
+  def self.critical_hit?(player, weapon, battle_enemy, part, damage, sword_skill: false)
     return false unless weapon
     return true if part.weakness? && part_would_break?(battle_enemy, part, damage)
 
     agility_bonus = (player.effective_agility - mob_effective_agility(battle_enemy)) / 5
     stiffness_bonus = enemy_sword_skill_stiffness?(battle_enemy) ? ENEMY_SWORD_SKILL_STIFFNESS_CRITICAL_BONUS : 0
-    chance_cap = enemy_sword_skill_stiffness?(battle_enemy) ? 75 : 30
-    chance = [[weapon.effective_critical_rate + agility_bonus + stiffness_bonus, 1].max, chance_cap].min
+    accuracy_bonus = sword_skill ? weapon.accuracy_level.to_i : 0
+    chance_cap = (enemy_sword_skill_stiffness?(battle_enemy) ? 75 : 30) + accuracy_bonus
+    base_rate = sword_skill ? weapon.sword_skill_critical_rate : weapon.effective_critical_rate
+    chance = [ [ base_rate + agility_bonus + stiffness_bonus, 1 ].max, chance_cap ].min
     rand(100) < chance
   end
 
@@ -874,6 +879,8 @@ def self.gain_weapon_skill!(player, weapon, amount)
       agility_bonus: weapon.agility_bonus,
       critical_rate: weapon.critical_rate,
       part_break_power: weapon.part_break_power,
+      enhance_limit: weapon.enhance_limit,
+      enhancement_difficulty: weapon.enhancement_difficulty,
       equipped: false
     )
 

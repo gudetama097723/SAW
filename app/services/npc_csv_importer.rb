@@ -29,12 +29,18 @@ class NpcCsvImporter
 
   def attributes_for(row)
     placement_type = required(row, "placement_type")
+    npc_type = row["npc_type"].presence || "general"
+    location = location_for(row, placement_type)
+    blacksmith_max = integer(row["blacksmith_max_proficiency"])
+    if npc_type == "blacksmith" && blacksmith_max.nil?
+      blacksmith_max = BlacksmithService.proficiency_cap_for_floor(location&.floor)
+    end
 
     {
       name: required(row, "name"),
-      npc_type: row["npc_type"].presence || "general",
+      npc_type: npc_type,
       placement_type: placement_type,
-      location: location_for(row, placement_type),
+      location: location,
       field_area: field_area_for(row, placement_type),
       facility_key: row["facility_key"].presence,
       dungeon_key: row["dungeon_key"].presence,
@@ -46,8 +52,17 @@ class NpcCsvImporter
       discovery_rate: integer(row["discovery_rate"]) || 100,
       repeat_discovery_required: boolean(row["repeat_discovery_required"], default: false),
       discovery_conditions_json: row["discovery_conditions_json"].presence || "{}",
-      initial_affinity_cap: integer(row["initial_affinity_cap"]) || 60
+      initial_affinity_cap: integer(row["initial_affinity_cap"]) || 60,
+      blacksmith_base_proficiency: integer(row["blacksmith_base_proficiency"]) || 0,
+      blacksmith_max_proficiency: blacksmith_max || 0,
+      craft_fee_multiplier: decimal(row["craft_fee_multiplier"], default: 1.0),
+      maintenance_fee_multiplier: decimal(row["maintenance_fee_multiplier"], default: 1.0),
+      enhance_fee_multiplier: decimal(row["enhance_fee_multiplier"], default: 1.0)
     }
+  end
+
+  def decimal(value, default:)
+    value.present? ? BigDecimal(value.to_s) : default
   end
 
   def location_for(row, placement_type)

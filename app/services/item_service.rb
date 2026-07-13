@@ -17,6 +17,10 @@ class ItemService
     end
     item.quantity = item.quantity.to_i + quantity.to_i
     item.apply_item_defaults
+    if item.maintenance_kit?
+      item.max_durability = WeaponMaintenanceService::KIT_MAX_DURABILITY
+      item.durability = item.max_durability if item.durability.to_i <= 0
+    end
     if unique
       item.unique_item = true
       item.discardable = false

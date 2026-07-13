@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_12_002000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_13_000006) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -87,8 +87,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_002000) do
     t.datetime "created_at", null: false
     t.text "description"
     t.boolean "discardable", default: true, null: false
+    t.integer "durability"
     t.text "eat_effect_data", default: "{}", null: false
     t.boolean "food", default: false, null: false
+    t.integer "max_durability"
     t.string "name"
     t.integer "player_id", null: false
     t.boolean "protected_from_death_penalty", default: false, null: false
@@ -120,6 +122,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_002000) do
     t.integer "danger_level"
     t.string "environment", default: "normal", null: false
     t.integer "floor"
+    t.boolean "has_blacksmith_facility", default: false, null: false
     t.integer "mapping_progress", default: 0, null: false
     t.string "name"
     t.boolean "safe_area"
@@ -223,6 +226,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_002000) do
     t.integer "affinity_cap", default: 60, null: false
     t.text "affinity_cap_flags", default: "{}", null: false
     t.text "affinity_event_flags", default: "{}", null: false
+    t.integer "blacksmith_proficiency_bonus", default: 0, null: false
     t.datetime "created_at", null: false
     t.boolean "currently_available", default: false, null: false
     t.integer "discovered_count", default: 0, null: false
@@ -264,16 +268,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_002000) do
 
   create_table "npcs", force: :cascade do |t|
     t.boolean "active", default: true, null: false
+    t.integer "blacksmith_base_proficiency", default: 0, null: false
+    t.integer "blacksmith_max_proficiency", default: 0, null: false
     t.string "code", null: false
+    t.decimal "craft_fee_multiplier", precision: 5, scale: 2, default: "1.0", null: false
     t.datetime "created_at", null: false
     t.text "description"
     t.text "discovery_conditions_json", default: "{}", null: false
     t.integer "discovery_rate", default: 100, null: false
     t.string "dungeon_key"
+    t.decimal "enhance_fee_multiplier", precision: 5, scale: 2, default: "1.0", null: false
     t.string "facility_key"
     t.integer "field_area_id"
     t.integer "initial_affinity_cap", default: 60, null: false
     t.integer "location_id"
+    t.decimal "maintenance_fee_multiplier", precision: 5, scale: 2, default: "1.0", null: false
     t.text "metadata_json", default: "{}", null: false
     t.string "name", null: false
     t.string "npc_type", default: "general", null: false
@@ -516,33 +525,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_002000) do
     t.index ["source_weapon_name"], name: "index_weapon_evolution_rules_on_source_weapon_name"
   end
 
-  create_table "weapon_upgrade_recipes", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.integer "required_col", default: 0, null: false
-    t.text "required_materials_data", default: "{}", null: false
-    t.integer "target_level", null: false
-    t.datetime "updated_at", null: false
-    t.string "weapon_name"
-    t.string "weapon_type"
-    t.index ["weapon_name", "weapon_type", "target_level"], name: "index_weapon_upgrade_recipes_lookup"
-  end
-
   create_table "weapons", force: :cascade do |t|
+    t.integer "accuracy_level", default: 0, null: false
     t.integer "agility_bonus", default: 0, null: false
     t.integer "agility_ratio", default: 30, null: false
     t.text "attack_attributes", default: "斬撃", null: false
     t.integer "attack_power", default: 1, null: false
+    t.text "craft_data", default: "{}", null: false
+    t.boolean "crafted", default: false, null: false
+    t.string "crafted_by_name"
     t.datetime "created_at", null: false
     t.integer "critical_rate", default: 5, null: false
     t.text "description"
     t.boolean "discardable", default: true, null: false
     t.integer "drop_rate", default: 0, null: false
     t.integer "durability", default: 10, null: false
+    t.integer "durability_level", default: 0, null: false
+    t.decimal "durability_loss_remainder", precision: 8, scale: 4, default: "0.0", null: false
+    t.integer "enhance_attempts", default: 0, null: false
+    t.integer "enhance_limit", default: 3, null: false
     t.text "enhancement_data", default: "{}", null: false
+    t.decimal "enhancement_difficulty", precision: 6, scale: 2, default: "1.0", null: false
     t.integer "enhancement_level", default: 0, null: false
     t.boolean "equipped", default: false, null: false
     t.boolean "favorite", default: false, null: false
+    t.integer "heaviness_level", default: 0, null: false
     t.integer "hp_bonus", default: 0, null: false
+    t.integer "maintenance_level", default: 0, null: false
     t.integer "max_durability", default: 10, null: false
     t.integer "mob_id"
     t.string "name", null: false
@@ -550,7 +559,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_002000) do
     t.integer "player_base_id"
     t.integer "player_id"
     t.boolean "protected_from_death_penalty", default: false, null: false
+    t.integer "quickness_level", default: 0, null: false
     t.string "rarity", default: "common", null: false
+    t.integer "sharpness_level", default: 0, null: false
     t.text "status_resistance_data", default: "{}", null: false
     t.integer "strength_bonus", default: 0, null: false
     t.integer "strength_ratio", default: 70, null: false

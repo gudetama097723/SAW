@@ -48,6 +48,37 @@ class NpcQuestServiceTest < ActiveSupport::TestCase
     assert_includes NpcQuestService.active_quests(player, quest.npc), player_quest
   end
 
+  test "blacksmith quest reward raises only that player's effective proficiency up to the npc cap" do
+    player = players(:one)
+    location = Location.create!(name: "鍛冶依頼試験の町", floor: 1, danger_level: 0, safe_area: true)
+    player.update!(location: location)
+    npc = Npc.create!(
+      code: "quest_blacksmith",
+      name: "依頼試験鍛冶師",
+      npc_type: "blacksmith",
+      placement_type: "facility",
+      facility_key: "blacksmith",
+      location: player.location,
+      blacksmith_base_proficiency: 70,
+      blacksmith_max_proficiency: 100
+    )
+    player.npc_discoveries.create!(npc: npc, currently_available: true)
+    quest = NpcQuest.create!(
+      code: "blacksmith_training_reward",
+      name: "鍛造研究",
+      npc: npc,
+      completion_conditions_json: "{}",
+      reward_data: { blacksmith_proficiency: 50 }.to_json
+    )
+
+    assert_equal :ok, NpcQuestService.accept_quest!(player, quest).status
+    result = NpcQuestService.complete_quest!(player, quest)
+
+    assert_equal :ok, result.status
+    assert_includes result.message, "鍛冶熟練度が30上昇"
+    assert_equal 100, npc.blacksmith_proficiency_for(player)
+  end
+
   private
 
   def create_quest(code:, repeatable:, quest_type: "npc")

@@ -20,7 +20,12 @@
   validates :placement_type, inclusion: { in: PLACEMENT_TYPES }
   validates :discovery_rate, numericality: { only_integer: true, greater_than_or_equal_to: 0, less_than_or_equal_to: 100 }
   validates :initial_affinity_cap, numericality: { only_integer: true, greater_than_or_equal_to: 1, less_than_or_equal_to: 100 }
+  validates :blacksmith_base_proficiency, :blacksmith_max_proficiency,
+    numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+  validates :craft_fee_multiplier, :maintenance_fee_multiplier, :enhance_fee_multiplier,
+    numericality: { greater_than_or_equal_to: 0 }
   validate :placement_target_is_consistent
+  validate :blacksmith_proficiency_range
 
   def metadata
     JSON.parse(metadata_json.presence || "{}")
@@ -38,7 +43,25 @@
     discovery_rate.to_i.clamp(0, 100)
   end
 
+  def blacksmith?
+    npc_type == "blacksmith" && placement_type == "facility" && facility_key == "blacksmith"
+  end
+
+  def blacksmith_proficiency_for(player)
+    return 0 unless blacksmith?
+
+    bonus = player&.npc_discoveries&.find_by(npc: self)&.blacksmith_proficiency_bonus.to_i
+    (blacksmith_base_proficiency.to_i + bonus).clamp(0, blacksmith_max_proficiency.to_i)
+  end
+
   private
+
+  def blacksmith_proficiency_range
+    return unless blacksmith?
+    return if blacksmith_max_proficiency.to_i >= blacksmith_base_proficiency.to_i
+
+    errors.add(:blacksmith_max_proficiency, "must be greater than or equal to base proficiency")
+  end
 
   def placement_target_is_consistent
     case placement_type

@@ -63,7 +63,7 @@
     <% discovered_facility_count = [
       town_discovery&.found_inn?,
       town_discovery&.found_item_shop?,
-      town_discovery&.found_blacksmith?,
+      town_discovery&.found_blacksmith? && @player.location&.has_blacksmith_facility?,
       town_discovery&.found_weapon_shop?,
       town_discovery&.found_restaurant?
     ].count(true) %>
@@ -90,7 +90,7 @@
           <% end %>
         <% end %>
 
-        <% if town_discovery&.found_blacksmith? %>
+        <% if town_discovery&.found_blacksmith? && @player.location&.has_blacksmith_facility? %>
           <% if FacilityHoursService.open?("blacksmith", @player) %>
             <%= link_to "鍛冶屋に入る", game_path(panel: "blacksmith"), class: "btn btn-outline-warning w-100" %>
           <% else %>

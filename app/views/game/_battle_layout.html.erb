@@ -208,8 +208,8 @@
           <p class="mb-1">種別: <%= selected_detail_weapon.weapon_type %></p>
           <p class="mb-1">レアリティ: <%= selected_detail_weapon.rarity %></p>
           <p class="mb-1">攻撃力: <%= selected_detail_weapon.effective_attack_power %>（本来 <%= selected_detail_weapon.base_effective_attack_power %>）</p>
-          <p class="mb-1">強化: +<%= selected_detail_weapon.enhancement_level.to_i %> / <%= Weapon::MAX_ENHANCEMENT_LEVEL %></p>
-          <p class="mb-1">耐久力: <%= selected_detail_weapon.durability %> / <%= selected_detail_weapon.max_durability %>（<%= selected_detail_weapon.durability_condition_label %>）</p>
+          <p class="mb-1">強化: <%= selected_detail_weapon.enhancement_breakdown %>（試行 <%= selected_detail_weapon.enhance_attempts %>/<%= selected_detail_weapon.enhance_limit %>）</p>
+          <p class="mb-1">耐久力: <%= selected_detail_weapon.durability %> / <%= selected_detail_weapon.effective_max_durability %>（<%= selected_detail_weapon.durability_condition_label %>）</p>
           <p class="mb-1">攻撃属性: <%= selected_detail_weapon.attack_attribute_list.join(" / ") %></p>
           <p class="mb-1">クリティカル率: <%= selected_detail_weapon.critical_rate %>%</p>
           <p class="mb-1">部位破壊力: <%= selected_detail_weapon.effective_part_break_power %>%</p>

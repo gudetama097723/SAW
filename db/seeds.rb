@@ -21,6 +21,7 @@ seed_rows("locations.csv") do |row|
     floor: to_int(row["floor"]),
     danger_level: to_int(row["danger_level"]),
     safe_area: to_bool(row["safe_area"]),
+    has_blacksmith_facility: to_bool(row["has_blacksmith_facility"]),
     weather: row["weather"].presence || "clear",
     environment: row["environment"].presence || "normal"
   )
@@ -117,6 +118,8 @@ seed_rows("player_weapons.csv") do |row|
 part_break_power: to_int(row["part_break_power"]) || 100,
 attack_attributes: row["attack_attributes"].presence || "斬撃",
 enhancement_level: to_int(row["enhancement_level"]) || 0,
+enhance_limit: to_int(row["enhance_limit"]) || 3,
+enhancement_difficulty: row["enhancement_difficulty"].presence&.to_d || 1.to_d,
 equipped: to_bool(row["equipped"])
   )
 end
@@ -205,6 +208,8 @@ seed_rows("mob_weapons.csv") do |row|
 part_break_power: to_int(row["part_break_power"]) || 100,
 attack_attributes: row["attack_attributes"].presence || "斬撃",
 enhancement_level: to_int(row["enhancement_level"]) || 0,
+enhance_limit: to_int(row["enhance_limit"]) || 3,
+enhancement_difficulty: row["enhancement_difficulty"].presence&.to_d || 1.to_d,
 drop_rate: to_int(row["drop_rate"])
   )
 end
@@ -265,18 +270,6 @@ seed_rows("weapon_evolution_rules.csv") do |row|
   )
 end
 
-seed_rows("weapon_upgrade_recipes.csv") do |row|
-  recipe = WeaponUpgradeRecipe.find_or_initialize_by(
-    weapon_name: row["weapon_name"].presence,
-    weapon_type: row["weapon_type"].presence,
-    target_level: to_int(row["target_level"])
-  )
-  recipe.update!(
-    required_col: to_int(row["required_col"]) || 0,
-    required_materials_data: row["required_materials_data"].presence || "{}"
-  )
-end
-
 field_areas_index = FieldArea.all.index_by(&:name)
 npcs_map = {}
 
@@ -300,7 +293,12 @@ seed_rows("npcs.csv") do |row|
     discovery_rate:            to_int(row["discovery_rate"]) || 50,
     repeat_discovery_required: to_bool(row["repeat_discovery_required"]),
     discovery_conditions_json: row["discovery_conditions_json"].presence || "{}",
-    initial_affinity_cap:      to_int(row["initial_affinity_cap"]) || 60
+    initial_affinity_cap:      to_int(row["initial_affinity_cap"]) || 60,
+    blacksmith_base_proficiency: to_int(row["blacksmith_base_proficiency"]) || 0,
+    blacksmith_max_proficiency:  to_int(row["blacksmith_max_proficiency"]) || 0,
+    craft_fee_multiplier: row["craft_fee_multiplier"].presence&.to_d || 1.to_d,
+    maintenance_fee_multiplier: row["maintenance_fee_multiplier"].presence&.to_d || 1.to_d,
+    enhance_fee_multiplier: row["enhance_fee_multiplier"].presence&.to_d || 1.to_d
   )
   npcs_map[npc.code] = npc
 end
