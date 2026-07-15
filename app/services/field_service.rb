@@ -231,6 +231,7 @@ class FieldService
     player.save!
     first_level = encounters.first.level
     battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp_for_level(first_level), ambush: ambush)
+    initial_distance = ambush ? "near" : "middle"
     encounters.first(5).each.with_index(1) do |encounter, position|
       mob = encounter.mob
       enemy_level = encounter.level
@@ -241,7 +242,8 @@ class FieldService
           enemy_hp: enemy_max_hp,
           enemy_max_hp: enemy_max_hp,
           enemy_level: enemy_level,
-          position: position
+          position: position,
+          distance: initial_distance
         )
       )
     end
@@ -259,7 +261,7 @@ class FieldService
     [base.to_i, 1].max
   end
 
-  def self.battle_enemy_attributes(mob:, enemy_hp:, enemy_max_hp:, enemy_level:, position:)
+  def self.battle_enemy_attributes(mob:, enemy_hp:, enemy_max_hp:, enemy_level:, position:, distance: "near")
     attrs = {
       mob: mob,
       enemy_hp: enemy_hp,
@@ -269,6 +271,7 @@ class FieldService
     probe = BattleEnemy.new
     attrs[:enemy_max_hp] = enemy_max_hp if probe.has_attribute?(:enemy_max_hp)
     attrs[:enemy_level] = enemy_level if probe.has_attribute?(:enemy_level)
+    attrs[:distance] = distance if probe.has_attribute?(:distance)
     attrs
   end
 

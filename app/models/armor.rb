@@ -13,6 +13,8 @@ class Armor < ApplicationRecord
   belongs_to :player, optional: true
   belongs_to :player_base, optional: true
 
+  before_save :unequip_other_armor_in_slot, if: :being_equipped_by_player?
+
   validates :slot, inclusion: { in: EQUIPPABLE_SLOTS }
 
   def broken? = durability.to_i <= 0
@@ -88,6 +90,16 @@ class Armor < ApplicationRecord
 
   def status_resistance_bonus(status)
     status_resistance[status.to_s].to_i
+  end
+
+  private
+
+  def being_equipped_by_player?
+    player_id.present? && equipped? && (new_record? || will_save_change_to_equipped?)
+  end
+
+  def unequip_other_armor_in_slot
+    player.armors.where(slot: slot, equipped: true).where.not(id: id).update_all(equipped: false)
   end
 end
 

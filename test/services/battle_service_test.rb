@@ -52,6 +52,102 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_includes result.message, "武器を装備していないため、ソードスキルは使用できません。"
   end
 
+  test "near reach weapon closes from middle distance before attacking" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
+    player.weapons.destroy_all
+    player.weapons.create!(name: "射程確認剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+    BuffEffectService.apply_battle_effect!(player, "test_sure_hit", { sure_hit: true }, turns: 1)
+    mob = Mob.create!(name: "距離確認mob", hp: 50, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 50)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 50, enemy_level: 1, position: 1, distance: "middle")
+
+    result = BattleService.resolve_player_attack!(
+      battle: battle,
+      player: player,
+      mob_part_id: nil,
+      target_enemy_id: enemy.id,
+      label: "通常攻撃",
+      damage_multiplier: 100,
+      durability_cost: 1,
+      skill_gain: 0,
+      stiffness: false,
+      hits: 1,
+      sword_skill: false,
+      attack_attribute: "斬撃"
+    )
+
+    assert_equal :ok, result.status
+    assert_includes result.message, "接近した"
+    assert_equal "near", enemy.reload.distance
+    assert_operator enemy.enemy_hp, :<, 50
+  end
+
+  test "near reach weapon cannot close from far distance and attack" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
+    player.weapons.destroy_all
+    player.weapons.create!(name: "遠距離確認剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+    mob = Mob.create!(name: "遠距離確認mob", hp: 50, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 50)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 50, enemy_level: 1, position: 1, distance: "far")
+
+    result = BattleService.resolve_player_attack!(
+      battle: battle,
+      player: player,
+      mob_part_id: nil,
+      target_enemy_id: enemy.id,
+      label: "通常攻撃",
+      damage_multiplier: 100,
+      durability_cost: 1,
+      skill_gain: 0,
+      stiffness: false,
+      hits: 1,
+      sword_skill: false,
+      attack_attribute: "斬撃"
+    )
+
+    assert_equal :error, result.status
+    assert_includes result.message, "距離が遠く攻撃が届きません"
+    assert_equal "far", enemy.reload.distance
+    assert_equal 50, enemy.enemy_hp
+  end
+
+  test "backstep is blocked when surrounded by nearby enemies" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, agility: 10)
+    mob = Mob.create!(name: "包囲確認mob", hp: 30, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 30)
+    3.times do |index|
+      battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 1, position: index + 1, distance: "near")
+    end
+
+    result = BattleService.resolve_backstep!(player, battle, target_enemy_id: battle.battle_enemies.first.id)
+
+    assert_equal :error, result.status
+    assert_includes result.message, "囲まれていて距離を取れません"
+  end
+
+  test "evasive action raises evasion chance and consumes enemy attack turn" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, agility: 20)
+    mob = Mob.create!(name: "回避確認mob", hp: 30, atk: 20, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 30)
+    battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 1, position: 1, distance: "near")
+
+    BattleService.singleton_class.define_method(:rand) { |_range| 0 }
+    begin
+      result = BattleService.resolve_evasive_action!(player, battle)
+
+      assert_equal :ok, result.status
+      assert_includes result.message, "回避行動を取った"
+      assert_includes result.message, "回避した"
+      assert_equal 100, player.reload.hp
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+  end
+
   test "sword skill starts individual cooldown and blocks repeated use" do
     player = players(:one)
     player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)

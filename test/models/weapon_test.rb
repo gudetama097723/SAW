@@ -1,6 +1,29 @@
 require "test_helper"
 
 class WeaponTest < ActiveSupport::TestCase
+  test "equipping a weapon replaces the current weapon without dual wield" do
+    player = players(:one)
+    first = player.weapons.create!(name: "最初の剣", weapon_type: "片手直剣", equipped: true)
+    second = player.weapons.create!(name: "次の剣", weapon_type: "片手直剣", equipped: true)
+
+    assert_not first.reload.equipped?
+    assert second.reload.equipped?
+    assert_equal 1, player.equipped_weapons.count
+  end
+
+  test "dual wield allows two equipped weapons but replaces the oldest third weapon" do
+    player = players(:one)
+    player.skills.create!(name: "二刀流", proficiency: 0)
+    first = player.weapons.create!(name: "二刀流の一振り目", weapon_type: "片手直剣", equipped: true)
+    second = player.weapons.create!(name: "二刀流の二振り目", weapon_type: "片手直剣", equipped: true)
+    third = player.weapons.create!(name: "二刀流の三振り目", weapon_type: "片手直剣", equipped: true)
+
+    assert_not first.reload.equipped?
+    assert second.reload.equipped?
+    assert third.reload.equipped?
+    assert_equal 2, player.equipped_weapons.count
+  end
+
   test "one handed weapon types are identified for shields" do
     assert Weapon.new(weapon_type: "片手直剣").one_handed?
     assert Weapon.new(weapon_type: "細剣").one_handed?

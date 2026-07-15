@@ -105,7 +105,7 @@ player.obtain_key_item!(
 
 seed_rows("player_weapons.csv") do |row|
   weapon = Weapon.find_or_initialize_by(player: player, name: row["name"])
-  weapon.update!(
+  attributes = {
     weapon_type: row["weapon_type"],
     rarity: row["rarity"],
     attack_power: to_int(row["attack_power"]),
@@ -119,14 +119,15 @@ part_break_power: to_int(row["part_break_power"]) || 100,
 attack_attributes: row["attack_attributes"].presence || "斬撃",
 enhancement_level: to_int(row["enhancement_level"]) || 0,
 enhance_limit: to_int(row["enhance_limit"]) || 3,
-enhancement_difficulty: row["enhancement_difficulty"].presence&.to_d || 1.to_d,
-equipped: to_bool(row["equipped"])
-  )
+enhancement_difficulty: row["enhancement_difficulty"].presence&.to_d || 1.to_d
+  }
+  attributes[:equipped] = to_bool(row["equipped"]) && player.equipped_weapons.none? if weapon.new_record?
+  weapon.update!(attributes)
 end
 
 seed_rows("player_armors.csv") do |row|
   armor = Armor.find_or_initialize_by(player: player, name: row["name"])
-  armor.update!(
+  attributes = {
     armor_type: row["armor_type"],
     slot: row["slot"],
     rarity: row["rarity"],
@@ -136,9 +137,10 @@ seed_rows("player_armors.csv") do |row|
     strength_bonus: to_int(row["strength_bonus"]),
     agility_bonus: to_int(row["agility_bonus"]),
     durability: to_int(row["durability"]),
-    max_durability: to_int(row["max_durability"]),
-    equipped: to_bool(row["equipped"])
-  )
+    max_durability: to_int(row["max_durability"])
+  }
+  attributes[:equipped] = to_bool(row["equipped"]) && player.armor_for(row["slot"]).nil? if armor.new_record?
+  armor.update!(attributes)
 end
 
 seed_rows("player_skills.csv") do |row|

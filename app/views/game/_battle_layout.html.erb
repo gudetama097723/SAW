@@ -56,6 +56,14 @@
             <%= link_to combat_weapon ? "通常攻撃" : "素手攻撃",
                 game_path(battle_command: "attack", attack_group: combat_weapon ? nil : "unarmed", attack_attribute: combat_weapon ? nil : "打撃", target_enemy_id: selected_enemy&.id),
                 class: "btn btn-outline-warning w-100" %>
+            <%= button_to "バックステップ",
+                backstep_path(target_enemy_id: selected_enemy&.id),
+                method: :post,
+                class: "btn btn-outline-light w-100" %>
+            <%= button_to "回避行動",
+                evade_path(target_enemy_id: selected_enemy&.id),
+                method: :post,
+                class: "btn btn-outline-light w-100" %>
             <div class="btn btn-outline-secondary disabled w-100">防御</div>
             <% if combat_weapon %>
               <div class="btn btn-outline-secondary disabled w-100">パリィを狙う</div>
@@ -312,6 +320,7 @@
             <h5 class="mb-2"><%= enemy.position %>. <%= enemy.display_name %></h5>
             <p class="<%= ["mb-1", enemy_hp_text_class].compact.join(" ") %>">
               HP: <%= enemy.enemy_hp %> / <%= enemy.effective_max_hp %>
+              <span class="badge bg-info text-dark ms-1"><%= enemy.distance_label %></span>
               <% enemy.condition_labels.each do |label| %>
                 <span class="badge bg-warning text-dark ms-1"><%= label %></span>
               <% end %>

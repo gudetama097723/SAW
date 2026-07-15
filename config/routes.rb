@@ -19,6 +19,8 @@
   post "learn_skill", to: "game#learn_skill"
   post "attack", to: "game#attack"
   post "sword_skill", to: "game#sword_skill"
+  post "backstep", to: "game#backstep"
+  post "evade", to: "game#evade"
   post "use_battle_item", to: "game#use_battle_item"
   post "use_item", to: "game#use_item"
   post "eat_item", to: "game#eat_item"

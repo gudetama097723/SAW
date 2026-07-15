@@ -1,4 +1,10 @@
 class BattleEnemy < ApplicationRecord
+  DISTANCES = {
+    "near" => { label: "近距離", rank: 0 },
+    "middle" => { label: "中距離", rank: 1 },
+    "far" => { label: "遠距離", rank: 2 }
+  }.freeze
+
   belongs_to :battle
   belongs_to :mob
 
@@ -21,6 +27,38 @@ class BattleEnemy < ApplicationRecord
 
   def display_name
     level_based? ? "#{mob.name} Lv#{effective_level}" : mob.name
+  end
+
+  def distance_key
+    DISTANCES.key?(distance.to_s) ? distance.to_s : "near"
+  end
+
+  def distance_label
+    DISTANCES.fetch(distance_key).fetch(:label)
+  end
+
+  def distance_rank
+    DISTANCES.fetch(distance_key).fetch(:rank)
+  end
+
+  def increase_distance!
+    next_distance = case distance_key
+    when "near" then "middle"
+    when "middle" then "far"
+    else "far"
+    end
+
+    update!(distance: next_distance)
+  end
+
+  def decrease_distance!
+    next_distance = case distance_key
+    when "far" then "middle"
+    when "middle" then "near"
+    else "near"
+    end
+
+    update!(distance: next_distance)
   end
 
   def effective_max_hp

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_13_000006) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_15_001000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -34,6 +34,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_13_000006) do
     t.datetime "updated_at", null: false
     t.integer "weight", default: 0, null: false
     t.index ["player_base_id"], name: "index_armors_on_player_base_id"
+    t.index ["player_id", "slot"], name: "index_armors_on_unique_equipped_slot", unique: true, where: "equipped = 1 AND player_id IS NOT NULL"
     t.index ["player_id"], name: "index_armors_on_player_id"
   end
 
@@ -41,6 +42,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_13_000006) do
     t.text "battle_effects", default: "{}", null: false
     t.integer "battle_id", null: false
     t.datetime "created_at", null: false
+    t.string "distance", default: "near", null: false
     t.integer "enemy_hp", null: false
     t.integer "enemy_level", default: 1, null: false
     t.integer "enemy_max_hp"

@@ -343,6 +343,24 @@ class FieldServiceTest < ActiveSupport::TestCase
     assert_equal 1, enemy.effective_durability
   end
 
+  test "normal battle starts enemies at middle distance" do
+    player = players(:one)
+    mob = mobs(:one)
+
+    battle = FieldService.create_battle!(player, [mob])
+
+    assert_equal ["middle"], battle.battle_enemies.map(&:distance)
+  end
+
+  test "ambush battle starts enemies at near distance" do
+    player = players(:one)
+    mob = mobs(:one)
+
+    battle = FieldService.create_battle!(player, [mob], ambush: true)
+
+    assert_equal ["near"], battle.battle_enemies.map(&:distance)
+  end
+
   test "field bosses use the same level based display and stats" do
     mob = mobs(:one)
     mob.update!(boss_type: "field_boss", hp: 100, hp_growth: 10, level: 14)

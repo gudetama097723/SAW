@@ -28,6 +28,8 @@ class Weapon < ApplicationRecord
   belongs_to :mob, optional: true
   belongs_to :player_base, optional: true
 
+  before_save :unequip_excess_player_weapons, if: :being_equipped_by_player?
+
   validates :enhance_limit, :enhance_attempts,
     :sharpness_level, :quickness_level, :accuracy_level, :heaviness_level, :durability_level,
     numericality: { only_integer: true, greater_than_or_equal_to: 0 }
@@ -274,6 +276,23 @@ def sell_price
       "epic" => 8,
       "legendary" => 13
     }.fetch(rarity, 2)
+  end
+
+  private
+
+  def being_equipped_by_player?
+    player_id.present? && equipped? && (new_record? || will_save_change_to_equipped?)
+  end
+
+  def unequip_excess_player_weapons
+    available_peer_slots = player.dual_wield? ? 1 : 0
+    excess_ids = player.weapons
+      .where(equipped: true)
+      .where.not(id: id)
+      .order(updated_at: :desc, id: :desc)
+      .offset(available_peer_slots)
+      .pluck(:id)
+    player.weapons.where(id: excess_ids).update_all(equipped: false) if excess_ids.any?
   end
 end
 

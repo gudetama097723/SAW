@@ -130,6 +130,20 @@ module Game
       end
     end
 
+    def backstep
+      result = BattleService.resolve_backstep!(
+        current_player,
+        current_battle,
+        target_enemy_id: params[:target_enemy_id]
+      )
+      redirect_with_result(result, battle_command: "battle", target_enemy_id: params[:target_enemy_id])
+    end
+
+    def evade
+      result = BattleService.resolve_evasive_action!(current_player, current_battle)
+      redirect_with_result(result, battle_command: "battle", target_enemy_id: params[:target_enemy_id])
+    end
+
     def use_item
       player = current_player
 

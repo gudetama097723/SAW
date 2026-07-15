@@ -4,6 +4,8 @@
   STATUS_ATTACK_VARIANCE_RANGE = 75..125
   ENEMY_SWORD_SKILL_STIFFNESS_KEY = "enemy_sword_skill_stiffness"
   ENEMY_SWORD_SKILL_STIFFNESS_CRITICAL_BONUS = 35
+  MIDDLE_REACH_WEAPON_TYPES = %w[大剣 斧 槍 両手剣].freeze
+  FAR_REACH_WEAPON_TYPES = %w[投擲 弓].freeze
 
   def self.ensure_mob_parts!(mob)
     return [] unless mob
@@ -81,7 +83,13 @@
 
     target_enemies = target_enemies_for(battle, target_enemy_id, group_start, area, target_enemy_ids, max_targets: sword_skill ? SkillCatalog.find(skill_key).max_targets : 4)
     return Result.new(status: :error, message: "攻撃対象がいません。") if target_enemies.empty?
+    unreachable = target_enemies.reject { |battle_enemy| player_attack_can_close_and_reach?(weapon, battle_enemy, sword_skill: sword_skill) }
+    if unreachable.any?
+      names = unreachable.map { |battle_enemy| "#{battle_enemy.display_name}（#{battle_enemy.distance_label}）" }.join("、")
+      return Result.new(status: :error, message: "#{names}には距離が遠く攻撃が届きません。")
+    end
 
+    approach_messages = target_enemies.filter_map { |battle_enemy| approach_for_player_attack!(weapon, battle_enemy, sword_skill: sword_skill) }
     hit_messages = []
     actual_attack_attribute = attack_attribute_for(weapon, attack_attribute, sword_skill)
     damage_multiplier = weapon.sword_skill_damage_multiplier(damage_multiplier, hits) if sword_skill && weapon
@@ -117,7 +125,7 @@
     weapon&.apply_durability_loss!(durability_loss_for(weapon, durability_cost, actual_attack_attribute))
 
     if battle.alive_enemies.reload.empty?
-      return finish_battle_victory!(player, battle, weapon, label, hit_messages.join(" / "), skill_gain, sword_skill, skill_key)
+      return finish_battle_victory!(player, battle, weapon, label, "#{approach_messages.join}#{hit_messages.join(' / ')}", skill_gain, sword_skill, skill_key)
     end
 
     skill_message = sword_skill ? gain_sword_skill_use!(player, weapon, skill_key, skill_gain) : ""
@@ -148,11 +156,11 @@
 
     Result.new(
       status: :ok,
-      message: "#{turn_messages.join}#{label}！#{hit_messages.join(' / ')}！#{knockback_message}#{enemy_result.message}#{stiffness_message}#{broken_message}#{skill_message}"
+      message: "#{turn_messages.join}#{approach_messages.join}#{label}！#{hit_messages.join(' / ')}！#{knockback_message}#{enemy_result.message}#{stiffness_message}#{broken_message}#{skill_message}"
     )
   end
 
-  def self.apply_enemy_attack!(player, battle, prefix: "", allow_evasion: true)
+  def self.apply_enemy_attack!(player, battle, prefix: "", allow_evasion: true, evasion_focus: false)
     return Result.new(status: :ok, message: "") if battle.destroyed?
 
     ensure_battle_enemies!(battle)
@@ -176,19 +184,35 @@
       end
 
       sword_skill = enemy_sword_skill_for(battle_enemy)
-      if enemy_sword_skill_weapon_guarded?(player, battle_enemy, sword_skill)
+      enemy_approach_message = ""
+      unless enemy_attack_reaches?(battle_enemy, sword_skill: sword_skill)
+        if enemy_attack_can_close_and_reach?(battle_enemy, sword_skill: sword_skill)
+          before = battle_enemy.distance_label
+          close_distance!(battle_enemy)
+          enemy_approach_message = "#{mob_name}は距離を詰めた（#{before}→#{battle_enemy.distance_label}）。"
+        else
+          close_distance!(battle_enemy)
+          BuffEffectService.tick_battle_turn!(battle_enemy)
+          battle_enemy.save!
+          messages << enemy_message("#{prefix}#{mob_name}は距離を詰めた。")
+          next
+        end
+      end
+
+      if !evasion_focus && enemy_sword_skill_weapon_guarded?(player, battle_enemy, sword_skill)
         start_enemy_sword_skill_cooldown!(battle_enemy, sword_skill)
         battle_enemy.save!
         player.save!
-        return Result.new(status: :ok, message: enemy_message("#{prefix}#{mob_name}の#{enemy_attack_name(sword_skill)}を#{combat_weapon_for(player).display_name}で弾いた！ノックバックが発生し、互いに距離を取った！"))
+        return Result.new(status: :ok, message: enemy_message("#{prefix}#{enemy_approach_message}#{mob_name}の#{enemy_attack_name(sword_skill)}を#{combat_weapon_for(player).display_name}で弾いた！ノックバックが発生し、互いに距離を取った！"))
       end
 
       mark_enemy_sword_skill_stiffness!(battle_enemy, sword_skill) if sword_skill
-      if allow_evasion && evaded_enemy_attack?(player, battle_enemy)
+      if allow_evasion && enemy_attack_evaded?(player, battle_enemy, focused: evasion_focus)
         start_enemy_sword_skill_cooldown!(battle_enemy, sword_skill) if sword_skill
         BuffEffectService.tick_battle_turn!(battle_enemy)
         battle_enemy.save!
-        messages << enemy_message("#{prefix}#{mob_name}の#{enemy_attack_name(sword_skill)}を回避した！")
+        counter_message = sword_skill ? " 硬直の隙を突ける！" : ""
+        messages << enemy_message("#{prefix}#{enemy_approach_message}#{mob_name}の#{enemy_attack_name(sword_skill)}を回避した！#{counter_message}")
         next
       end
 
@@ -197,12 +221,12 @@
       apply_mob_status_attacks!(player, battle_enemy)
 
       if player.hp <= 0
-        return handle_player_defeat!(player, battle, "#{enemy_message("#{prefix}#{mob_name}の#{enemy_attack_name(sword_skill)}！#{enemy_skill_hit_text(sword_skill)}#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。")
+        return handle_player_defeat!(player, battle, "#{enemy_message("#{prefix}#{enemy_approach_message}#{mob_name}の#{enemy_attack_name(sword_skill)}！#{enemy_skill_hit_text(sword_skill)}#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。")
       end
 
       BuffEffectService.tick_battle_turn!(battle_enemy)
       battle_enemy.save!
-      messages << enemy_message("#{prefix}#{mob_name}の#{enemy_attack_name(sword_skill)}！#{enemy_skill_hit_text(sword_skill)}#{enemy_damage}ダメージを受けた！")
+      messages << enemy_message("#{prefix}#{enemy_approach_message}#{mob_name}の#{enemy_attack_name(sword_skill)}！#{enemy_skill_hit_text(sword_skill)}#{enemy_damage}ダメージを受けた！")
     end
 
     player.save!
@@ -216,6 +240,63 @@
     Result.new(status: :ok, message: messages.join)
   end
 
+  def self.resolve_backstep!(player, battle, target_enemy_id: nil)
+    return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
+
+    ensure_battle_enemies!(battle)
+    turn_messages = apply_battle_turn_start_effects!(player, battle)
+    return handle_player_defeat!(player, battle, "#{turn_messages.join}あなたは倒れた……。") if player.hp.to_i <= 0
+
+    blocked_result = resolve_player_action_block_after_turn_start!(player, battle, turn_messages)
+    return blocked_result if blocked_result
+    return Result.new(status: :error, message: "囲まれていて距離を取れません。") if encircled?(battle)
+
+    target = target_enemies_for(battle, target_enemy_id, nil, false).first
+    return Result.new(status: :error, message: "距離を取る対象がいません。") unless target
+    return Result.new(status: :error, message: "#{target.display_name}とは既に遠距離です。") if target.distance_key == "far"
+
+    BuffEffectService.tick_battle_turn!(player)
+    player.save!
+
+    if backstep_success?(player, battle, target)
+      before = target.distance_label
+      target.increase_distance!
+      enemy_result = apply_enemy_attack!(player, battle)
+      return enemy_result if enemy_result.status == :defeated
+
+      tick_sword_skill_cooldowns_for_turn!(player, battle)
+      player.save!
+      Result.new(status: :ok, message: "#{turn_messages.join}バックステップ！#{target.display_name}との距離を#{before}から#{target.distance_label}へ離した。#{enemy_result.message}")
+    else
+      enemy_result = apply_enemy_attack!(player, battle)
+      return enemy_result if enemy_result.status == :defeated
+
+      tick_sword_skill_cooldowns_for_turn!(player, battle)
+      player.save!
+      Result.new(status: :ok, message: "#{turn_messages.join}バックステップに失敗した！#{enemy_result.message}")
+    end
+  end
+
+  def self.resolve_evasive_action!(player, battle)
+    return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
+
+    ensure_battle_enemies!(battle)
+    turn_messages = apply_battle_turn_start_effects!(player, battle)
+    return handle_player_defeat!(player, battle, "#{turn_messages.join}あなたは倒れた……。") if player.hp.to_i <= 0
+
+    blocked_result = resolve_player_action_block_after_turn_start!(player, battle, turn_messages)
+    return blocked_result if blocked_result
+
+    BuffEffectService.tick_battle_turn!(player)
+    player.save!
+    enemy_result = apply_enemy_attack!(player, battle, prefix: "回避行動中、", evasion_focus: true)
+    return enemy_result if enemy_result.status == :defeated
+
+    tick_sword_skill_cooldowns_for_turn!(player, battle)
+    player.save!
+    Result.new(status: :ok, message: "#{turn_messages.join}回避行動を取った。#{enemy_result.message}")
+  end
+
   def self.resolve_player_action_block!(player, battle)
     return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
 
@@ -223,6 +304,19 @@
     turn_messages = apply_battle_turn_start_effects!(player, battle)
     return handle_player_defeat!(player, battle, "#{turn_messages.join}あなたは倒れた……。") if player.hp.to_i <= 0
 
+    blocked_message = StatusEffectService.action_blocked_message!(player)
+    return nil unless blocked_message
+
+    BuffEffectService.tick_battle_turn!(player)
+    tick_sword_skill_cooldowns_for_turn!(player, battle)
+    player.save!
+    enemy_result = apply_enemy_attack!(player, battle)
+    return enemy_result if enemy_result.status == :defeated
+
+    Result.new(status: :ok, message: "#{turn_messages.join}#{blocked_message}#{enemy_result.message}")
+  end
+
+  def self.resolve_player_action_block_after_turn_start!(player, battle, turn_messages)
     blocked_message = StatusEffectService.action_blocked_message!(player)
     return nil unless blocked_message
 
@@ -268,7 +362,8 @@
         enemy_hp: battle.enemy_hp || enemy_max_hp,
         enemy_max_hp: enemy_max_hp,
         enemy_level: enemy_level,
-        position: 1
+        position: 1,
+        distance: battle.ambush? ? "near" : "middle"
       )
     )
     battle.alive_enemies.to_a
@@ -291,6 +386,64 @@
     else
       alive.first ? [alive.first] : []
     end
+  end
+
+  def self.player_attack_reaches?(weapon, battle_enemy, sword_skill: false)
+    distance_reachable?(battle_enemy, weapon_reach_rank(weapon))
+  end
+
+  def self.player_attack_can_close_and_reach?(weapon, battle_enemy, sword_skill: false)
+    distance_rank_after_standard_approach(battle_enemy) <= weapon_reach_rank(weapon)
+  end
+
+  def self.enemy_attack_reaches?(battle_enemy, sword_skill: false)
+    distance_reachable?(battle_enemy, weapon_reach_rank(battle_enemy.mob.equipped_weapon))
+  end
+
+  def self.enemy_attack_can_close_and_reach?(battle_enemy, sword_skill: false)
+    distance_rank_after_standard_approach(battle_enemy) <= weapon_reach_rank(battle_enemy.mob.equipped_weapon)
+  end
+
+  def self.distance_reachable?(battle_enemy, reach_rank)
+    battle_enemy.distance_rank <= reach_rank
+  end
+
+  def self.distance_rank_after_standard_approach(battle_enemy)
+    [battle_enemy.distance_rank - 1, 0].max
+  end
+
+  def self.weapon_reach_rank(weapon)
+    return 0 unless weapon
+
+    weapon_type = weapon.weapon_type.to_s
+    return 2 if FAR_REACH_WEAPON_TYPES.any? { |type| weapon_type.include?(type) }
+    return 1 if MIDDLE_REACH_WEAPON_TYPES.any? { |type| weapon_type.include?(type) }
+
+    0
+  end
+
+  def self.close_distance!(battle_enemy)
+    battle_enemy.decrease_distance! unless battle_enemy.distance_key == "near"
+  end
+
+  def self.approach_for_player_attack!(weapon, battle_enemy, sword_skill: false)
+    return if player_attack_reaches?(weapon, battle_enemy, sword_skill: sword_skill)
+
+    before = battle_enemy.distance_label
+    close_distance!(battle_enemy)
+    "#{battle_enemy.display_name}へ接近した（#{before}→#{battle_enemy.distance_label}）。"
+  end
+
+  def self.encircled?(battle)
+    battle.alive_enemies.to_a.count { |battle_enemy| battle_enemy.distance_key == "near" } >= 3
+  end
+
+  def self.backstep_success?(player, battle, target)
+    enemy_agility = battle.alive_enemies.map { |battle_enemy| mob_effective_agility(battle_enemy) }.max.to_i
+    agility_gap = player.effective_agility - enemy_agility
+    enemy_count_penalty = [battle.alive_enemies.size - 1, 0].max * 8
+    chance = [[70 + agility_gap * 5 - enemy_count_penalty, 25].max, 95].min
+    rand(100) < chance
   end
 
   def self.resolve_hit!(player:, weapon:, battle_enemy:, mob_part_id:, damage_multiplier:, attack_attribute:, sword_skill: false)
@@ -753,11 +906,14 @@ end
     battle_enemy.mob.mob_parts.select { |part| part.break_effect == effect && part_broken?(battle_enemy, part) }
   end
 
-  def self.evaded_enemy_attack?(player, battle_enemy)
+  def self.enemy_attack_evaded?(player, battle_enemy, focused: false)
     player_agility = (player.effective_agility * BuffEffectService.agility_multiplier(player)).round
     agility_gap = player_agility - mob_effective_agility(battle_enemy)
     weight_penalty = player.overweight? ? (player.overweight_amount * 2).ceil : 0
-    chance = [[10 + (agility_gap * 5) - weight_penalty, 5].max, 75].min
+    base = focused ? 45 : 10
+    floor = focused ? 20 : 5
+    cap = focused ? 90 : 75
+    chance = [[base + (agility_gap * 5) - weight_penalty, floor].max, cap].min
     rand(100) < chance
   end
 
