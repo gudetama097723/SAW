@@ -1,7 +1,6 @@
 class FieldService
   Result = Struct.new(:status, :message, :battle, keyword_init: true)
   Encounter = Struct.new(:mob, :level, keyword_init: true)
-  REQUIRED_MAPPING_TO_REACH_DESTINATION = 30
   ROAMING_AREA_BOSS_ENCOUNTER_RATE = 5
   PACK_MOB_NAME = "群狼"
   PACK_LEADER_NAME = "群狼の王"

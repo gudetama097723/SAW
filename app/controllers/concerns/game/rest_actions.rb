@@ -107,7 +107,10 @@ module Game
         break if rest_recovery_complete?(player) && requested_rest_sleep_minutes <= 0
       end
 
-      StatusEffectService.cure!(player, "sleep") if rest_recovery_complete?(player)
+      if rest_recovery_complete?(player)
+        StatusEffectService.cure!(player, "sleep")
+        player.reset_sleep_deprivation!
+      end
       player.increment_skill_counter!("field_sleep_count")
       player.save!
 

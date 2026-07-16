@@ -199,6 +199,11 @@ module Game
   def evolve_weapon
     player = current_player
 
+    unless BlacksmithFacilityAccessService.available?(player)
+      redirect_to game_path, alert: BlacksmithFacilityAccessService.message_for(:evolve)
+      return
+    end
+
     unless player.location&.safe_area? && player.town_discovery_for&.found_blacksmith?
       redirect_to game_path, alert: "鍛冶屋はまだ利用できません。"
       return
@@ -279,7 +284,8 @@ module Game
         end
 
         weapon_fees = weapons.sum { |weapon| (weapon.repair_cost * context.fee_multiplier(:maintenance)).round }
-        total_fee = weapon_fees + armors.sum(&:repair_cost)
+        armor_fees = armors.sum { |armor| (armor.repair_cost * context.fee_multiplier(:maintenance)).round }
+        total_fee = weapon_fees + armor_fees
         if player.col.to_i < total_fee
           redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), alert: "コルが足りません。整備には#{total_fee}コル必要です。"
           return
@@ -307,7 +313,8 @@ module Game
           redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "整備できる防具がありません。"
           return
         end
-        fee = armor.repair_cost
+        context = BlacksmithService.context_for(player, mode: "npc")
+        fee = context ? (armor.repair_cost * context.fee_multiplier(:maintenance)).round : armor.repair_cost
         if player.col.to_i < fee
           redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "コルが足りません。整備には#{fee}コル必要です。"
           return
@@ -498,6 +505,8 @@ module Game
 
         weapon.update!(equipped: true)
         player.armors.where(slot: "shield").update_all(equipped: false) unless player.shield_equippable?
+        StatusEffectService.clamp_hp_to_max!(player)
+        player.save!
       end
 
       if battle
@@ -522,7 +531,11 @@ module Game
         return
       end
 
-      weapon.update!(equipped: false)
+      ActiveRecord::Base.transaction do
+        weapon.update!(equipped: false)
+        StatusEffectService.clamp_hp_to_max!(player)
+        player.save!
+      end
       redirect_to game_path(panel: "equipment"), notice: "#{weapon.name}を外した。"
     end
 
@@ -557,6 +570,8 @@ module Game
       ActiveRecord::Base.transaction do
         player.armors.where(slot: armor.slot).update_all(equipped: false)
         armor.update!(equipped: true)
+        StatusEffectService.clamp_hp_to_max!(player)
+        player.save!
       end
       if battle
         enemy_result = BattleService.apply_enemy_attack!(player, battle)
@@ -580,7 +595,11 @@ module Game
         return
       end
 
-      armor.update!(equipped: false)
+      ActiveRecord::Base.transaction do
+        armor.update!(equipped: false)
+        StatusEffectService.clamp_hp_to_max!(player)
+        player.save!
+      end
       redirect_to game_path(panel: "equipment"), notice: "#{armor.name}を外した。"
     end
 

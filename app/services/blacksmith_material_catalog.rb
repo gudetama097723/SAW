@@ -24,8 +24,11 @@ class BlacksmithMaterialCatalog
   end
 
   def self.load_all
+    path = Rails.root.join("db", "seeds", "blacksmith_materials.csv")
+    return [] unless File.exist?(path)
+
     rows = []
-    SimpleCsv.foreach(Rails.root.join("db", "seeds", "blacksmith_materials.csv")) { |row| rows << row }
+    SimpleCsv.foreach(path) { |row| rows << row }
     rows.map do |row|
       Material.new(
         name: row["name"], category: row["category"], processing_level: row["processing_level"].to_i,

@@ -8,8 +8,9 @@ class WeaponCraftTypeCatalog
 
   def self.all
     @all ||= begin
+      path = Rails.root.join("db", "seeds", "weapon_craft_types.csv")
       rows = []
-      SimpleCsv.foreach(Rails.root.join("db", "seeds", "weapon_craft_types.csv")) { |row| rows << row }
+      SimpleCsv.foreach(path) { |row| rows << row } if File.exist?(path)
       rows.map do |row|
         Template.new(
           weapon_type: row["weapon_type"], attack_multiplier: row["attack_multiplier"].to_f,

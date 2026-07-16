@@ -24,9 +24,16 @@ class WeaponMaintenanceService
     ratio = missing.to_f / [ weapon.effective_max_durability, 1 ].max
     kit_cost = kit_cost_for(blacksmith.proficiency)
     gained = 0
+    insufficient_after_lock = false
     ActiveRecord::Base.transaction do
       player.lock!
       weapon.lock!
+      still_missing_kit = blacksmith.player? && !player.items.find_by(name: KIT_NAME)&.quantity.to_i&.positive?
+      if still_missing_kit || player.col.to_i < fee
+        insufficient_after_lock = true
+        raise ActiveRecord::Rollback
+      end
+
       consume_kit!(kit, kit_cost) if blacksmith.player?
       player.col = player.col.to_i - fee
       player.advance_time!(20)
@@ -37,6 +44,7 @@ class WeaponMaintenanceService
         completion_ratio: ratio < 0.05 ? 0.0 : ratio
       )
     end
+    return error(blacksmith.player? ? "武器整備キットが必要です。" : "コルが足りません。整備には#{fee}コル必要です。") if insufficient_after_lock
 
     cost_text = blacksmith.player? ? "整備キット耐久を#{kit_cost}消費" : "#{fee}コル支払った"
     Result.new(status: :ok, skill_exp_gained: gained, message: "#{weapon.display_name}を最大耐久まで整備した。#{cost_text}。")

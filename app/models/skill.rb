@@ -49,7 +49,11 @@
 
   def proficiency_from_exp(exp, growth_scale)
     scale = [growth_scale.to_i, 1].max
-    (1000 * (1 - Math.exp(-exp.to_i / scale.to_f))).floor.clamp(0, 1000)
+    raw = 1000 * (1 - Math.exp(-exp.to_i / scale.to_f))
+    # raw は指数関数の漸近曲線のため、浮動小数点上は現実的なexp量では999までしか到達せず、
+    # 文字通りの1000には天文学的なexpが必要になってしまう。999到達をもって実質カンスト扱いにする。
+    value = raw >= 999 ? 1000 : raw.floor
+    value.clamp(0, 1000)
   end
 end
 

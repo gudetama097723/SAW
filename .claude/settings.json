@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(bin/rails test *)",
-      "Bash(bin/rails db:seed RAILS_ENV=development)"
+      "Bash(bin/rails db:seed RAILS_ENV=development)",
+      "Bash(bin/brakeman -q -w2)",
+      "Bash(awk -F, 'NR==1{print;next}{print $1\",\"$2}' db/seeds/weapons.csv)",
+      "Bash(bin/rubocop --format simple)",
+      "Bash(bin/bundler-audit check *)"
     ]
   },
   "ignorePatterns": [

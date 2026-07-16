@@ -41,15 +41,22 @@ class WeaponUpgradeService
     return Result.new(status: :error, message: "素材が足りません。#{missing.first} ×#{missing.last}が必要です。") if missing
 
     succeeded = false
-    exhausted_during_lock = false
+    abort_reason = nil
     previous_level = weapon.enhancement_level
     ActiveRecord::Base.transaction do
       player.lock!
       weapon.lock!
-      if weapon.max_enhancement?
-        exhausted_during_lock = true
-        raise ActiveRecord::Rollback
+      still_missing = quote.required_materials.find do |name, quantity|
+        player.items.find_by(name: name)&.quantity.to_i < quantity.to_i
       end
+      if weapon.max_enhancement?
+        abort_reason = :max_enhancement
+      elsif player.col.to_i < quote.required_col
+        abort_reason = :insufficient_col
+      elsif still_missing
+        abort_reason = :insufficient_materials
+      end
+      raise ActiveRecord::Rollback if abort_reason
 
       consume_materials!(player, quote.required_materials)
       player.col = player.col.to_i - quote.required_col
@@ -63,7 +70,13 @@ class WeaponUpgradeService
         context, task_difficulty: quote.processing_level + quote.target_level * 10, action: :enhance
       )
     end
-    return Result.new(status: :error, message: enhancement_limit_message(weapon)) if exhausted_during_lock
+    if abort_reason == :max_enhancement
+      return Result.new(status: :error, message: enhancement_limit_message(weapon))
+    elsif abort_reason == :insufficient_col
+      return Result.new(status: :error, message: "コルが足りません。強化には#{quote.required_col}コル必要です。")
+    elsif abort_reason == :insufficient_materials
+      return Result.new(status: :error, message: "素材が足りません。もう一度お試しください。")
+    end
 
     if succeeded
       Result.new(

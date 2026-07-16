@@ -118,17 +118,6 @@ class ExplorationRewardService
     suffix
   end
 
-  def self.treasure_hazard_message(treasure_chest, inspected: false)
-    case treasure_chest.hazard_type
-    when "mimic"
-      inspected ? "ミミックの気配がある。" : "不穏な気配がある。"
-    when "trap"
-      inspected ? "罠の仕掛けがある。" : "違和感がある。"
-    else
-      ""
-    end
-  end
-
   def self.start_boss_battle!(player, mob)
 
     state = player.player_boss_kills.find_or_create_by!(mob: mob)
@@ -146,7 +135,7 @@ class ExplorationRewardService
     state = player.player_boss_kills.find_or_create_by!(mob: mob)
     first_defeat = !state.defeated?
 
-    state.defeated_count = state.defeated_count.to_i + 1 if state.has_attribute?(:defeated_count)
+    state.defeated_count = state.defeated_count.to_i + 1
     state.found = true
     state.defeated = true
     state.defeated_at ||= Time.current
@@ -271,9 +260,7 @@ class ExplorationRewardService
 
     state = player.player_boss_kills.find_by(mob: pack_leader)
     return 0 unless state
-    return state.defeated_count.to_i if state.has_attribute?(:defeated_count)
-
-    state.defeated? ? 1 : 0
+    state.defeated_count.to_i
   end
 
   def self.mark_treasure_found!(player, chest)

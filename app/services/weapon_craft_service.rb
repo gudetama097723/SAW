@@ -46,8 +46,15 @@ class WeaponCraftService
 
     weapon = nil
     gained = 0
+    insufficient_after_lock = false
     ActiveRecord::Base.transaction do
       player.lock!
+      still_missing = quantities.find { |name, quantity| player.items.where(name: name).sum(:quantity).to_i < quantity }
+      if still_missing || player.col.to_i < fee
+        insufficient_after_lock = true
+        raise ActiveRecord::Rollback
+      end
+
       consume_materials!(player, quantities)
       player.col = player.col.to_i - fee
       player.advance_time!(60)
@@ -57,6 +64,7 @@ class WeaponCraftService
         blacksmith, task_difficulty: [ required_level, ore.craft_rank * 10 ].max, action: :craft
       )
     end
+    return error("素材またはコルが不足しています。もう一度お試しください。") if insufficient_after_lock
 
     fee_text = blacksmith.player? ? "工賃なし" : "工賃#{fee}コル"
     Result.new(

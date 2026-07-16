@@ -10,22 +10,14 @@
 
   def self.ensure_mob_parts!(mob)
     return [] unless mob
-    if mob.boss?
-      ensure_boss_parts!(mob)
-      return mob.mob_parts.to_a
-    end
     return mob.mob_parts.to_a if mob.mob_parts.exists?
 
-    mob.mob_parts.create!(name: "本体", damage_multiplier: 100, weakness: true)
-    mob.mob_parts.to_a
-  end
-
-  def self.ensure_boss_parts!(mob)
-    boss_part_templates_for(mob).each do |attrs|
-      part = mob.mob_parts.find_or_initialize_by(name: attrs[:name])
-      part.update!(attrs)
+    if mob.boss?
+      boss_part_templates_for(mob).each { |attrs| mob.mob_parts.create!(attrs) }
+    else
+      mob.mob_parts.create!(name: "本体", damage_multiplier: 100, weakness: true)
     end
-    mob.mob_parts.where(name: "本体").destroy_all if mob.mob_parts.where.not(name: "本体").exists?
+    mob.mob_parts.to_a
   end
 
   def self.boss_part_templates_for(mob)
@@ -124,9 +116,10 @@
     consume_player_ambush_opening!(battle)
 
     weapon&.apply_durability_loss!(durability_loss_for(weapon, durability_cost, actual_attack_attribute))
+    use_exp_message = gain_weapon_use_exp!(player, weapon)
 
     if battle.alive_enemies.reload.empty?
-      return finish_battle_victory!(player, battle, weapon, label, "#{approach_messages.join}#{hit_messages.join(' / ')}", skill_gain, sword_skill, skill_key)
+      return finish_battle_victory!(player, battle, weapon, label, "#{approach_messages.join}#{hit_messages.join(' / ')}#{use_exp_message}", skill_gain, sword_skill, skill_key)
     end
 
     skill_message = sword_skill ? gain_sword_skill_use!(player, weapon, skill_key, skill_gain) : ""
@@ -157,7 +150,7 @@
 
     Result.new(
       status: :ok,
-      message: "#{turn_messages.join}#{approach_messages.join}#{label}！#{hit_messages.join(' / ')}！#{knockback_message}#{enemy_result.message}#{stiffness_message}#{broken_message}#{skill_message}"
+      message: "#{turn_messages.join}#{approach_messages.join}#{label}！#{hit_messages.join(' / ')}！#{knockback_message}#{enemy_result.message}#{stiffness_message}#{broken_message}#{skill_message}#{use_exp_message}"
     )
   end
 
@@ -1007,6 +1000,18 @@ def self.gain_sword_skill_use!(player, weapon, skill_key, amount)
   before_level = skill.sword_skill_level(skill_key)
   after_level = skill.gain_sword_skill_exp!(skill_key, amount)
   after_level > before_level ? " #{SkillCatalog.find(skill_key).name} Lv.#{after_level}に上昇した！" : ""
+end
+
+# キル時のexp加算(kill_exp/sword_skill_kill_bonus)を主軸に保つため、
+# 毎ヒットで加算する分はCSV上のuse_expの一部（1/3）に抑える。
+PER_HIT_PROFICIENCY_EXP_RATIO = 1.0 / 3
+
+def self.gain_weapon_use_exp!(player, weapon)
+  return "" unless weapon
+
+  growth = SkillGrowthCatalog.find(weapon_skill_name(weapon))
+  per_hit_exp = (growth.use_exp * PER_HIT_PROFICIENCY_EXP_RATIO).ceil
+  gain_weapon_skill!(player, weapon, per_hit_exp)
 end
 
 def self.gain_weapon_skill!(player, weapon, amount)

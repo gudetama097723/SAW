@@ -6,6 +6,7 @@ class SessionsController < ApplicationController
     user = User.find_by(username: params[:username].to_s.strip.downcase)
 
     if user&.authenticate(params[:password].to_s)
+      reset_session
       session[:user_id] = user.id
       if user.player&.weapons&.exists?
         redirect_to game_path, notice: "ログインしました。"

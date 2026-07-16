@@ -166,8 +166,7 @@ end
 
 def sell_price
     base = effective_attack_power.to_i * 4
-    durability_rate = max_durability.to_i.positive? ? durability.to_i.to_f / max_durability.to_i : 0.5
-    [(base * durability_rate * rarity_cost_multiplier / 2.0).floor, 1].max
+    [(base * rarity_cost_multiplier / 2.0).floor, 1].max
   end
 
   def attack_attribute_list

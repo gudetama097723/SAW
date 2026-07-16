@@ -11,6 +11,7 @@ class RegistrationsController < ApplicationController
       PlayerInitializer.create_for_user!(@user)
     end
 
+    reset_session
     session[:user_id] = @user.id
     redirect_to starter_weapon_path, notice: "登録しました。最初の武器を選んでください。"
   rescue ActiveRecord::RecordInvalid

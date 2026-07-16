@@ -38,14 +38,31 @@
     relation.save!
 
     actual_gain = after - before
+    cap_message = actual_gain.positive? ? retry_pending_cap_unlocks!(player, npc, relation) : ""
     Result.new(
       status: actual_gain.positive? ? :ok : :none,
-      message: actual_gain.positive? ? "親密度が#{actual_gain}上がった。（#{stage_for(after)}）" : "親密度はこれ以上上がらなかった。",
+      message: actual_gain.positive? ? "親密度が#{actual_gain}上がった。（#{stage_for(after)}）#{cap_message}" : "親密度はこれ以上上がらなかった。",
       affinity: after,
       gain: actual_gain,
       stage: stage_for(after),
       rule: rule
     )
+  end
+
+  # 完了済みクエストの親密度上限アンロックを再評価する。
+  # クエスト達成時の親密度がrequired_affinity未満だった場合、達成イベント自体は過ぎ去ってしまうため、
+  # 後から親密度が閾値を超えたタイミングで改めて解放判定できるようにする。
+  def self.retry_pending_cap_unlocks!(player, npc, relation)
+    codes = player.player_quests.joins(:npc_quest)
+      .where(npc_quests: { npc_id: npc.id }, status: "completed")
+      .distinct
+      .pluck("npc_quests.code")
+    return "" if codes.empty?
+
+    codes.filter_map do |code|
+      result = NpcAffinityCapService.unlock!(player, npc, unlock_type: "quest_clear", unlock_key: code)
+      result.message if result.ok?
+    end.join
   end
 
   def self.gift!(player, npc, item_name)

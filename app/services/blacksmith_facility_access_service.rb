@@ -2,6 +2,7 @@ class BlacksmithFacilityAccessService
   MESSAGES = {
     craft: "武器を生産するには鍛冶設備が必要だ。",
     enhance: "武器を強化するには鍛冶設備が必要だ。",
+    evolve: "武器を進化させるには鍛冶設備が必要だ。",
     npc_maintenance: "NPCへ整備を依頼するには鍛冶設備が必要だ。",
     facility: "ここには武器を鍛造できる設備がない。"
   }.freeze
