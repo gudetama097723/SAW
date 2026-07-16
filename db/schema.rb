@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_15_001000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_15_002000) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -60,6 +60,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_15_001000) do
     t.boolean "ambush"
     t.datetime "created_at", null: false
     t.integer "enemy_hp"
+    t.string "initiative_type", default: "normal", null: false
     t.integer "mob_id", null: false
     t.text "part_states", default: "{}", null: false
     t.integer "player_id", null: false

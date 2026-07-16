@@ -4,6 +4,7 @@
   STATUS_ATTACK_VARIANCE_RANGE = 75..125
   ENEMY_SWORD_SKILL_STIFFNESS_KEY = "enemy_sword_skill_stiffness"
   ENEMY_SWORD_SKILL_STIFFNESS_CRITICAL_BONUS = 35
+  BACKSTEP_ACTION_SKIP_KEY = "backstep_action_skip"
   MIDDLE_REACH_WEAPON_TYPES = %w[大剣 斧 槍 両手剣].freeze
   FAR_REACH_WEAPON_TYPES = %w[投擲 弓].freeze
 
@@ -120,7 +121,7 @@
       break if knockback_message.present?
     end
 
-    battle.update!(ambush: false) if battle.ambush?
+    consume_player_ambush_opening!(battle)
 
     weapon&.apply_durability_loss!(durability_loss_for(weapon, durability_cost, actual_attack_attribute))
 
@@ -168,6 +169,11 @@
 
     battle.alive_enemies.each do |battle_enemy|
       mob_name = battle_enemy.mob.name
+      if enemy_action_skipped_by_backstep?(battle_enemy)
+        messages << enemy_message("#{prefix}#{mob_name}は踏み込みが間に合わなかった。")
+        next
+      end
+
       blocked_message = StatusEffectService.action_blocked_message!(battle_enemy)
       if blocked_message
         BuffEffectService.tick_battle_turn!(battle_enemy)
@@ -261,6 +267,8 @@
     if backstep_success?(player, battle, target)
       before = target.distance_label
       target.increase_distance!
+      mark_backstep_action_skip!(target)
+      consume_player_ambush_opening!(battle)
       enemy_result = apply_enemy_attack!(player, battle)
       return enemy_result if enemy_result.status == :defeated
 
@@ -268,6 +276,7 @@
       player.save!
       Result.new(status: :ok, message: "#{turn_messages.join}バックステップ！#{target.display_name}との距離を#{before}から#{target.distance_label}へ離した。#{enemy_result.message}")
     else
+      consume_player_ambush_opening!(battle)
       enemy_result = apply_enemy_attack!(player, battle)
       return enemy_result if enemy_result.status == :defeated
 
@@ -288,6 +297,7 @@
     return blocked_result if blocked_result
 
     BuffEffectService.tick_battle_turn!(player)
+    consume_player_ambush_opening!(battle)
     player.save!
     enemy_result = apply_enemy_attack!(player, battle, prefix: "回避行動中、", evasion_focus: true)
     return enemy_result if enemy_result.status == :defeated
@@ -363,7 +373,7 @@
         enemy_max_hp: enemy_max_hp,
         enemy_level: enemy_level,
         position: 1,
-        distance: battle.ambush? ? "near" : "middle"
+        distance: FieldService.initial_battle_distance(battle.initiative_key)
       )
     )
     battle.alive_enemies.to_a
@@ -393,7 +403,7 @@
   end
 
   def self.player_attack_can_close_and_reach?(weapon, battle_enemy, sword_skill: false)
-    distance_rank_after_standard_approach(battle_enemy) <= weapon_reach_rank(weapon)
+    distance_rank_after_player_approach(battle_enemy) <= weapon_reach_rank(weapon)
   end
 
   def self.enemy_attack_reaches?(battle_enemy, sword_skill: false)
@@ -410,6 +420,10 @@
 
   def self.distance_rank_after_standard_approach(battle_enemy)
     [battle_enemy.distance_rank - 1, 0].max
+  end
+
+  def self.distance_rank_after_player_approach(battle_enemy)
+    player_ambush_opening?(battle_enemy.battle) ? 0 : distance_rank_after_standard_approach(battle_enemy)
   end
 
   def self.weapon_reach_rank(weapon)
@@ -430,8 +444,34 @@
     return if player_attack_reaches?(weapon, battle_enemy, sword_skill: sword_skill)
 
     before = battle_enemy.distance_label
-    close_distance!(battle_enemy)
+    if player_ambush_opening?(battle_enemy.battle)
+      battle_enemy.update!(distance: "near")
+    else
+      close_distance!(battle_enemy)
+    end
     "#{battle_enemy.display_name}へ接近した（#{before}→#{battle_enemy.distance_label}）。"
+  end
+
+  def self.player_ambush_opening?(battle)
+    battle&.player_ambush? && battle.ambush?
+  end
+
+  def self.consume_player_ambush_opening!(battle)
+    battle.update!(ambush: false) if battle&.ambush?
+  end
+
+  def self.mark_backstep_action_skip!(battle_enemy)
+    BuffEffectService.apply_battle_effect!(battle_enemy, BACKSTEP_ACTION_SKIP_KEY, {}, turns: 1)
+    battle_enemy.save!
+  end
+
+  def self.enemy_action_skipped_by_backstep?(battle_enemy)
+    data = BuffEffectService.battle_effects(battle_enemy)
+    return false unless data.delete(BACKSTEP_ACTION_SKIP_KEY)
+
+    battle_enemy.battle_effects = data.to_json
+    battle_enemy.save!
+    true
   end
 
   def self.encircled?(battle)
@@ -536,7 +576,7 @@ end
     player_agility = (player.effective_agility * BuffEffectService.agility_multiplier(player)).round
     agility_gap = player_agility - mob_effective_agility(battle_enemy)
     part_modifier = part.weakness? ? -10 : 0
-    ambush_bonus = battle_enemy.battle.ambush? ? 15 : 0
+    ambush_bonus = player_ambush_opening?(battle_enemy.battle) ? 15 : 0
 
     return true if BuffEffectService.sure_hit?(player)
 

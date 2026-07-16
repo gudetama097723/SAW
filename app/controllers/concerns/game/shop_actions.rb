@@ -260,6 +260,47 @@ module Game
         end
       end
 
+      if params[:repair_all] == "1" && !self_maintenance
+        unless params[:confirm_repair] == "1"
+          redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), alert: "整備する内容を確認してください。"
+          return
+        end
+
+        context = BlacksmithService.context_for(player, mode: "npc")
+        weapons = player.weapons.select do |weapon|
+          weapon.durability.to_i < weapon.effective_max_durability &&
+            context && context.proficiency >= weapon.maintenance_level.to_i
+        end
+        armors = player.armors.select { |armor| armor.repair_cost.positive? }
+        equipment = weapons + armors
+        if equipment.empty?
+          redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), alert: "整備できる装備がありません。"
+          return
+        end
+
+        weapon_fees = weapons.sum { |weapon| (weapon.repair_cost * context.fee_multiplier(:maintenance)).round }
+        total_fee = weapon_fees + armors.sum(&:repair_cost)
+        if player.col.to_i < total_fee
+          redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), alert: "コルが足りません。整備には#{total_fee}コル必要です。"
+          return
+        end
+
+        ActiveRecord::Base.transaction do
+          player.lock!
+          weapons.each(&:lock!)
+          armors.each(&:lock!)
+          player.col = player.col.to_i - total_fee
+          player.advance_time!(20 * equipment.size)
+          weapons.each { |weapon| weapon.update!(durability: weapon.effective_max_durability) }
+          armors.each { |armor| armor.update!(durability: armor.max_durability) }
+          player.save!
+        end
+
+        repaired_names = equipment.map { |item| item.respond_to?(:display_name) ? item.display_name : item.name }.join("、")
+        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), notice: "鍛冶屋で#{repaired_names}をまとめて整備した。#{total_fee}コル支払った。"
+        return
+      end
+
       if params[:armor_id].present? && params[:smith_mode].to_s != "player"
         armor = player.armors.find_by(id: params[:armor_id])
         unless armor&.repair_cost.to_i&.positive?

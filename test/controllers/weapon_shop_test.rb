@@ -101,9 +101,49 @@ class WeaponShopTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_not_includes response.body, "武器を購入する"
 
+    get game_path, params: { panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc" }
+    assert_response :success
+    assert_includes response.body, "防具整備"
+    assert_includes response.body, armor.name
+    assert_includes response.body, "耐久 20 / 100"
+
     post blacksmith_path, params: { armor_id: armor.id, confirm_repair: "1" }
     assert_redirected_to game_path(panel: "blacksmith", blacksmith_menu: "repair")
     assert_equal 100, armor.reload.durability
+  end
+
+  test "blacksmith repairs all damaged weapons and armor together" do
+    @player.town_discovery_for.update!(found_blacksmith: true)
+    Npc.create!(
+      code: "bulk_repair_blacksmith",
+      name: "一括整備鍛冶師",
+      npc_type: "blacksmith",
+      placement_type: "facility",
+      facility_key: "blacksmith",
+      location: @location,
+      blacksmith_base_proficiency: 100,
+      blacksmith_max_proficiency: 200
+    )
+    weapon = @player.weapons.create!(name: "一括整備剣", weapon_type: "片手直剣", durability: 40, max_durability: 100, maintenance_level: 0)
+    armor = @player.armors.create!(name: "一括整備鎧", armor_type: "革鎧", slot: "body", durability: 20, max_durability: 100)
+    col_before = @player.col
+
+    get game_path, params: { panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc" }
+    assert_response :success
+    assert_includes response.body, "すべて整備する"
+
+    get game_path, params: { panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc", confirm_repair_all: "1" }
+    assert_response :success
+    assert_includes response.body, "すべて整備しますか？"
+    assert_includes response.body, "対象: 2点"
+
+    post blacksmith_path, params: { repair_all: "1", confirm_repair: "1", smith_mode: "npc" }
+
+    assert_redirected_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc")
+    assert_equal weapon.effective_max_durability, weapon.reload.durability
+    assert_equal armor.max_durability, armor.reload.durability
+    assert_operator @player.reload.col, :<, col_before
+    assert_includes flash[:notice], "まとめて整備した"
   end
 
   test "blacksmith information can enter conversation with its facility npc" do

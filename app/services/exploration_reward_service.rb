@@ -136,7 +136,7 @@ class ExplorationRewardService
     return Result.new(status: :error, message: "#{mob.name}はすでに討伐済みです。") if state.defeated?
     return Result.new(status: :error, message: "この場所からは#{mob.name}に挑めません。") unless boss_challengeable_here?(player, mob)
 
-    battle = FieldService.create_battle!(player, [mob], ambush: true)
+    battle = FieldService.create_battle!(player, [mob])
     Result.new(status: :ok, message: "#{mob.name}に挑んだ！", battle: battle)
   end
 

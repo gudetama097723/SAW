@@ -105,7 +105,7 @@ class FieldService
     event = rand(100)
 
     if event < gather_encounter_chance(player)
-      battle = create_battle!(player, encounter_mobs_for(player))
+      battle = create_battle!(player, encounter_mobs_for(player), initiative_type: "enemy_ambush")
       message = "採取中に#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}と遭遇した！"
     elsif event < 75
       gathered = GatheringCatalog.roll_item(player)
@@ -130,7 +130,7 @@ class FieldService
 
     if rand(100) < 85
       ambush = hunt_ambush?(player)
-      battle = create_battle!(player, encounter_mobs_for(player), ambush: ambush)
+      battle = create_battle!(player, encounter_mobs_for(player), initiative_type: ambush ? "player_ambush" : "normal")
       message = "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}を発見した！"
       message += "先制攻撃のチャンス！" if ambush
     else
@@ -151,7 +151,7 @@ class FieldService
 
     player.rests.destroy_all
     destroyed_tent = destroy_best_portable_tent!(player)
-    battle = create_battle!(player, mobs)
+    battle = create_battle!(player, mobs, initiative_type: "enemy_ambush")
     tent_message = destroyed_tent ? "#{destroyed_tent.name}を壊された！" : ""
     Result.new(status: :encounter, message: "休憩中に#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に見つかった！#{tent_message}", battle: battle)
   end
@@ -163,7 +163,7 @@ class FieldService
     mobs = encounter_mobs_for(player)
     return Result.new(status: :none) if mobs.empty?
 
-    battle = create_battle!(player, mobs)
+    battle = create_battle!(player, mobs, initiative_type: "enemy_ambush")
     Result.new(status: :encounter, message: "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に見つかった！", battle: battle)
   end
 
@@ -187,7 +187,7 @@ class FieldService
       mobs = encounter_mobs_for(player)
       return Result.new(status: :none) if mobs.empty?
 
-      battle = create_battle!(player, mobs, ambush: true)
+      battle = create_battle!(player, mobs, initiative_type: "enemy_ambush")
       enemy_result = BattleService.apply_enemy_attack!(player, battle, prefix: "麻痺で動けないところを襲われた！", allow_evasion: false)
       return Result.new(status: :defeated, message: enemy_result.message, battle: battle) if enemy_result.status == :defeated
 
@@ -213,14 +213,14 @@ class FieldService
       mobs = encounter_mobs_for(player)
       return Result.new(status: :none) if mobs.empty?
 
-      battle = create_battle!(player, mobs, ambush: true)
+      battle = create_battle!(player, mobs, initiative_type: "enemy_ambush")
       return Result.new(status: :encounter, message: "眠っているところを#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}に襲われた！", battle: battle)
     end
 
     nil
   end
 
-  def self.create_battle!(player, mobs, ambush: false)
+  def self.create_battle!(player, mobs, ambush: false, initiative_type: nil)
     encounters = Array(mobs).compact.map { |entry| normalize_encounter(entry, player) }.compact
     encounters = expand_pack_leader_encounter(encounters, player)
     first_mob = encounters.first&.mob
@@ -230,8 +230,9 @@ class FieldService
     BuffEffectService.clear_battle_effects!(player)
     player.save!
     first_level = encounters.first.level
-    battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp_for_level(first_level), ambush: ambush)
-    initial_distance = ambush ? "near" : "middle"
+    initiative_type = normalize_initiative_type(initiative_type, ambush)
+    battle = Battle.create!(player: player, mob: first_mob, enemy_hp: first_mob.hp_for_level(first_level), ambush: initiative_type == "player_ambush", initiative_type: initiative_type)
+    initial_distance = initial_battle_distance(initiative_type)
     encounters.first(5).each.with_index(1) do |encounter, position|
       mob = encounter.mob
       enemy_level = encounter.level
@@ -273,6 +274,24 @@ class FieldService
     attrs[:enemy_level] = enemy_level if probe.has_attribute?(:enemy_level)
     attrs[:distance] = distance if probe.has_attribute?(:distance)
     attrs
+  end
+
+  def self.normalize_initiative_type(initiative_type, ambush)
+    value = initiative_type.to_s.presence
+    return value if Battle::INITIATIVE_TYPES.include?(value)
+
+    ambush ? "enemy_ambush" : "normal"
+  end
+
+  def self.initial_battle_distance(initiative_type)
+    case initiative_type.to_s
+    when "player_ambush"
+      "far"
+    when "enemy_ambush"
+      "near"
+    else
+      "middle"
+    end
   end
 
   def self.encounter_mobs_for(player_or_route)

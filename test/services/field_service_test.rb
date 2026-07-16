@@ -359,6 +359,18 @@ class FieldServiceTest < ActiveSupport::TestCase
     battle = FieldService.create_battle!(player, [mob], ambush: true)
 
     assert_equal ["near"], battle.battle_enemies.map(&:distance)
+    assert_equal "enemy_ambush", battle.initiative_type
+  end
+
+  test "hunt ambush starts enemies at far distance with player initiative" do
+    player = players(:one)
+    mob = mobs(:one)
+
+    battle = FieldService.create_battle!(player, [mob], initiative_type: "player_ambush")
+
+    assert battle.ambush?
+    assert_equal "player_ambush", battle.initiative_type
+    assert_equal ["far"], battle.battle_enemies.map(&:distance)
   end
 
   test "field bosses use the same level based display and stats" do

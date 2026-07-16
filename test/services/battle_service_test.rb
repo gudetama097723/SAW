@@ -113,6 +113,37 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_equal 50, enemy.enemy_hp
   end
 
+  test "player hunt ambush opening closes from far distance before attacking once" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
+    player.weapons.destroy_all
+    player.weapons.create!(name: "狩り奇襲剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+    BuffEffectService.apply_battle_effect!(player, "test_sure_hit", { sure_hit: true }, turns: 1)
+    mob = Mob.create!(name: "狩り奇襲mob", hp: 80, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 80, ambush: true, initiative_type: "player_ambush")
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 80, enemy_level: 1, position: 1, distance: "far")
+
+    result = BattleService.resolve_player_attack!(
+      battle: battle,
+      player: player,
+      mob_part_id: nil,
+      target_enemy_id: enemy.id,
+      label: "通常攻撃",
+      damage_multiplier: 100,
+      durability_cost: 1,
+      skill_gain: 0,
+      stiffness: false,
+      hits: 1,
+      sword_skill: false,
+      attack_attribute: "斬撃"
+    )
+
+    assert_equal :ok, result.status
+    assert_includes result.message, "遠距離→近距離"
+    assert_equal "near", enemy.reload.distance
+    assert_not battle.reload.ambush?
+  end
+
   test "backstep is blocked when surrounded by nearby enemies" do
     player = players(:one)
     player.update!(hp: 100, max_hp: 100, agility: 10)
@@ -126,6 +157,27 @@ class BattleServiceTest < ActiveSupport::TestCase
 
     assert_equal :error, result.status
     assert_includes result.message, "囲まれていて距離を取れません"
+  end
+
+  test "successful backstep makes target enemy miss its immediate action" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, agility: 20)
+    mob = Mob.create!(name: "後退確認mob", hp: 30, atk: 20, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 30)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 1, position: 1, distance: "near")
+
+    BattleService.singleton_class.define_method(:rand) { |_range| 0 }
+    begin
+      result = BattleService.resolve_backstep!(player, battle, target_enemy_id: enemy.id)
+
+      assert_equal :ok, result.status
+      assert_includes result.message, "バックステップ"
+      assert_includes result.message, "踏み込みが間に合わなかった"
+      assert_equal "middle", enemy.reload.distance
+      assert_equal 100, player.reload.hp
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
   end
 
   test "evasive action raises evasion chance and consumes enemy attack turn" do
