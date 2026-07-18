@@ -12,7 +12,7 @@ module Game
         return
       end
 
-      temporary_only = location.name == "ヒルテンドルフ"
+      temporary_only = location.temporary_base_allowed?
       base_type = temporary_only ? "temporary" : "home"
       base_label = temporary_only ? "仮拠点" : "本拠点"
 
@@ -353,7 +353,7 @@ module Game
     end
 
     def current_inn_base_for(player)
-      base_type = player.location&.name == "ヒルテンドルフ" ? "temporary" : "home"
+      base_type = player.location&.temporary_base_allowed? ? "temporary" : "home"
       player.player_bases.find_by(location: player.location, base_type: base_type, active: true)
     end
 

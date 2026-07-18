@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_15_002000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_18_000003) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -129,6 +129,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_15_002000) do
     t.integer "mapping_progress", default: 0, null: false
     t.string "name"
     t.boolean "safe_area"
+    t.boolean "temporary_base_allowed", default: false, null: false
     t.datetime "updated_at", null: false
     t.string "weather", default: "clear", null: false
   end
@@ -416,6 +417,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_15_002000) do
     t.integer "exp", default: 0, null: false
     t.integer "field_position", default: 0, null: false
     t.integer "field_route_id"
+    t.integer "field_route_origin_position"
+    t.integer "field_route_origin_route_id"
     t.integer "floor"
     t.boolean "found_blacksmith", default: false, null: false
     t.boolean "found_inn", default: false, null: false
@@ -439,6 +442,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_15_002000) do
     t.integer "strength", default: 1, null: false
     t.datetime "updated_at", null: false
     t.integer "user_id"
+    t.index ["field_route_origin_route_id"], name: "index_players_on_field_route_origin_route_id"
     t.index ["location_id"], name: "index_players_on_location_id"
     t.index ["user_id"], name: "index_players_on_user_id"
   end
@@ -459,9 +463,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_15_002000) do
     t.string "name", default: "名もなき道", null: false
     t.integer "to_location_id", null: false
     t.integer "travel_time"
+    t.integer "unlock_field_area_id"
+    t.integer "unlock_required_mapping", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["from_location_id"], name: "index_routes_on_from_location_id"
     t.index ["to_location_id"], name: "index_routes_on_to_location_id"
+    t.index ["unlock_field_area_id"], name: "index_routes_on_unlock_field_area_id"
   end
 
   create_table "skills", force: :cascade do |t|

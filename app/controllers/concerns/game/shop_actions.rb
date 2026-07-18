@@ -294,8 +294,9 @@ module Game
           return
         end
 
-        weapon_fees = weapons.sum { |weapon| (weapon.repair_cost * context.fee_multiplier(:maintenance)).round }
-        armor_fees = armors.sum { |armor| (armor.repair_cost * context.fee_multiplier(:maintenance)).round }
+        maintenance_fee_multiplier = context&.fee_multiplier(:maintenance) || 1
+        weapon_fees = weapons.sum { |weapon| (weapon.repair_cost * maintenance_fee_multiplier).round }
+        armor_fees = armors.sum { |armor| (armor.repair_cost * maintenance_fee_multiplier).round }
         total_fee = weapon_fees + armor_fees
         if player.col.to_i < total_fee
           redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), alert: "刻銭が足りません。整備には#{total_fee}刻銭必要です。"

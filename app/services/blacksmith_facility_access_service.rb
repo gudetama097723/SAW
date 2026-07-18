@@ -23,6 +23,7 @@ class BlacksmithFacilityAccessService
   def self.executor_available?(player, context)
     return false unless context
     return context.player == player if context.player?
+    return context.player == player && available?(player) if context.facility?
 
     context.player == player && npc_available?(player, context.npc)
   end

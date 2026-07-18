@@ -144,7 +144,7 @@ module Game
         return
       end
 
-      base_type = player.location&.name == "ヒルテンドルフ" ? "temporary" : "home"
+      base_type = player.location&.temporary_base_allowed? ? "temporary" : "home"
       current_inn_base = player.player_bases.find_by(location: player.location, base_type: base_type, active: true)
       cost = current_inn_base ? 0 : inn_cost_for(player.location)
       if player.col.to_i < cost

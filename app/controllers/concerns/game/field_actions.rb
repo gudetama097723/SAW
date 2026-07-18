@@ -140,9 +140,15 @@ module Game
         return
       end
 
-      # すでにフィールド上にいる場合：フィールド内を進む
-      unless player.field_route == route
-        redirect_to game_path, notice: "現在進行中のフィールド以外には移動できない。"
+      # すでにフィールド上にいる場合：分岐先ルートへ切り替える
+      if player.field_route != route
+        player.field_route_origin_route_id = player.field_route_id
+        player.field_route_origin_position = player.field_position
+        player.field_route = route
+        player.field_position = 0
+        player.advance_time!(5)
+        player.save!
+        redirect_to game_path, notice: "#{route.name}へ入った。"
         return
       end
 
@@ -153,12 +159,10 @@ module Game
       reached_destination = FieldService.destination_reached?(player, route)
 
       if direction == "backward" && player.field_position.to_i <= 0
-        player.location = route.from_location
-        player.field_route = nil
-        player.field_position = 0
+        destination_name = exit_field_route_backward!(player, route)
         player.advance_time!(5)
         player.save!
-        redirect_to game_path, notice: "#{route.from_location.name}へ戻った。5分経過した。"
+        redirect_to game_path, notice: "#{destination_name}へ戻った。5分経過した。"
         return
       end
 
@@ -193,7 +197,7 @@ module Game
 
       direction_text =
         if direction == "backward"
-          route.from_location.name
+          route.backward_destination_name
         elsif direction == "area"
           FieldService.current_area_for(player)&.name || "探索済みエリア"
         else
@@ -204,12 +208,10 @@ module Game
       player.advance_time!(elapsed_time)
 
       if player.field_position <= 0
-        player.location = route.from_location
-        player.field_route = nil
-        player.field_position = 0
+        destination_name = exit_field_route_backward!(player, route)
         player.save!
 
-        redirect_to game_path, notice: "#{route.from_location.name}へ到着した。#{elapsed_time}分経過した。"
+        redirect_to game_path, notice: "#{destination_name}へ到着した。#{elapsed_time}分経過した。"
         return
       end
 
@@ -224,6 +226,8 @@ module Game
         player.location = route.to_location
         player.field_route = nil
         player.field_position = 0
+        player.field_route_origin_route_id = nil
+        player.field_route_origin_position = nil
         FieldService.route_progress_for(player, route).update!(reached_destination: true)
         player.save!
 
@@ -259,6 +263,30 @@ module Game
     end
 
     private
+
+    def exit_field_route_backward!(player, route)
+      if player.field_route_origin_route_id.present?
+        origin_route = Route.find(player.field_route_origin_route_id)
+        origin_position = player.field_route_origin_position.to_i
+        player.field_route = origin_route
+        player.field_position = origin_position
+        player.field_route_origin_route_id = nil
+        player.field_route_origin_position = nil
+        return origin_route.name
+      end
+
+      if route.locked?
+        branch_area = route.unlock_field_area
+        player.field_route = branch_area.route
+        player.field_position = branch_area.start_distance
+        return branch_area.route.name
+      end
+
+      player.location = route.from_location
+      player.field_route = nil
+      player.field_position = 0
+      route.from_location.name
+    end
 
     def append_npc_discovery_message(message, npc_discovery)
       return message unless npc_discovery&.discovered?

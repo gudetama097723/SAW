@@ -17,13 +17,38 @@ class FieldService
   }.freeze
 
   def self.available_routes_for(player)
-    location = player&.location
+    return [] unless player
+
+    if player.field_route.present?
+      return [player.field_route] + branch_routes_from_current_area(player)
+    end
+
+    location = player.location
     return [] unless location
-    return [player.field_route].compact if player.field_route.present?
 
     Route.includes(:from_location, :to_location).select do |route|
-      route.from_location == location || route.to_location == location
+      if route.locked?
+        # 分岐ルートはfrom_locationを技術上の便宜値として持つのみで、そこから直接
+        # 進入することはできない。到達済みの終端(to_location)からの帰路としてのみ現れる。
+        route.to_location == location
+      else
+        route.from_location == location || route.to_location == location
+      end
     end
+  end
+
+  def self.route_unlocked?(player, route)
+    return true unless route.unlock_field_area_id
+
+    progress = player.progress_for_area(route.unlock_field_area)
+    progress.mapping_progress.to_i >= route.unlock_required_mapping.to_i
+  end
+
+  def self.branch_routes_from_current_area(player)
+    area = current_area_for(player)
+    return [] unless area
+
+    Route.where(unlock_field_area: area).select { |route| route_unlocked?(player, route) }
   end
 
   def self.explore!(player)

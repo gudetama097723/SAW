@@ -152,6 +152,19 @@ class WeaponShopTest < ActionDispatch::IntegrationTest
     assert_includes flash[:notice], "まとめて整備した"
   end
 
+  test "bulk blacksmith repair handles weapons and armor when no npc blacksmith is available" do
+    @player.town_discovery_for.update!(found_blacksmith: true)
+    weapon = @player.weapons.create!(name: "NPC不在整備剣", weapon_type: "片手直剣", durability: 40, max_durability: 100, maintenance_level: 0)
+    armor = @player.armors.create!(name: "NPC不在整備鎧", armor_type: "革鎧", slot: "body", durability: 20, max_durability: 100)
+
+    post blacksmith_path, params: { repair_all: "1", confirm_repair: "1", smith_mode: "npc" }
+
+    assert_redirected_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc")
+    assert_equal weapon.effective_max_durability, weapon.reload.durability
+    assert_equal armor.max_durability, armor.reload.durability
+    assert_includes flash[:notice], "まとめて整備した"
+  end
+
   test "blacksmith information can enter conversation with its facility npc" do
     @player.town_discovery_for.update!(found_blacksmith: true)
     npc = Npc.create!(

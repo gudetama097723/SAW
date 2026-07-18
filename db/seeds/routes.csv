@@ -1,3 +1,4 @@
-﻿name,from,to,travel_time,danger_level,distance,mapping_difficulty
-ゆりかごの野,ヴィーゲンブルク,ヒルテンドルフ,30,20,150,1.00
-静寂の森,ヒルテンドルフ,次の町,40,30,150,1.35
+﻿name,from,to,travel_time,danger_level,distance,mapping_difficulty,unlock_route,unlock_field_area,unlock_required_mapping
+ゆりかごの野,ヴィーゲンブルク,ヒルテンドルフ,30,20,150,1.00,,,
+静寂の森,ヒルテンドルフ,次の町,40,30,150,1.35,,,
+骨石の岩場,ヴィーゲンブルク,エルツドルフ,35,25,150,1.15,ゆりかごの野,整備された街道,70

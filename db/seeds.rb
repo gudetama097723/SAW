@@ -22,6 +22,7 @@ seed_rows("locations.csv") do |row|
     danger_level: to_int(row["danger_level"]),
     safe_area: to_bool(row["safe_area"]),
     has_blacksmith_facility: to_bool(row["has_blacksmith_facility"]),
+    temporary_base_allowed: to_bool(row["temporary_base_allowed"]),
     weather: row["weather"].presence || "clear",
     environment: row["environment"].presence || "normal"
   )
@@ -53,6 +54,18 @@ seed_rows("field_areas.csv") do |row|
     required_mapping_to_enter_next: to_int(row["required_mapping_to_enter_next"]) || 30,
     required_mapping_to_reach_town: to_int(row["required_mapping_to_reach_town"]) || 0,
     description: row["description"].presence
+  )
+end
+
+seed_rows("routes.csv") do |row|
+  next if row["unlock_route"].blank? || row["unlock_field_area"].blank?
+
+  route = routes.fetch(row["name"])
+  unlock_route = routes.fetch(row["unlock_route"])
+  unlock_area = unlock_route.field_areas.find_by!(name: row["unlock_field_area"])
+  route.update!(
+    unlock_field_area: unlock_area,
+    unlock_required_mapping: to_int(row["unlock_required_mapping"]) || 0
   )
 end
 
@@ -179,6 +192,12 @@ seed_rows("mobs.csv") do |row|
 end
 
 mobs.merge!(Mob.where.not(name: mobs.keys).index_by(&:name))
+
+seed_rows("boss_mobs.csv") do |row|
+  next if mobs.key?(row["name"])
+
+  mobs[row["name"]] = Mob.find_or_create_by!(name: row["name"])
+end
 
 seed_rows("mob_parts.csv") do |row|
   mob = mobs.fetch(row["mob"])

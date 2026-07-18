@@ -48,9 +48,10 @@
   <% elsif blacksmith_menu == "repair" %>
     <% damaged_weapons = @player.weapons.select { |weapon| weapon.durability.to_i < weapon.effective_max_durability } %>
     <% damaged_armors = @player.armors.select { |armor| armor.repair_cost.positive? } %>
+    <% maintenance_fee_multiplier = context&.fee_multiplier(:maintenance) || 1 %>
     <% bulk_weapons = smith_mode == "npc" && context ? damaged_weapons.select { |weapon| context.proficiency >= weapon.maintenance_level.to_i } : [] %>
     <% bulk_equipment_count = bulk_weapons.size + damaged_armors.size %>
-    <% bulk_repair_cost = bulk_weapons.sum { |weapon| (weapon.repair_cost * context.fee_multiplier(:maintenance)).round } + damaged_armors.sum(&:repair_cost) %>
+    <% bulk_repair_cost = bulk_weapons.sum { |weapon| (weapon.repair_cost * maintenance_fee_multiplier).round } + damaged_armors.sum { |armor| (armor.repair_cost * maintenance_fee_multiplier).round } %>
     <% if smith_mode == "npc" && bulk_equipment_count.positive? %>
       <% if params[:confirm_repair_all] == "1" %>
         <div class="border border-warning rounded p-2 mb-3">

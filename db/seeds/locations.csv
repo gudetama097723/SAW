@@ -1,6 +1,8 @@
-﻿name,floor,danger_level,safe_area,has_blacksmith_facility,weather,environment
-ヴィーゲンブルク,1,0,TRUE,TRUE,clear,normal
-ヒルテンドルフ,1,0,TRUE,TRUE,clear,normal
-次の町,1,0,TRUE,TRUE,clear,normal
-ゆりかごの野,1,20,FALSE,FALSE,clear,normal
-静寂の森,1,30,FALSE,FALSE,fog,deep_fog
+﻿name,floor,danger_level,safe_area,has_blacksmith_facility,temporary_base_allowed,weather,environment
+ヴィーゲンブルク,1,0,TRUE,TRUE,FALSE,clear,normal
+ヒルテンドルフ,1,0,TRUE,TRUE,TRUE,clear,normal
+次の町,1,0,TRUE,TRUE,FALSE,clear,normal
+エルツドルフ,1,0,TRUE,TRUE,TRUE,clear,normal
+ゆりかごの野,1,20,FALSE,FALSE,FALSE,clear,normal
+静寂の森,1,30,FALSE,FALSE,FALSE,fog,deep_fog
+骨石の岩場,1,25,FALSE,FALSE,FALSE,clear,normal

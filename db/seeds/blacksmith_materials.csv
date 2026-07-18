@@ -7,6 +7,7 @@
 硬い甲殻,monster_material,40,0,0,0,0,4,durable|heavy|break,1.00,1.20,1.15,5,,0,0
 厚い甲殻,monster_material,80,0,0,0,0,8,durable|heavy|break,1.00,1.25,1.20,7,,0,0
 狼王の牙,monster_material,120,0,0,0,0,15,sharp|attack|light|rare|named_material,1.18,1.00,0.90,2,,0,0
+亀甲片,monster_material,60,0,0,0,0,5,durable|heavy|break,1.00,1.22,1.12,6,,0,0
 精錬石,support_material,20,0,0,0,0,2,,1.00,1.00,1.00,0,attack,0.10,0.00
 硬化樹液,support_material,30,0,0,0,0,3,,1.00,1.00,1.00,0,durability,0.10,0.00
 軽銀粉,support_material,80,0,0,0,0,8,,1.00,1.00,1.00,0,weight,0.10,0.05

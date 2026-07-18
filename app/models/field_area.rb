@@ -4,6 +4,7 @@ class FieldArea < ApplicationRecord
   has_many :boss_mobs, class_name: "Mob", dependent: :nullify
   has_many :npcs, dependent: :nullify
   has_many :player_field_area_progresses, dependent: :destroy
+  has_many :unlocked_routes, class_name: "Route", foreign_key: :unlock_field_area_id, dependent: :nullify, inverse_of: :unlock_field_area
 
   scope :ordered, -> { order(:start_distance, :end_distance) }
 

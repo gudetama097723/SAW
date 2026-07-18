@@ -33,3 +33,15 @@
 蒼狼フェンリル,前脚,85,FALSE,72,strength_down,,0,打撃
 蒼狼フェンリル,後脚,75,FALSE,64,agility_down,,0,刺突
 蒼狼フェンリル,尾,70,FALSE,58,,狼王の牙,18,斬撃
+石殻亀,甲羅,105,TRUE,22,strength_down,亀甲片,40,打撃
+石殻亀,頭,80,FALSE,10,,,0,刺突
+石殻亀,脚,75,FALSE,12,agility_down,,0,斬撃
+砂搔き鼬,胴体,100,TRUE,10,,砂搔き鼬の毛皮,40,斬撃
+砂搔き鼬,脚,75,FALSE,7,agility_down,,0,刺突
+岩喰い蟲,腹殻,110,TRUE,14,,鋭鉄鉱,15,刺突
+岩喰い蟲,頭,85,FALSE,9,,,0,打撃
+岩喰い蟲,脚,75,FALSE,9,agility_down,,0,斬撃
+砕けぬ番人,頭部の核,120,TRUE,90,strength_down,磨り減った認識票,60,打撃
+砕けぬ番人,胴体,85,FALSE,110,,亀甲片,30,打撃
+砕けぬ番人,右腕,85,FALSE,65,strength_down,,0,打撃
+砕けぬ番人,脚部,80,FALSE,75,agility_down,,0,打撃

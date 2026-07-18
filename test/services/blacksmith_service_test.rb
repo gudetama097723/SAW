@@ -27,4 +27,19 @@ class BlacksmithServiceTest < ActiveSupport::TestCase
     assert_equal 80, BlacksmithService.proficiency_for(player, blacksmith)
     assert_equal 4, BlacksmithService.success_bonus_for(player, blacksmith)
   end
+
+  test "npc mode falls back to facility default context when no npc blacksmith exists" do
+    player = players(:one)
+    location = Location.create!(name: "施設標準鍛冶試験の町", floor: 1, danger_level: 0, safe_area: true, has_blacksmith_facility: true)
+    player.update!(location: location, field_route: nil)
+
+    context = BlacksmithService.context_for(player, mode: "npc")
+
+    assert context.facility?
+    assert_not context.player?
+    assert_not context.npc?
+    assert_equal "鍛冶屋", context.name
+    assert_equal 1.0, context.fee_multiplier(:maintenance)
+    assert_equal BlacksmithService.proficiency_cap_for_floor(location.floor), context.proficiency
+  end
 end

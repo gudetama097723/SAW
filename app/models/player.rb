@@ -42,6 +42,7 @@
   belongs_to :user, optional: true
   belongs_to :location, optional: true
   belongs_to :field_route, class_name: "Route", optional: true
+  belongs_to :field_route_origin_route, class_name: "Route", optional: true
   has_many :player_field_area_progresses, dependent: :destroy
   has_many :field_areas, through: :player_field_area_progresses
   has_many :player_treasure_chests, dependent: :destroy

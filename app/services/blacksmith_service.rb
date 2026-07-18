@@ -1,19 +1,27 @@
 class BlacksmithService
-  Context = Struct.new(:player, :npc, :proficiency, keyword_init: true) do
+  Context = Struct.new(:player, :npc, :proficiency, :facility_default, keyword_init: true) do
     def player?
-      npc.nil?
+      npc.nil? && !facility?
     end
 
     def npc?
       npc.present?
     end
 
+    def facility?
+      facility_default == true
+    end
+
     def name
-      player? ? player.name : npc.name
+      return player.name if player?
+      return npc.name if npc?
+
+      "鍛冶屋"
     end
 
     def fee_multiplier(action)
       return 0.0 if player?
+      return 1.0 if facility?
 
       attribute = {
         craft: :craft_fee_multiplier,
@@ -50,9 +58,13 @@ class BlacksmithService
       Context.new(player: player, proficiency: skill.proficiency.to_i.clamp(0, 1000))
     else
       npc = blacksmith || current_for(player)
-      return unless BlacksmithFacilityAccessService.npc_available?(player, npc)
+      if npc
+        return unless BlacksmithFacilityAccessService.npc_available?(player, npc)
 
-      Context.new(player: player, npc: npc, proficiency: npc.blacksmith_proficiency_for(player))
+        Context.new(player: player, npc: npc, proficiency: npc.blacksmith_proficiency_for(player))
+      elsif BlacksmithFacilityAccessService.available?(player)
+        Context.new(player: player, proficiency: proficiency_cap_for_floor(player.floor), facility_default: true)
+      end
     end
   end
 

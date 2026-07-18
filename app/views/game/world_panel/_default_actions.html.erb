@@ -140,7 +140,7 @@
         <% destination_reached = route_progress&.reached_destination? %>
         <% next_discovered_area = FieldService.next_discovered_area_for(@player, route) %>
 
-        <%= button_to "#{route.from_location.name}方面へ戻る",
+        <%= button_to "#{route.backward_destination_name}方面へ戻る",
             move_path(route_id: route.id, direction: "backward"),
             method: :post,
             class: "btn btn-outline-warning w-100" %>
@@ -159,6 +159,14 @@
 
         <% unless destination_discovered %>
           <div class="small text-secondary">周辺を探索して道筋を探そう</div>
+        <% end %>
+
+        <% branch_routes = (@routes || []).reject { |branch| branch == route } %>
+        <% branch_routes.each do |branch| %>
+          <%= button_to "#{branch.name}へ入る（分岐路）",
+              move_path(route_id: branch.id),
+              method: :post,
+              class: "btn btn-outline-info w-100" %>
         <% end %>
       <% elsif @routes.present? %>
         <% @routes.each do |route| %>
