@@ -25,20 +25,20 @@ class BattleServiceTest < ActiveSupport::TestCase
 
     assert_equal :ok, result.status
     assert_includes result.message, "素手攻撃！"
-    assert_match(/\[reward\].*コル獲得！.*経験値を 10 獲得した！.*\[\/reward\]/m, result.message)
+    assert_match(/\[reward\].*刻銭獲得！.*経験値を 10 獲得した！.*\[\/reward\]/m, result.message)
   end
 
   test "sword skill requires equipped weapon" do
     player = players(:one)
     player.weapons.destroy_all
-    mob = Mob.create!(name: "ソードスキル制限テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    mob = Mob.create!(name: "錬技制限テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
     battle = player.battles.create!(mob: mob, enemy_hp: 10)
 
     result = BattleService.resolve_player_attack!(
       battle: battle,
       player: player,
       mob_part_id: nil,
-      label: "バーチカル",
+      label: "カデーレ",
       damage_multiplier: 150,
       durability_cost: 2,
       skill_gain: 3,
@@ -49,7 +49,7 @@ class BattleServiceTest < ActiveSupport::TestCase
     )
 
     assert_equal :error, result.status
-    assert_includes result.message, "武器を装備していないため、ソードスキルは使用できません。"
+    assert_includes result.message, "武器を装備していないため、錬技は使用できません。"
   end
 
   test "near reach weapon closes from middle distance before attacking" do
@@ -213,7 +213,7 @@ class BattleServiceTest < ActiveSupport::TestCase
       battle: battle,
       player: player,
       mob_part_id: nil,
-      label: "バーチカル",
+      label: "カデーレ",
       damage_multiplier: 100,
       durability_cost: 1,
       skill_gain: 1,
@@ -233,7 +233,7 @@ class BattleServiceTest < ActiveSupport::TestCase
       battle: battle.reload,
       player: player,
       mob_part_id: nil,
-      label: "ホリゾンタル",
+      label: "セカーレ",
       damage_multiplier: 100,
       durability_cost: 1,
       skill_gain: 1,
@@ -246,7 +246,7 @@ class BattleServiceTest < ActiveSupport::TestCase
     )
 
     assert_equal :error, blocked.status
-    assert_includes blocked.message, "ソードスキル発動後の反動"
+    assert_includes blocked.message, "錬技発動後の反動"
     assert_equal 99, weapon.reload.durability
 
     normal_attack = BattleService.resolve_player_attack!(
@@ -281,7 +281,7 @@ class BattleServiceTest < ActiveSupport::TestCase
       battle: battle,
       player: player,
       mob_part_id: nil,
-      label: "バーチカル",
+      label: "カデーレ",
       damage_multiplier: 100,
       durability_cost: 1,
       skill_gain: 1,
@@ -295,7 +295,7 @@ class BattleServiceTest < ActiveSupport::TestCase
 
     assert_equal :ok, result.status
     assert_not_includes result.message, "[enemy]硬直反撃テストmobの攻撃！"
-    assert_includes result.message, "[enemy]ソードスキル後の硬直中、硬直反撃テストmobの攻撃！"
+    assert_includes result.message, "[enemy]錬技後の硬直中、硬直反撃テストmobの攻撃！"
   end
 
   test "normal attack reduces sword skill cooldown" do
@@ -575,9 +575,9 @@ class BattleServiceTest < ActiveSupport::TestCase
 
     skill_names = BattleService.enemy_sword_skills_for(enemy).map(&:name)
 
-    assert_equal ["バーチカル", "ホリゾンタル"], skill_names
-    assert_not_includes skill_names, "バーチカルアーク"
-    assert_not_includes skill_names, "ホリゾンタルアーク"
+    assert_equal ["カデーレ", "セカーレ"], skill_names
+    assert_not_includes skill_names, "ビス・カデーレ"
+    assert_not_includes skill_names, "ビス・セカーレ"
   end
 
   test "armed enemies without learned sword skills do not use sword skills" do
@@ -601,7 +601,7 @@ class BattleServiceTest < ActiveSupport::TestCase
       BattleService.singleton_class.remove_method(:rand)
     end
 
-    assert_includes ["バーチカル", "ホリゾンタル"], skill.name
+    assert_includes ["カデーレ", "セカーレ"], skill.name
   end
 
   test "configured enemy sword skill keys define learned skills for future floor bosses" do
@@ -623,7 +623,7 @@ class BattleServiceTest < ActiveSupport::TestCase
 
     skill_names = BattleService.enemy_sword_skills_for(enemy).map(&:name)
 
-    assert_equal ["ホリゾンタルアーク"], skill_names
+    assert_equal ["ビス・セカーレ"], skill_names
   end
 
   test "armed enemy cannot use sword skills when weapon arm is broken" do
@@ -655,7 +655,7 @@ class BattleServiceTest < ActiveSupport::TestCase
     player = players(:one)
     player.update!(hp: 100, max_hp: 100, agility: 0)
     player.weapons.destroy_all
-    mob = Mob.create!(name: "ソードスキル使用mob", hp: 30, atk: 10, rarity: "normal", level: 10, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0, enemy_sword_skill_keys: "vertical|horizontal")
+    mob = Mob.create!(name: "錬技使用mob", hp: 30, atk: 10, rarity: "normal", level: 10, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0, enemy_sword_skill_keys: "vertical|horizontal")
     mob.weapons.create!(name: "敵用ショートソード", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
     battle = player.battles.create!(mob: mob, enemy_hp: 30)
     battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 10, position: 1)
@@ -670,7 +670,7 @@ class BattleServiceTest < ActiveSupport::TestCase
     end
 
     assert_equal :ok, result.status
-    assert_match(/ソードスキル使用mobの(バーチカル|ホリゾンタル)！/, result.message)
+    assert_match(/錬技使用mobの(カデーレ|セカーレ)！/, result.message)
     assert_operator player.reload.hp, :<, 100
   end
 
@@ -700,7 +700,7 @@ class BattleServiceTest < ActiveSupport::TestCase
     player.weapons.destroy_all
     player.weapons.create!(name: "受け止め剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
     mob = Mob.create!(name: "武器受け敵mob", hp: 30, atk: 10, rarity: "boss", boss_type: "area_boss", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0, enemy_sword_skill_keys: "vertical")
-    mob.weapons.create!(name: "敵ソードスキル剣", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
+    mob.weapons.create!(name: "敵錬技剣", weapon_type: "片手直剣", rarity: "common", attack_power: 5, durability: 100, max_durability: 100, attack_attributes: "斬撃")
     battle = player.battles.create!(mob: mob, enemy_hp: 30)
     enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 30, enemy_level: 1, position: 1)
 
@@ -735,7 +735,7 @@ class BattleServiceTest < ActiveSupport::TestCase
         battle: battle,
         player: player,
         mob_part_id: weak_part.id,
-        label: "バーチカル",
+        label: "カデーレ",
         damage_multiplier: 100,
         durability_cost: 1,
         skill_gain: 1,
@@ -753,6 +753,6 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_equal :ok, result.status
     assert_includes result.message, "敵防御剣で弾かれた！"
     assert_includes result.message, "ノックバックが発生"
-    assert_not_includes result.message, "ソードスキル後の硬直中"
+    assert_not_includes result.message, "錬技後の硬直中"
   end
 end

@@ -56,7 +56,7 @@ seed_rows("field_areas.csv") do |row|
   )
 end
 
-town = locations.fetch("はじまりの街")
+town = locations.fetch("ヴィーゲンブルク")
 demo_user = User.find_or_initialize_by(username: "kirito")
 demo_user.password = "password" if demo_user.new_record?
 demo_user.save!
@@ -85,8 +85,8 @@ player.update!(
 )
 
 player.obtain_key_item!(
-  name: "はじまりの街の通行証",
-  description: "はじまりの街で正式なプレイヤーとして登録された証。",
+  name: "ヴィーゲンブルクの通行証",
+  description: "ヴィーゲンブルクで正式なプレイヤーとして登録された証。",
   category: "story",
   unique_key: "beginning_town_pass"
 )

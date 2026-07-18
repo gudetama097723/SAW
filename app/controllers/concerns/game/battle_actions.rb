@@ -49,7 +49,7 @@ module Game
       player = current_player
       weapon = BattleService.combat_weapon_for(player)
       unless weapon
-        redirect_to game_path(battle_command: "attack"), alert: "武器を装備していないため、ソードスキルは使用できません。"
+        redirect_to game_path(battle_command: "attack"), alert: "武器を装備していないため、錬技は使用できません。"
         return
       end
 

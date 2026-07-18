@@ -35,7 +35,7 @@ class ItemService
     shop_item = ShopCatalog.item_shop_item(player.location, item_name)
     return Result.new(status: :error, message: "この町では#{item_name}を購入できません。") unless shop_item
     total_price = shop_item.price * quantity
-    return Result.new(status: :error, message: "コルが足りません。#{item_name}は#{quantity}個で#{total_price}コルです。") if player.col.to_i < total_price
+    return Result.new(status: :error, message: "刻銭が足りません。#{item_name}は#{quantity}個で#{total_price}刻銭です。") if player.col.to_i < total_price
 
     player.col = player.col.to_i - total_price
     player.advance_time!(5 * quantity)
@@ -46,7 +46,7 @@ class ItemService
       item.save!
     end
 
-    Result.new(status: :ok, message: "道具屋で#{shop_item.item_name}を#{quantity}個購入した。#{total_price}コル支払った。", item: item)
+    Result.new(status: :ok, message: "道具屋で#{shop_item.item_name}を#{quantity}個購入した。#{total_price}刻銭支払った。", item: item)
   end
 
   def self.buy_potion!(player)
@@ -63,7 +63,7 @@ class ItemService
     end
 
     if player.col.to_i < total_cost
-      return Result.new(status: :error, message: "コルが足りません。ポーション#{quantity}本の生産には#{total_cost}コル必要です。")
+      return Result.new(status: :error, message: "刻銭が足りません。ポーション#{quantity}本の生産には#{total_cost}刻銭必要です。")
     end
 
     herb.quantity -= required_herbs
@@ -77,7 +77,7 @@ class ItemService
       player.save!
     end
 
-    Result.new(status: :ok, message: "薬草#{required_herbs}個と#{total_cost}コルでポーションを#{quantity}本生産した。", item: potion)
+    Result.new(status: :ok, message: "薬草#{required_herbs}個と#{total_cost}刻銭でポーションを#{quantity}本生産した。", item: potion)
   end
 
   def self.sell_item!(player, item, quantity: 1, confirm_unique: false)
@@ -95,7 +95,7 @@ class ItemService
       player.save!
     end
 
-    Result.new(status: :ok, message: "#{item.name}を#{quantity}個、#{price}コルで売却した。")
+    Result.new(status: :ok, message: "#{item.name}を#{quantity}個、#{price}刻銭で売却した。")
   end
 
   def self.consume_healing_potion!(player)

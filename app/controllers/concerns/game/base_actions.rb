@@ -12,7 +12,7 @@ module Game
         return
       end
 
-      temporary_only = location.name == "ホルンカの村"
+      temporary_only = location.name == "ヒルテンドルフ"
       base_type = temporary_only ? "temporary" : "home"
       base_label = temporary_only ? "仮拠点" : "本拠点"
 
@@ -26,7 +26,7 @@ module Game
         player.player_bases.where(location: location, base_type: "home").update_all(active: false) if base_type == "temporary"
         player.player_bases.find_or_create_by!(location: location, base_type: base_type).update!(
           active: true,
-          rent: base_type == "home" ? (location.name == "はじまりの街" ? 0 : 300) : 50,
+          rent: base_type == "home" ? (location.name == "ヴィーゲンブルク" ? 0 : 300) : 50,
           storage_limit: storage_limit_for_base(location, base_type)
         )
       end
@@ -155,14 +155,14 @@ module Game
         return
       end
       if amount <= 0 || player.col.to_i < amount
-        redirect_to game_path(panel: "inn", inn_menu: "col"), alert: "預けるコルが足りません。"
+        redirect_to game_path(panel: "inn", inn_menu: "col"), alert: "預ける刻銭が足りません。"
         return
       end
 
       player.col = player.col.to_i - amount
       player.base_col = player.base_col.to_i + amount
       player.save!
-      redirect_to game_path(panel: "inn", inn_menu: "col"), notice: "#{amount}コルを預けた。"
+      redirect_to game_path(panel: "inn", inn_menu: "col"), notice: "#{amount}刻銭を預けた。"
     end
 
     def withdraw_base_col
@@ -175,14 +175,14 @@ module Game
         return
       end
       if amount <= 0 || player.base_col.to_i < amount
-        redirect_to game_path(panel: "inn", inn_menu: "col"), alert: "引き出すコルが足りません。"
+        redirect_to game_path(panel: "inn", inn_menu: "col"), alert: "引き出す刻銭が足りません。"
         return
       end
 
       player.base_col = player.base_col.to_i - amount
       player.col = player.col.to_i + amount
       player.save!
-      redirect_to game_path(panel: "inn", inn_menu: "col"), notice: "#{amount}コルを引き出した。"
+      redirect_to game_path(panel: "inn", inn_menu: "col"), notice: "#{amount}刻銭を引き出した。"
     end
 
     def withdraw_item
@@ -318,7 +318,7 @@ module Game
       end
 
       if player.col.to_i < cost
-        redirect_to game_path(panel: "inn", inn_menu: "storage", storage_tab: "transfer"), alert: "輸送費#{cost}コルが足りません。"
+        redirect_to game_path(panel: "inn", inn_menu: "storage", storage_tab: "transfer"), alert: "輸送費#{cost}刻銭が足りません。"
         return
       end
 
@@ -341,7 +341,7 @@ module Game
         player.save!
       end
 
-      redirect_to game_path(panel: "inn", inn_menu: "storage", storage_tab: "transfer"), notice: "#{destination_base.location.name}へ輸送した。重量#{total_weight.to_f.round(2)}、輸送費#{cost}コル。"
+      redirect_to game_path(panel: "inn", inn_menu: "storage", storage_tab: "transfer"), notice: "#{destination_base.location.name}へ輸送した。重量#{total_weight.to_f.round(2)}、輸送費#{cost}刻銭。"
     end
 
     private
@@ -349,11 +349,11 @@ module Game
     def storage_limit_for_base(location, base_type)
       return 10 unless base_type == "home"
 
-      location.name == "はじまりの街" ? 100 : 30
+      location.name == "ヴィーゲンブルク" ? 100 : 30
     end
 
     def current_inn_base_for(player)
-      base_type = player.location&.name == "ホルンカの村" ? "temporary" : "home"
+      base_type = player.location&.name == "ヒルテンドルフ" ? "temporary" : "home"
       player.player_bases.find_by(location: player.location, base_type: base_type, active: true)
     end
 

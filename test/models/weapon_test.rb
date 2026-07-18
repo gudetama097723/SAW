@@ -93,8 +93,8 @@ class WeaponTest < ActiveSupport::TestCase
   end
 
   test "small sword is available cheaply at weapon shops" do
-    beginning_town = Location.new(name: "はじまりの街")
-    hornka = Location.new(name: "ホルンカの村")
+    beginning_town = Location.new(name: "ヴィーゲンブルク")
+    hornka = Location.new(name: "ヒルテンドルフ")
 
     beginning_definition = ShopCatalog.weapon_shop_weapon(beginning_town, "スモールソード")
     hornka_definition = ShopCatalog.weapon_shop_weapon(hornka, "スモールソード")

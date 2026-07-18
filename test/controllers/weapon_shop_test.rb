@@ -2,7 +2,7 @@ require "test_helper"
 
 class WeaponShopTest < ActionDispatch::IntegrationTest
   setup do
-    @location = Location.create!(name: "はじまりの街", floor: 1, danger_level: 0, safe_area: true, has_blacksmith_facility: true)
+    @location = Location.create!(name: "ヴィーゲンブルク", floor: 1, danger_level: 0, safe_area: true, has_blacksmith_facility: true)
     @user = User.create!(username: "weapon_shop_#{SecureRandom.hex(4)}", password: "password")
     @player = Player.create!(user: @user, name: "武具店テスト", hp: 100, max_hp: 100, col: 1_000, floor: 1, location: @location, current_time: 600)
     @player.town_discovery_for.update!(found_weapon_shop: true)

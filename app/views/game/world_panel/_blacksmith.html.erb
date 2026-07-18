@@ -38,7 +38,7 @@
             <%= form.select field, options_for_select(BlacksmithMaterialCatalog.for_category(category).map { |material| ["#{material.name}（加工Lv#{material.processing_level}／所持#{@player.items.where(name: material.name).sum(:quantity)}）", material.name] }), {}, class: "form-select" %>
           </div>
         <% end %>
-        <p class="small mb-2"><%= context.player? ? "工賃：0コル" : "工賃：鉱石ランクと担当鍛冶師により決定" %></p>
+        <p class="small mb-2"><%= context.player? ? "工賃：0刻銭" : "工賃：鉱石ランクと担当鍛冶師により決定" %></p>
         <%= form.submit "鍛造する", class: "btn btn-outline-warning w-100" %>
       <% end %>
     <% else %>
@@ -56,14 +56,14 @@
         <div class="border border-warning rounded p-2 mb-3">
           <h6>すべて整備しますか？</h6>
           <p class="mb-1">対象: <%= bulk_equipment_count %>点</p>
-          <p class="mb-2">費用: <%= bulk_repair_cost %>コル</p>
+          <p class="mb-2">費用: <%= bulk_repair_cost %>刻銭</p>
           <div class="d-flex gap-2">
             <%= button_to "はい", blacksmith_path(repair_all: "1", confirm_repair: "1", smith_mode: smith_mode), method: :post, form: { class: "flex-fill" }, class: "btn btn-warning w-100" %>
             <%= link_to "いいえ", game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: smith_mode), class: "btn btn-outline-light flex-fill" %>
           </div>
         </div>
       <% else %>
-        <%= link_to "すべて整備する / #{bulk_repair_cost}コル", game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: smith_mode, confirm_repair_all: "1"), class: "btn btn-warning w-100 mb-3" %>
+        <%= link_to "すべて整備する / #{bulk_repair_cost}刻銭", game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: smith_mode, confirm_repair_all: "1"), class: "btn btn-warning w-100 mb-3" %>
       <% end %>
     <% end %>
 
@@ -78,7 +78,7 @@
           <% available = context.proficiency >= weapon.maintenance_level.to_i %>
           <div class="border rounded p-2">
             <p class="mb-1"><strong><%= weapon.display_name %></strong>／耐久 <%= weapon.durability %> / <%= weapon.effective_max_durability %></p>
-            <p class="mb-2">必要熟練度 <%= weapon.maintenance_level %>／<%= context.player? ? "工賃0コル" : "整備費#{(weapon.repair_cost * context.fee_multiplier(:maintenance)).round}コル" %></p>
+            <p class="mb-2">必要熟練度 <%= weapon.maintenance_level %>／<%= context.player? ? "工賃0刻銭" : "整備費#{(weapon.repair_cost * context.fee_multiplier(:maintenance)).round}刻銭" %></p>
             <%= button_to available ? "最大まで整備" : "鍛冶熟練度不足", blacksmith_path(weapon_id: weapon.id, smith_mode: smith_mode), method: :post, disabled: !available, class: "btn btn-outline-warning btn-sm w-100" %>
           </div>
         <% end %>
@@ -94,7 +94,7 @@
           <% damaged_armors.each do |armor| %>
             <div class="border rounded p-2">
               <p class="mb-1"><strong><%= armor.name %></strong>（<%= armor.slot_name %>）／耐久 <%= armor.durability %> / <%= armor.max_durability %></p>
-              <p class="mb-2">整備費 <%= armor.repair_cost %>コル</p>
+              <p class="mb-2">整備費 <%= armor.repair_cost %>刻銭</p>
               <%= button_to "最大まで整備", blacksmith_path(armor_id: armor.id, smith_mode: smith_mode), method: :post, class: "btn btn-outline-warning btn-sm w-100" %>
             </div>
           <% end %>
@@ -137,11 +137,11 @@
                   <% end %>
                 </div>
                 <p class="mb-1">必要熟練度 <%= quote.processing_level %>／鍛冶補正 +<%= quote.blacksmith_bonus %>pt</p>
-                <p class="mb-2">必要: <%= quote.required_col %>コル／<%= quote.required_materials.map { |name, count| "#{name} ×#{count}" }.join("、") %></p>
+                <p class="mb-2">必要: <%= quote.required_col %>刻銭／<%= quote.required_materials.map { |name, count| "#{name} ×#{count}" }.join("、") %></p>
                 <% if available %>
                 <div class="border border-warning rounded p-2">
                   <p class="mb-1"><strong><%= config[:name] %>を強化しますか？</strong></p>
-                  <p class="small mb-2">成功率 <%= quote.success_rate %>%。失敗時もコル・素材・強化試行回数を消費します。</p>
+                  <p class="small mb-2">成功率 <%= quote.success_rate %>%。失敗時も刻銭・素材・強化試行回数を消費します。</p>
                   <div class="d-flex gap-2">
                     <%= button_to "はい", upgrade_weapon_path(weapon_id: selected_weapon.id, enhancement_type: type, smith_mode: smith_mode, confirm_upgrade: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-warning w-100" %>
                     <%= link_to "いいえ", game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: selected_weapon.id, smith_mode: smith_mode), class: "btn btn-outline-light flex-fill" %>

@@ -288,7 +288,7 @@ class ExplorationRewardService
     col = reward["col"].to_i
     if col.positive?
       player.col = player.col.to_i + col
-      messages << "#{col}コルを入手した。"
+      messages << "#{col}刻銭を入手した。"
     end
 
     Array(reward["items"]).each do |item_reward|

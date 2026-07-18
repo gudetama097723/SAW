@@ -2,14 +2,14 @@ require "test_helper"
 
 class FieldServiceTest < ActiveSupport::TestCase
   test "starting grassland gathering can yield poison mushrooms" do
-    items = FieldService.gatherable_items_for(Route.new(name: "はじまりの草原"))
+    items = FieldService.gatherable_items_for(Route.new(name: "ゆりかごの野"))
 
     assert_includes items, "毒キノコ"
     assert_operator items.count("毒キノコ"), :<, items.count("薬草")
   end
 
   test "gathering catalog loads item category from csv" do
-    definition = GatheringCatalog.definitions_for(Route.new(name: "はじまりの草原")).find do |candidate|
+    definition = GatheringCatalog.definitions_for(Route.new(name: "ゆりかごの野")).find do |candidate|
       candidate.item_name == "毒キノコ"
     end
 
@@ -76,7 +76,7 @@ class FieldServiceTest < ActiveSupport::TestCase
   test "hunt encounter is not guaranteed to be an ambush" do
     player = players(:one)
     route = routes(:one)
-    route.update!(name: "はじまりの草原")
+    route.update!(name: "ゆりかごの野")
     player.update!(field_route: route, current_time: 12 * 60)
     rolls = 0
 
@@ -199,7 +199,7 @@ class FieldServiceTest < ActiveSupport::TestCase
   test "spawn rows define enemy level ranges" do
     player = players(:one)
     route = routes(:one)
-    route.update!(name: "はじまりの草原")
+    route.update!(name: "ゆりかごの野")
     player.update!(field_route: route, current_time: 12 * 60)
 
     slime = mobs(:one)
@@ -217,7 +217,7 @@ class FieldServiceTest < ActiveSupport::TestCase
   test "encounter mobs keep player time for night spawn level bonus" do
     player = players(:one)
     route = routes(:one)
-    route.update!(name: "はじまりの草原")
+    route.update!(name: "ゆりかごの野")
     player.update!(field_route: route, current_time: 23 * 60)
     mob = mobs(:one)
     mob.update!(name: "スライム", level: 1)
@@ -246,7 +246,7 @@ class FieldServiceTest < ActiveSupport::TestCase
     player = players(:one)
     route = routes(:one)
     area = field_areas(:one)
-    route.update!(name: "はじまりの草原")
+    route.update!(name: "ゆりかごの野")
     area.update!(route: route, name: "獣道・狼の縄張り", start_distance: 91, end_distance: 120)
     player.update!(field_route: route, field_position: 95, current_time: 12 * 60)
     Mob.create!(name: "群狼", hp: 55, atk: 26, rarity: "normal", level: 6, agility: 9, durability: 8, exp_reward: 55, flee_rate: 0)
@@ -275,7 +275,7 @@ class FieldServiceTest < ActiveSupport::TestCase
     player = players(:one)
     route = routes(:one)
     area = field_areas(:one)
-    route.update!(name: "はじまりの草原")
+    route.update!(name: "ゆりかごの野")
     area.update!(route: route, name: "獣道・狼の縄張り", start_distance: 91, end_distance: 120)
     player.update!(field_route: route, field_position: 95, current_time: 12 * 60)
     king = Mob.create!(name: "群狼の王", hp: 240, atk: 34, rarity: "boss", boss_type: "area_boss", level: 8, agility: 12, durability: 22, exp_reward: 500, flee_rate: 0)
@@ -308,7 +308,7 @@ class FieldServiceTest < ActiveSupport::TestCase
     player = players(:one)
     route = routes(:one)
     area = field_areas(:one)
-    route.update!(name: "はじまりの草原")
+    route.update!(name: "ゆりかごの野")
     area.update!(route: route, name: "獣道・狼の縄張り", start_distance: 91, end_distance: 120)
     player.update!(field_route: route, field_position: 95, current_time: 12 * 60)
     fenrir = Mob.create!(name: "蒼狼フェンリル", hp: 720, atk: 58, rarity: "boss", boss_type: "field_boss", level: 12, agility: 18, durability: 38, exp_reward: 1500, flee_rate: 0)

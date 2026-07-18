@@ -34,7 +34,7 @@ class WeaponCraftService
     return error("素材が足りません。#{missing.first} ×#{missing.last}が必要です。") if missing
 
     fee = fee_for(blacksmith, ore)
-    return error("コルが足りません。生産工賃として#{fee}コル必要です。") if player.col.to_i < fee
+    return error("刻銭が足りません。生産工賃として#{fee}刻銭必要です。") if player.col.to_i < fee
 
     generated = CraftedWeaponStatGenerator.call(
       proficiency: blacksmith.proficiency, ore: ore, monster_material: monster,
@@ -64,9 +64,9 @@ class WeaponCraftService
         blacksmith, task_difficulty: [ required_level, ore.craft_rank * 10 ].max, action: :craft
       )
     end
-    return error("素材またはコルが不足しています。もう一度お試しください。") if insufficient_after_lock
+    return error("素材または刻銭が不足しています。もう一度お試しください。") if insufficient_after_lock
 
-    fee_text = blacksmith.player? ? "工賃なし" : "工賃#{fee}コル"
+    fee_text = blacksmith.player? ? "工賃なし" : "工賃#{fee}刻銭"
     Result.new(
       status: :ok, weapon: weapon, skill_exp_gained: gained,
       message: "――武器生産完了。《#{weapon.name}》 攻撃力#{weapon.attack_power}／耐久値#{weapon.max_durability}／重量#{weapon.weight.to_i}／強化試行上限#{weapon.enhance_limit}（#{fee_text}）"

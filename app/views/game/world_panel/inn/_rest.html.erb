@@ -1,7 +1,7 @@
           <h6>眠る</h6>
           <p>5分ごとに最大HPの2%と状態異常値2を回復します。</p>
 
-          <%= button_to "回復完了まで眠る（#{inn_cost}コル）",
+          <%= button_to "回復完了まで眠る（#{inn_cost}刻銭）",
               inn_path,
               method: :post,
               class: "btn btn-outline-success w-100 mb-3" %>
@@ -22,5 +22,5 @@
                     class: "form-select" %>
               </div>
             </div>
-            <%= submit_tag "指定時刻まで眠る（#{inn_cost}コル）", class: "btn btn-outline-success w-100 mt-2" %>
+            <%= submit_tag "指定時刻まで眠る（#{inn_cost}刻銭）", class: "btn btn-outline-success w-100 mt-2" %>
           <% end %>

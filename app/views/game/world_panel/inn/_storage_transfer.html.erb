@@ -8,7 +8,7 @@
                 <% destination_base = destination_bases.find { |base| base.id == params[:destination_base_id].to_i } %>
                 <div class="border border-info rounded p-2 mb-3">
                   <p class="mb-1"><%= params[:transfer_labels] %></p>
-                  <p class="mb-1"><%= destination_base&.location_name || "輸送先" %> に <%= params[:transfer_cost] %>コルで輸送します。</p>
+                  <p class="mb-1"><%= destination_base&.location_name || "輸送先" %> に <%= params[:transfer_cost] %>刻銭で輸送します。</p>
                   <p class="small text-secondary mb-2">総重量: <%= params[:transfer_weight] %></p>
                   <div class="d-flex gap-2">
                     <%= form_with url: transfer_base_item_path, method: :post, class: "flex-fill" do %>
@@ -29,7 +29,7 @@
                   </div>
                 </div>
               <% elsif destination_bases.any? && (storage_items.any? || stored_weapons.any? || stored_armors.any?) %>
-                <p class="small text-warning mb-2">輸送にはコルが必要です。最低輸送費は道中危険度で変動し、重量10までは最低費用内、それ以上は重いほど加算されます。</p>
+                <p class="small text-warning mb-2">輸送には刻銭が必要です。最低輸送費は道中危険度で変動し、重量10までは最低費用内、それ以上は重いほど加算されます。</p>
                 <%= form_with url: transfer_base_item_path, method: :post, class: "d-grid gap-2" do %>
                   <%= select_tag :destination_base_id, options_from_collection_for_select(destination_bases, :id, :location_name, params[:destination_base_id]), class: "form-select form-select-sm" %>
                   <% storage_items.each do |storage_item| %>

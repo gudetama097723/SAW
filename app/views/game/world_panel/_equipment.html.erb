@@ -35,7 +35,7 @@
                 <p class="mb-1">重量: <%= weapon.weight %></p>
                 <p class="mb-1">能力反映: 筋力 <%= weapon.strength_ratio %>% / 敏捷 <%= weapon.agility_ratio %>%</p>
                 <p class="mb-1">補正: HP <%= signed_bonus(weapon.hp_bonus) %> / 筋力 <%= signed_bonus(weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(weapon.agility_bonus) %></p>
-                <p class="mb-1">売却価格: <%= weapon.sell_price %>コル</p>
+                <p class="mb-1">売却価格: <%= weapon.sell_price %>刻銭</p>
                 <% if weapon.description.present? %>
                   <p class="mb-2"><%= weapon.description %></p>
                 <% end %>

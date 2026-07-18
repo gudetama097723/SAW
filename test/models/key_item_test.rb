@@ -5,7 +5,7 @@ class KeyItemTest < ActiveSupport::TestCase
     player = players(:one)
     player.key_items.destroy_all
 
-    player.obtain_key_item!(name: "はじまりの街の通行証", category: "story", unique_key: "beginning_town_pass")
+    player.obtain_key_item!(name: "ヴィーゲンブルクの通行証", category: "story", unique_key: "beginning_town_pass")
     player.obtain_key_item!(name: "古びた地図", category: "map", unique_key: "first_floor_old_map")
 
     assert_equal 2, player.key_items.count

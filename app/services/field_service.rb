@@ -421,7 +421,7 @@ class FieldService
 
   def self.encounter_count_for(context)
     roll = rand(100)
-    if field_name_for(context) == "はじまりの草原" && %i[dawn day].include?(time_period_key_for(context))
+    if field_name_for(context) == "ゆりかごの野" && %i[dawn day].include?(time_period_key_for(context))
       return 5 if roll < 1
       return 4 if roll < 3
       return 3 if roll < 10

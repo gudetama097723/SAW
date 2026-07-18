@@ -34,7 +34,7 @@ class WeaponUpgradeService
     if context.proficiency < quote.processing_level.to_i
       return Result.new(status: :error, message: "この素材を扱うには鍛冶の技量が足りない。（必要熟練度#{quote.processing_level}）")
     end
-    return Result.new(status: :error, message: "コルが足りません。強化には#{quote.required_col}コル必要です。") if player.col.to_i < quote.required_col
+    return Result.new(status: :error, message: "刻銭が足りません。強化には#{quote.required_col}刻銭必要です。") if player.col.to_i < quote.required_col
 
     missing = quote.required_materials.find do |name, quantity|
       player.items.find_by(name: name)&.quantity.to_i < quantity.to_i
@@ -74,7 +74,7 @@ class WeaponUpgradeService
     if abort_reason == :max_enhancement
       return Result.new(status: :error, message: enhancement_limit_message(weapon))
     elsif abort_reason == :insufficient_col
-      return Result.new(status: :error, message: "コルが足りません。強化には#{quote.required_col}コル必要です。")
+      return Result.new(status: :error, message: "刻銭が足りません。強化には#{quote.required_col}刻銭必要です。")
     elsif abort_reason == :insufficient_materials
       return Result.new(status: :error, message: "素材が足りません。もう一度お試しください。")
     end
@@ -142,7 +142,7 @@ class WeaponUpgradeService
       ]
     when "Q"
       [ 1, 2, 3, 4, 5 ].map do |hit_count|
-        label = hit_count == 5 ? "ソードスキル倍率補正（5Hit以上）" : "ソードスキル倍率補正（#{hit_count}Hit）"
+        label = hit_count == 5 ? "錬技倍率補正（5Hit以上）" : "錬技倍率補正（#{hit_count}Hit）"
         effect_preview(
           label,
           weapon.sword_skill_damage_bonus_percent(hit_count),
@@ -153,8 +153,8 @@ class WeaponUpgradeService
       end
     when "A"
       [
-        effect_preview("ソードスキル命中率補正", weapon.sword_skill_accuracy_bonus, upgraded.sword_skill_accuracy_bonus, unit: "pt"),
-        effect_preview("ソードスキル会心率", weapon.sword_skill_critical_rate, upgraded.sword_skill_critical_rate, unit: "%")
+        effect_preview("錬技命中率補正", weapon.sword_skill_accuracy_bonus, upgraded.sword_skill_accuracy_bonus, unit: "pt"),
+        effect_preview("錬技会心率", weapon.sword_skill_critical_rate, upgraded.sword_skill_critical_rate, unit: "%")
       ]
     when "D"
       [

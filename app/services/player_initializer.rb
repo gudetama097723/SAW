@@ -1,6 +1,6 @@
 class PlayerInitializer
   def self.create_for_user!(user)
-    town = Location.find_by(name: "はじまりの街") || Location.first
+    town = Location.find_by(name: "ヴィーゲンブルク") || Location.first
     player = user.create_player!(
       name: user.username,
       hp: 100,

@@ -20,7 +20,7 @@ class ExplorationRewardServiceTest < ActiveSupport::TestCase
 
     assert_equal :ok, result.status
     assert_equal 10, player.reload.col
-    assert_includes result.message, "[treasure_reward]10コルを入手した。[/treasure_reward]"
+    assert_includes result.message, "[treasure_reward]10刻銭を入手した。[/treasure_reward]"
   end
 
   test "inspected box treasure can be opened" do
@@ -193,8 +193,8 @@ class ExplorationRewardServiceTest < ActiveSupport::TestCase
     state = player.player_boss_kills.find_by!(mob: boss)
 
     assert_equal 2, state.defeated_count
-    assert_includes first_message, "10コルを入手した"
-    assert_not_includes second_message, "10コルを入手した"
+    assert_includes first_message, "10刻銭を入手した"
+    assert_not_includes second_message, "10刻銭を入手した"
   end
 
   private

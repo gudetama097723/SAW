@@ -1,6 +1,6 @@
 ﻿name,floor,danger_level,safe_area,has_blacksmith_facility,weather,environment
-はじまりの街,1,0,TRUE,TRUE,clear,normal
-ホルンカの村,1,0,TRUE,TRUE,clear,normal
+ヴィーゲンブルク,1,0,TRUE,TRUE,clear,normal
+ヒルテンドルフ,1,0,TRUE,TRUE,clear,normal
 次の町,1,0,TRUE,TRUE,clear,normal
-はじまりの草原,1,20,FALSE,FALSE,clear,normal
+ゆりかごの野,1,20,FALSE,FALSE,clear,normal
 静寂の森,1,30,FALSE,FALSE,fog,deep_fog

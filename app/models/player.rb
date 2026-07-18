@@ -181,7 +181,7 @@ def home_base
 end
 
 def death_respawn_location
-  home_base&.location || Location.find_by(name: "はじまりの街") || location
+  home_base&.location || Location.find_by(name: "ヴィーゲンブルク") || location
 end
 
 def carried_item_weight

@@ -10,7 +10,7 @@
       <%= link_to "一覧に戻る", game_path(panel: "weapon_shop", shop_menu: "weapons"), class: "btn btn-outline-light w-100 mb-3" %>
       <h6><%= selected.name %></h6>
       <p>武器種: <%= selected.weapon_type %> / 攻撃: <%= selected.attack_power %></p>
-      <p>耐久: <%= selected.max_durability %> / 重量: <%= selected.weight %> / 価格: <%= selected.price %>コル</p>
+      <p>耐久: <%= selected.max_durability %> / 重量: <%= selected.weight %> / 価格: <%= selected.price %>刻銭</p>
       <p>現所持数: <%= owned_count %>本</p>
       <p><%= selected.description %></p>
       <% if params[:confirm_purchase] == "1" %>
@@ -44,7 +44,7 @@
       <p><%= selected.armor_type %> / 部位: <%= Armor.slot_name(selected.slot) %> / 防御: <%= selected.defense %></p>
       <p>耐久: <%= selected.max_durability %> / 重量: <%= selected.weight %> / 敏捷: <%= signed_bonus(selected.agility_bonus) %></p>
       <p>現所持数: <%= owned_count %>個</p>
-      <p>価格: <%= selected.price %>コル / <%= selected.description %></p>
+      <p>価格: <%= selected.price %>刻銭 / <%= selected.description %></p>
       <% if params[:confirm_purchase] == "1" %>
         <p class="fw-bold">購入しますか？</p>
         <div class="d-flex gap-2">
@@ -67,7 +67,7 @@
     <% selected = sell_type == "armors" ? items.find { |item| item.id == params[:armor_id].to_i } : items.find { |item| item.id == params[:weapon_id].to_i } %>
     <% if selected %>
       <%= link_to "一覧に戻る", game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: sell_type), class: "btn btn-outline-light w-100 mb-3" %>
-      <h6><%= selected.name %></h6><p>売却額: <%= selected.sell_price %>コル</p>
+      <h6><%= selected.name %></h6><p>売却額: <%= selected.sell_price %>刻銭</p>
       <% if params[:confirm_sell] == "1" %>
         <p class="fw-bold">売却しますか？</p>
         <% if sell_type == "armors" %>

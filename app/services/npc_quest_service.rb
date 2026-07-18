@@ -162,7 +162,7 @@ class NpcQuestService
   def self.reward_summary(quest)
     r = quest.reward
     parts = []
-    parts << "#{r["col"]}コル"   if r["col"].to_i.positive?
+    parts << "#{r["col"]}刻銭"   if r["col"].to_i.positive?
     parts << "#{r["exp"]}EXP"   if r["exp"].to_i.positive?
     parts << "親密度+#{r["affinity"]}" if r["affinity"].to_i.positive?
     parts << "鍛冶熟練度+#{r["blacksmith_proficiency"]}" if r["blacksmith_proficiency"].to_i.positive?
@@ -288,7 +288,7 @@ class NpcQuestService
     col = reward["col"].to_i
     if col.positive?
       player.col = player.col.to_i + col
-      messages << "#{col}コルを入手した。"
+      messages << "#{col}刻銭を入手した。"
     end
 
     exp = reward["exp"].to_i

@@ -156,7 +156,7 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "battle-reward-effect"
     assert_includes response.body, "宝箱獲得"
-    assert_includes response.body, "25コルを入手した。"
+    assert_includes response.body, "25刻銭を入手した。"
     assert_includes response.body, "薬草を2個入手した。"
   end
 
@@ -213,7 +213,7 @@ class GameControllerTest < ActionDispatch::IntegrationTest
 
     post sword_skill_path, params: { skill: "vertical", mob_part_id: part.id }
     assert_redirected_to game_path(battle_command: "attack")
-    assert_equal "武器を装備していないため、ソードスキルは使用できません。", flash[:alert]
+    assert_equal "武器を装備していないため、錬技は使用できません。", flash[:alert]
   end
 
   test "battle command links keep selected single enemy target" do
@@ -350,7 +350,7 @@ class GameControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "beginning town home base has expanded storage limit" do
-    beginning_town = Location.create!(name: "はじまりの街", floor: 1, danger_level: 0, safe_area: true)
+    beginning_town = Location.create!(name: "ヴィーゲンブルク", floor: 1, danger_level: 0, safe_area: true)
     @player.update!(location: beginning_town)
     @player.town_discovery_for.update!(found_inn: true)
 

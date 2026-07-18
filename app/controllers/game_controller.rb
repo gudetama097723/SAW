@@ -135,7 +135,7 @@
 
   def inn_cost_for(location)
     case location&.name
-    when "ホルンカの村"
+    when "ヒルテンドルフ"
       50
     else
       0

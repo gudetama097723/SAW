@@ -1,6 +1,6 @@
 ﻿code,name,npc_type,placement_type,location,route,field_area,facility_key,dungeon_key,position_key,sort_order,active,description,metadata_json,discovery_rate,repeat_discovery_required,discovery_conditions_json,initial_affinity_cap,blacksmith_base_proficiency,blacksmith_max_proficiency,craft_fee_multiplier,maintenance_fee_multiplier,enhance_fee_multiplier
-beginning_town_guide,街の案内人,guide,town,はじまりの街,,,,,town_square,10,TRUE,はじまりの街で新米プレイヤーに道案内をするNPC,{},100,FALSE,{},60,0,0,1.0,1.0,1.0
-beginning_inn_keeper,宿屋の主人,innkeeper,facility,はじまりの街,,,inn,,counter,20,TRUE,宿屋を管理しているNPC,{},100,FALSE,{},60,0,0,1.0,1.0,1.0
-beginning_blacksmith,鍛冶師ローデン,blacksmith,facility,はじまりの街,,,blacksmith,,forge,10,TRUE,新米冒険者向けの武器を鍛える第一層の鍛冶師,{},100,FALSE,{},60,80,120,1.0,1.0,1.0
-hornka_blacksmith,鍛冶師バルグ,blacksmith,facility,ホルンカの村,,,blacksmith,,forge,10,TRUE,獣素材と鉄を組み合わせた鍛造を得意とする鍛冶師,{},100,FALSE,{},60,100,180,1.2,1.1,1.2
+beginning_town_guide,街の案内人,guide,town,ヴィーゲンブルク,,,,,town_square,10,TRUE,ヴィーゲンブルクで新米プレイヤーに道案内をするNPC,{},100,FALSE,{},60,0,0,1.0,1.0,1.0
+beginning_inn_keeper,宿屋の主人,innkeeper,facility,ヴィーゲンブルク,,,inn,,counter,20,TRUE,宿屋を管理しているNPC,{},100,FALSE,{},60,0,0,1.0,1.0,1.0
+beginning_blacksmith,鍛冶師ローデン,blacksmith,facility,ヴィーゲンブルク,,,blacksmith,,forge,10,TRUE,新米冒険者向けの武器を鍛える第一層の鍛冶師,{},100,FALSE,{},60,80,120,1.0,1.0,1.0
+hornka_blacksmith,鍛冶師バルグ,blacksmith,facility,ヒルテンドルフ,,,blacksmith,,forge,10,TRUE,獣素材と鉄を組み合わせた鍛造を得意とする鍛冶師,{},100,FALSE,{},60,100,180,1.2,1.1,1.2
 next_town_blacksmith,鍛冶師セイン,blacksmith,facility,次の町,,,blacksmith,,forge,10,TRUE,第一層奥地の素材を扱う経験豊かな鍛冶師,{},100,FALSE,{},60,180,350,1.4,1.3,1.4

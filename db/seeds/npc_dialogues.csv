@@ -1,5 +1,5 @@
 ﻿npc_code,dialogue_type,sequence,text,active
-beginning_town_guide,intro,1,ようこそ、はじまりの街へ！私は街の案内人をしています。初めてここに来たんですね？,TRUE
+beginning_town_guide,intro,1,ようこそ、ヴィーゲンブルクへ！私は街の案内人をしています。初めてここに来たんですね？,TRUE
 beginning_town_guide,intro,2,アインクラッドは100層からなる浮遊城です。最上層のボスを倒すことがクリアの条件……と聞いています。,TRUE
 beginning_town_guide,intro,3,まずは街の中を散策して、施設の場所を覚えることをおすすめします。宿屋や道具屋が役に立つはずですよ。,TRUE
 beginning_town_guide,gossip,1,最近、外から来た冒険者が増えましたね。みんな攻略を目指しているんでしょうか。,TRUE

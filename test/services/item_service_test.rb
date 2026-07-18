@@ -3,7 +3,7 @@ require "test_helper"
 class ItemServiceTest < ActiveSupport::TestCase
   setup do
     @location = locations(:one)
-    @location.update!(name: "はじまりの街", safe_area: true)
+    @location.update!(name: "ヴィーゲンブルク", safe_area: true)
     @player = players(:one)
     @player.items.destroy_all
     @player.update!(location: @location, col: 1_000, current_time: 480, satiety: 100)

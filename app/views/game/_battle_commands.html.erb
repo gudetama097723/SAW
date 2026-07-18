@@ -85,9 +85,9 @@
     <%= link_to "戻る", selected_attack_group.present? ? game_path(battle_command: "attack") : game_path(battle_command: "battle"), class: "btn btn-outline-light w-100 mt-3" %>
   <% elsif battle_command == "sword_skill" %>
     <% if !equipped_weapon %>
-      <p class="mb-0">武器を装備していないため、ソードスキルは使用できません。</p>
+      <p class="mb-0">武器を装備していないため、錬技は使用できません。</p>
     <% elsif !equipped_weapon_skill_learned %>
-      <p class="mb-0"><%= equipped_weapon_skill_name %>スキルを習得していないため、ソードスキルは使用できません。</p>
+      <p class="mb-0"><%= equipped_weapon_skill_name %>スキルを習得していないため、錬技は使用できません。</p>
     <% else %>
     <% skill_set = BattleService.weapon_skill_name(equipped_weapon) %>
     <% sword_skill = @player.skills.find_by(name: skill_set) %>

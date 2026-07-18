@@ -10,7 +10,7 @@
             <% owned_quantity = owned_item_quantity(@player, selected_shop_item.item_name) %>
             <%= link_to "販売一覧に戻る", game_path(panel: "item_shop", shop_menu: "buy"), class: "btn btn-outline-light w-100 mb-3" %>
             <h6><%= selected_shop_item.item_name %></h6>
-            <p class="mb-1">価格: <%= selected_shop_item.price %>コル</p>
+            <p class="mb-1">価格: <%= selected_shop_item.price %>刻銭</p>
             <p class="mb-1">種別: <%= selected_shop_item.category %></p>
             <p class="mb-1">重さ: <%= Item.new(name: selected_shop_item.item_name, category: selected_shop_item.category).weight %></p>
             <p class="mb-1">現所持数: <%= owned_quantity %>個</p>
@@ -26,7 +26,7 @@
             <% if params[:confirm_purchase] == "1" %>
               <div class="border rounded p-2">
                 <p class="mb-1">購入数: <%= purchase_quantity %>個</p>
-                <p class="mb-2">合計: <%= purchase_total_price %>コル</p>
+                <p class="mb-2">合計: <%= purchase_total_price %>刻銭</p>
                 <div class="d-grid gap-2">
                   <%= form_with url: item_shop_path, method: :post do %>
                     <%= hidden_field_tag :item_name, selected_shop_item.item_name %>
@@ -53,7 +53,7 @@
           <% elsif shop_items.any? %>
             <div class="d-grid gap-2">
               <% shop_items.each do |shop_item| %>
-                <%= link_to "#{shop_item.item_name} / #{shop_item.price}コル / #{shop_item.category}",
+                <%= link_to "#{shop_item.item_name} / #{shop_item.price}刻銭 / #{shop_item.category}",
                     game_path(panel: "item_shop", shop_menu: "buy", item_name: shop_item.item_name),
                     class: "btn btn-outline-warning w-100" %>
               <% end %>
@@ -70,14 +70,14 @@
           <%= link_to "道具屋メニューに戻る", game_path(panel: "item_shop"), class: "btn btn-outline-light w-100 mb-3" %>
           <h6>ポーション</h6>
           <p class="mb-1">必要素材: 薬草 10個</p>
-          <p class="mb-1">費用: 20コル</p>
+          <p class="mb-1">費用: 20刻銭</p>
           <p class="mb-1">現所持数: <%= owned_potion_quantity %>個</p>
           <p class="mb-2">所持薬草: <%= (herb&.quantity || 0).to_i %></p>
           <% if params[:confirm_production] == "1" %>
             <div class="border rounded p-2">
               <p class="mb-1">生産数: <%= production_quantity %>本</p>
               <p class="mb-1">必要素材: 薬草 <%= required_herbs %>個</p>
-              <p class="mb-2">合計費用: <%= production_total_cost %>コル</p>
+              <p class="mb-2">合計費用: <%= production_total_cost %>刻銭</p>
               <div class="d-grid gap-2">
                 <%= form_with url: produce_item_path, method: :post do %>
                   <%= hidden_field_tag :quantity, production_quantity %>
@@ -113,7 +113,7 @@
               <% if selected_sell_item.valuable? %>
                 <p class="mb-1 text-warning">用途: 換金専用</p>
               <% end %>
-              <p class="mb-2">売却価格: 1個 <%= selected_sell_item.sell_price %>コル</p>
+              <p class="mb-2">売却価格: 1個 <%= selected_sell_item.sell_price %>刻銭</p>
               <% if selected_sell_item.unique_item? && params[:confirm_item_id].to_i != selected_sell_item.id %>
                 <%= link_to "売却確認へ", game_path(panel: "item_shop", shop_menu: "sell", item_id: selected_sell_item.id, confirm_item_id: selected_sell_item.id, item_category: sell_category), class: "btn btn-outline-danger w-100" %>
               <% else %>
@@ -143,7 +143,7 @@
             <% if listed_sell_items.any? %>
               <div class="d-grid gap-2">
                 <% listed_sell_items.each do |item| %>
-                  <%= link_to "#{item.name} × #{item.quantity} / 1個 #{item.sell_price}コル",
+                  <%= link_to "#{item.name} × #{item.quantity} / 1個 #{item.sell_price}刻銭",
                       game_path(panel: "item_shop", shop_menu: "sell", item_id: item.id, item_category: sell_category),
                       class: "btn btn-outline-warning w-100" %>
                 <% end %>

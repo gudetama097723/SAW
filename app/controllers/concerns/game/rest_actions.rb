@@ -144,11 +144,11 @@ module Game
         return
       end
 
-      base_type = player.location&.name == "ホルンカの村" ? "temporary" : "home"
+      base_type = player.location&.name == "ヒルテンドルフ" ? "temporary" : "home"
       current_inn_base = player.player_bases.find_by(location: player.location, base_type: base_type, active: true)
       cost = current_inn_base ? 0 : inn_cost_for(player.location)
       if player.col.to_i < cost
-        redirect_to game_path(panel: "inn"), alert: "コルが足りません。宿屋で休むには#{cost}コル必要です。"
+        redirect_to game_path(panel: "inn"), alert: "刻銭が足りません。宿屋で休むには#{cost}刻銭必要です。"
         return
       end
 
@@ -177,7 +177,7 @@ module Game
       player.reset_sleep_deprivation!
       player.save!
 
-      payment_message = cost.positive? ? "#{cost}コル支払った。" : ""
+      payment_message = cost.positive? ? "#{cost}刻銭支払った。" : ""
       hp_recovered = player.hp.to_i - hp_before
       status_recovered = [status_before - StatusEffectService.recoverable_value_total(player), 0].max
       recovery_message = []

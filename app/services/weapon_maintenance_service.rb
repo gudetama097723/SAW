@@ -18,7 +18,7 @@ class WeaponMaintenanceService
     fee = blacksmith.player? ? 0 : (weapon.repair_cost * blacksmith.fee_multiplier(:maintenance)).round
     kit = player.items.find_by(name: KIT_NAME) if blacksmith.player?
     return error("武器整備キットが必要です。") if blacksmith.player? && !kit&.quantity.to_i&.positive?
-    return error("コルが足りません。整備には#{fee}コル必要です。") if player.col.to_i < fee
+    return error("刻銭が足りません。整備には#{fee}刻銭必要です。") if player.col.to_i < fee
 
     missing = weapon.effective_max_durability - weapon.durability.to_i
     ratio = missing.to_f / [ weapon.effective_max_durability, 1 ].max
@@ -44,9 +44,9 @@ class WeaponMaintenanceService
         completion_ratio: ratio < 0.05 ? 0.0 : ratio
       )
     end
-    return error(blacksmith.player? ? "武器整備キットが必要です。" : "コルが足りません。整備には#{fee}コル必要です。") if insufficient_after_lock
+    return error(blacksmith.player? ? "武器整備キットが必要です。" : "刻銭が足りません。整備には#{fee}刻銭必要です。") if insufficient_after_lock
 
-    cost_text = blacksmith.player? ? "整備キット耐久を#{kit_cost}消費" : "#{fee}コル支払った"
+    cost_text = blacksmith.player? ? "整備キット耐久を#{kit_cost}消費" : "#{fee}刻銭支払った"
     Result.new(status: :ok, skill_exp_gained: gained, message: "#{weapon.display_name}を最大耐久まで整備した。#{cost_text}。")
   end
 

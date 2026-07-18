@@ -3,8 +3,8 @@ class Weapon < ApplicationRecord
   MAX_ENHANCEMENT_LEVEL = 10
   ENHANCEMENT_TYPES = {
     "S" => { attribute: :sharpness_level, name: "鋭さ", effect: "攻撃力 +4% / 部位破壊力 +0.5pt" },
-    "Q" => { attribute: :quickness_level, name: "速さ", effect: "ソードスキル倍率 +2% × 連撃係数" },
-    "A" => { attribute: :accuracy_level, name: "正確さ", effect: "ソードスキル命中率 +3pt / クリティカル率 +1pt" },
+    "Q" => { attribute: :quickness_level, name: "速さ", effect: "錬技倍率 +2% × 連撃係数" },
+    "A" => { attribute: :accuracy_level, name: "正確さ", effect: "錬技命中率 +3pt / クリティカル率 +1pt" },
     "H" => { attribute: :heaviness_level, name: "重さ", effect: "部位破壊力 +4pt / 攻撃力 +1%" },
     "D" => { attribute: :durability_level, name: "丈夫さ", effect: "最大耐久値 +10% / 耐久消費率 -3%" }
   }.freeze

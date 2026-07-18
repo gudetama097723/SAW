@@ -298,7 +298,7 @@ module Game
         armor_fees = armors.sum { |armor| (armor.repair_cost * context.fee_multiplier(:maintenance)).round }
         total_fee = weapon_fees + armor_fees
         if player.col.to_i < total_fee
-          redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), alert: "コルが足りません。整備には#{total_fee}コル必要です。"
+          redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), alert: "刻銭が足りません。整備には#{total_fee}刻銭必要です。"
           return
         end
 
@@ -314,7 +314,7 @@ module Game
         end
 
         repaired_names = equipment.map { |item| item.respond_to?(:display_name) ? item.display_name : item.name }.join("、")
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), notice: "鍛冶屋で#{repaired_names}をまとめて整備した。#{total_fee}コル支払った。"
+        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair", smith_mode: "npc"), notice: "鍛冶屋で#{repaired_names}をまとめて整備した。#{total_fee}刻銭支払った。"
         return
       end
 
@@ -327,14 +327,14 @@ module Game
         context = BlacksmithService.context_for(player, mode: "npc")
         fee = context ? (armor.repair_cost * context.fee_multiplier(:maintenance)).round : armor.repair_cost
         if player.col.to_i < fee
-          redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "コルが足りません。整備には#{fee}コル必要です。"
+          redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), alert: "刻銭が足りません。整備には#{fee}刻銭必要です。"
           return
         end
         ActiveRecord::Base.transaction do
           player.update!(col: player.col.to_i - fee)
           armor.update!(durability: armor.max_durability)
         end
-        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), notice: "鍛冶屋で#{armor.name}を整備した。#{fee}コル支払った。"
+        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "repair"), notice: "鍛冶屋で#{armor.name}を整備した。#{fee}刻銭支払った。"
         return
       end
 
@@ -367,7 +367,7 @@ module Game
         return
       end
       if player.col.to_i < definition.price
-        redirect_to game_path(panel: "weapon_shop"), alert: "コルが足りません。#{definition.name}は#{definition.price}コルです。"
+        redirect_to game_path(panel: "weapon_shop"), alert: "刻銭が足りません。#{definition.name}は#{definition.price}刻銭です。"
         return
       end
 
@@ -454,7 +454,7 @@ module Game
         player.save!
       end
 
-      redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "weapons"), notice: "#{weapon.name}を#{price}コルで売却した。"
+      redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "weapons"), notice: "#{weapon.name}を#{price}刻銭で売却した。"
     end
 
     def sell_armor
@@ -479,7 +479,7 @@ module Game
         player.advance_time!(10)
         player.save!
       end
-      redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "armors"), notice: "#{armor.name}を#{price}コルで売却した。"
+      redirect_to game_path(panel: "weapon_shop", shop_menu: "sell", sell_type: "armors"), notice: "#{armor.name}を#{price}刻銭で売却した。"
     end
 
     def equip_weapon

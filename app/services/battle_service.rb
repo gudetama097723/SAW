@@ -51,9 +51,9 @@
     return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
 
     weapon = combat_weapon_for(player)
-    return Result.new(status: :error, message: "武器を装備していないため、ソードスキルは使用できません。") if sword_skill && !weapon
+    return Result.new(status: :error, message: "武器を装備していないため、錬技は使用できません。") if sword_skill && !weapon
     if sword_skill && player.sword_skill_locked_out?
-      return Result.new(status: :error, message: "ソードスキル発動後の反動で、あと#{player.sword_skill_lockout_turns}ターン使用できません。")
+      return Result.new(status: :error, message: "錬技発動後の反動で、あと#{player.sword_skill_lockout_turns}ターン使用できません。")
     end
     if sword_skill && player.sword_skill_on_cooldown?(skill_key)
       return Result.new(status: :error, message: "#{SkillCatalog.find(skill_key).name}はクールタイム中です。あと#{player.sword_skill_cooldown(skill_key)}ターン使用できません。")
@@ -143,7 +143,7 @@
 
     stiffness_message = ""
     if stiffness && knockback_message.blank?
-      stiffness_result = apply_enemy_attack!(player, battle, prefix: "ソードスキル後の硬直中、", allow_evasion: false)
+      stiffness_result = apply_enemy_attack!(player, battle, prefix: "錬技後の硬直中、", allow_evasion: false)
       return stiffness_result if stiffness_result.status == :defeated
 
       stiffness_message = stiffness_result.message
@@ -681,7 +681,7 @@ end
 
     broken_message = destroy_weapon_if_broken!(weapon)
     victory_message = defeated_enemies.many? ? "敵を全て倒した！" : ""
-    reward_message = "#{victory_message}#{col_reward}コル獲得！#{exp_message}#{boss_reward_message}#{dropped_item_message}#{broken_part_drop_message}#{dropped_weapon_message}"
+    reward_message = "#{victory_message}#{col_reward}刻銭獲得！#{exp_message}#{boss_reward_message}#{dropped_item_message}#{broken_part_drop_message}#{dropped_weapon_message}"
     Result.new(status: :ok, message: "#{label}！#{damage_message}！[reward]#{reward_message}[/reward]#{broken_message}#{skill_message}")
   end
 
@@ -1047,7 +1047,7 @@ def self.gain_weapon_skill!(player, weapon, amount)
     end.map(&:name)
     learned_message = learned.map do |name|
       learned_skill = SkillCatalog.sword_skills(skill_name).find { |skill_definition| skill_definition.name == name }
-      " #{skill_name}の熟練度が #{learned_skill.required_proficiency} に到達した。新しいソードスキル「#{name}」を習得した！"
+      " #{skill_name}の熟練度が #{learned_skill.required_proficiency} に到達した。新しい錬技「#{name}」を習得した！"
     end.join
     capstone_message = awarded_capstone_slot ? " #{skill_name}熟練度がカンストした！スキルスロット +1" : ""
     "#{learned_message}#{capstone_message}"
