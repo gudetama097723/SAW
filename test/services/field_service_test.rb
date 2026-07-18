@@ -380,7 +380,7 @@ class FieldServiceTest < ActiveSupport::TestCase
     enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 230, enemy_max_hp: 230, enemy_level: 14, position: 1)
 
     assert enemy.level_based?
-    assert_equal "#{mob.name} Lv14", enemy.display_name
+    assert_equal mob.name, enemy.display_name
     assert_equal 230, enemy.effective_max_hp
   end
 

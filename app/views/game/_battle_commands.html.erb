@@ -98,6 +98,8 @@
     <% selected_skill = nil unless sword_skill_definitions.any? { |skill_definition| skill_definition.key == selected_skill } %>
     <% selected_skill_definition = selected_skill.present? ? SkillCatalog.find(selected_skill) : nil %>
     <% selected_skill_is_area = selected_skill_definition&.area? %>
+    <% sword_skill_lockout_turns = @player.sword_skill_lockout_turns %>
+    <% sword_skill_locked_out = sword_skill_lockout_turns.positive? %>
     <% if selected_skill_group.blank? && selected_skill.blank? %>
       <h5>使用可能スキル</h5>
       <div class="d-grid gap-2">
@@ -113,9 +115,9 @@
       <h5><%= skill_set %>スキル</h5>
       <div class="d-grid gap-2">
         <% sword_skill_definitions.each do |skill_definition| %>
-          <%= link_to skill_definition.name,
+          <%= link_to sword_skill_locked_out ? "#{skill_definition.name} 発動不能:#{sword_skill_lockout_turns}" : skill_definition.name,
               game_path(battle_command: "sword_skill", skill_group: "sword_skill", selected_skill: skill_definition.key),
-              class: "btn btn-outline-danger w-100" %>
+              class: sword_skill_locked_out ? "btn btn-outline-secondary w-100" : "btn btn-outline-danger w-100" %>
         <% end %>
       </div>
     <% else %>
@@ -123,6 +125,9 @@
       <p class="mb-1">種別: <%= selected_skill_definition.target_label %></p>
       <p class="mb-1">威力倍率: <%= selected_skill_definition.damage_multiplier %>%</p>
       <p class="mb-1">消費耐久: <%= selected_skill_definition.durability_cost %></p>
+      <% if sword_skill_locked_out %>
+        <p class="text-warning mb-1">発動不能: あと<%= sword_skill_lockout_turns %>ターン</p>
+      <% end %>
       <p class="mb-3"><%= selected_skill_definition.description %></p>
 
       <% if selected_skill_is_area %>
@@ -153,17 +158,25 @@
             <% area_parts.each do |part| %>
               <% state = area_part_states[part.id.to_s] || {} %>
               <% part_label = state["broken"] ? "#{part.name}（破壊済み）" : part.name %>
-              <%= button_to part_label,
-                  sword_skill_path(skill: selected_skill, group_start: group_start, target_enemy_id: area_enemy.id, mob_part_id: part.id),
-                  method: :post,
-                  class: "btn btn-outline-danger w-100" %>
+              <% if sword_skill_locked_out %>
+                <div class="btn btn-outline-secondary disabled w-100"><%= part_label %> 発動不能</div>
+              <% else %>
+                <%= button_to part_label,
+                    sword_skill_path(skill: selected_skill, group_start: group_start, target_enemy_id: area_enemy.id, mob_part_id: part.id),
+                    method: :post,
+                    class: "btn btn-outline-danger w-100" %>
+              <% end %>
             <% end %>
           </div>
         <% elsif selected_group.any? %>
-          <%= button_to "#{selected_group.size}体へ発動",
-              sword_skill_path(skill: selected_skill, group_start: group_start),
-              method: :post,
-              class: "btn btn-danger w-100" %>
+          <% if sword_skill_locked_out %>
+            <div class="btn btn-outline-secondary disabled w-100">発動不能</div>
+          <% else %>
+            <%= button_to "#{selected_group.size}体へ発動",
+                sword_skill_path(skill: selected_skill, group_start: group_start),
+                method: :post,
+                class: "btn btn-danger w-100" %>
+          <% end %>
           <p class="text-secondary small mt-2 mb-0">複数対象時は部位を選べず、命中しやすい部位へ自動で当たります。</p>
         <% end %>
       <% else %>
@@ -183,10 +196,14 @@
             <% selected_parts.each do |part| %>
               <% state = selected_part_states[part.id.to_s] || {} %>
               <% part_label = state["broken"] ? "#{part.name}（破壊済み）" : part.name %>
-              <%= button_to part_label,
-                  sword_skill_path(target_enemy_id: selected_enemy.id, mob_part_id: part.id, skill: selected_skill),
-                  method: :post,
-                  class: "btn btn-outline-danger w-100" %>
+              <% if sword_skill_locked_out %>
+                <div class="btn btn-outline-secondary disabled w-100"><%= part_label %> 発動不能</div>
+              <% else %>
+                <%= button_to part_label,
+                    sword_skill_path(target_enemy_id: selected_enemy.id, mob_part_id: part.id, skill: selected_skill),
+                    method: :post,
+                    class: "btn btn-outline-danger w-100" %>
+              <% end %>
             <% end %>
           </div>
         <% end %>
@@ -206,7 +223,7 @@
         <% available_weapons.each do |weapon| %>
           <div class="battle-equipment-card">
             <p class="mb-1"><%= weapon.display_name %></p>
-            <p class="mb-1">攻撃力: <%= weapon.effective_attack_power %>（本来 <%= weapon.base_effective_attack_power %>） / 耐久力: <%= weapon.durability %> / <%= weapon.effective_max_durability %>（<%= weapon.durability_condition_label %>）</p>
+            <p class="mb-1">攻撃力: <%= formatted_attack_power(weapon.effective_attack_power) %>（基礎 <%= weapon.attack_power %> / 強化 +<%= formatted_attack_bonus_percent(weapon) %>%） / 耐久力: <%= weapon.durability %> / <%= weapon.effective_max_durability %>（<%= weapon.durability_condition_label %>）</p>
             <% if weapon.effective_part_break_power > 100 %>
               <p class="mb-1">特性: 部位破壊率が高い</p>
             <% end %>
@@ -224,8 +241,10 @@
     <h5>アイテム</h5>
     <div class="d-grid gap-2">
       <% potion = @player.items.find_by(name: "ポーション", category: "healing") || @player.items.find_by(name: "ポーション") %>
-      <% if potion&.quantity.to_i.positive? %>
-        <%= button_to "ポーション × #{potion.quantity}", use_battle_item_path(item_name: "ポーション"), method: :post, class: "btn btn-outline-success w-100" %>
+      <% if @player.potion_healing? %>
+        <div class="btn btn-outline-secondary disabled w-100">ポーション回復中（残り<%= @player.potion_healing_turns_remaining %>ターン）</div>
+      <% elsif potion&.quantity.to_i.positive? %>
+        <%= button_to "ポーション × #{potion.quantity}（5ターン回復）", use_battle_item_path(item_name: "ポーション"), method: :post, class: "btn btn-outline-success w-100" %>
       <% else %>
         <div class="btn btn-outline-secondary disabled w-100">使用可能なアイテムなし</div>
       <% end %>

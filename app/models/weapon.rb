@@ -191,15 +191,23 @@ def sell_price
   end
 
   def effective_attack_power
-    [(base_effective_attack_power * durability_attack_multiplier).ceil, 1].max
+    [ base_effective_attack_power * durability_attack_multiplier, 1.0 ].max
   end
 
   def base_effective_attack_power
-    (attack_power.to_i * (1.0 + sharpness_level.to_i * 0.04 + heaviness_level.to_i * 0.01)).floor
+    attack_power.to_f * enhancement_attack_multiplier
+  end
+
+  def enhancement_attack_multiplier
+    1.0 + enhancement_attack_percent / 100.0
+  end
+
+  def enhancement_attack_percent
+    sharpness_level.to_i * 4.0 + heaviness_level.to_i
   end
 
   def enhancement_attack_bonus
-    base_effective_attack_power - attack_power.to_i
+    base_effective_attack_power - attack_power.to_f
   end
 
   def max_enhancement?
@@ -215,10 +223,10 @@ def sell_price
   end
 
   def enhancement_breakdown
-    ENHANCEMENT_TYPES.filter_map do |key, config|
+    ENHANCEMENT_TYPES.filter_map do |_key, config|
       level = public_send(config[:attribute]).to_i
-      "#{level}#{key}" if level.positive?
-    end.join(" ").presence || "未強化"
+      "#{config[:name]} +#{level}" if level.positive?
+    end.join("／").presence || "未強化"
   end
 
   def effective_max_durability
@@ -230,8 +238,12 @@ def sell_price
   end
 
   def sword_skill_damage_multiplier(base_multiplier, hit_count)
+    (base_multiplier.to_f * (1.0 + sword_skill_damage_bonus_percent(hit_count) / 100.0)).round
+  end
+
+  def sword_skill_damage_bonus_percent(hit_count)
     coefficient = { 1 => 1.0, 2 => 1.2, 3 => 1.4, 4 => 1.6 }.fetch([ hit_count.to_i, 1 ].max, 1.8)
-    (base_multiplier.to_f * (1.0 + quickness_level.to_i * 0.02 * coefficient)).round
+    quickness_level.to_i * 2.0 * coefficient
   end
 
   def sword_skill_accuracy_bonus
@@ -294,5 +306,3 @@ def sell_price
     player.weapons.where(id: excess_ids).update_all(equipped: false) if excess_ids.any?
   end
 end
-
-

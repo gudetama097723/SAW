@@ -52,6 +52,9 @@
 
     weapon = combat_weapon_for(player)
     return Result.new(status: :error, message: "武器を装備していないため、ソードスキルは使用できません。") if sword_skill && !weapon
+    if sword_skill && player.sword_skill_locked_out?
+      return Result.new(status: :error, message: "ソードスキル発動後の反動で、あと#{player.sword_skill_lockout_turns}ターン使用できません。")
+    end
     if sword_skill && player.sword_skill_on_cooldown?(skill_key)
       return Result.new(status: :error, message: "#{SkillCatalog.find(skill_key).name}はクールタイム中です。あと#{player.sword_skill_cooldown(skill_key)}ターン使用できません。")
     end
@@ -231,6 +234,7 @@
     player.save!
     if battle.alive_enemies.reload.empty?
       player.clear_sword_skill_cooldowns!
+      player.clear_potion_healing!
       player.save!
       battle.destroy!
       messages << "敵はいなくなった。"
@@ -497,8 +501,8 @@
       return "#{battle_enemy.mob.name}: #{guard_result[:message]}躱された！"
     end
 
-    base_hit_damage = (calculate_player_damage(player, weapon, battle_enemy, actual_part, attack_attribute) * damage_multiplier / 100.0).ceil
-    varied_damage = apply_player_damage_variance(base_hit_damage)
+    raw_hit_damage = calculate_player_damage(player, weapon, battle_enemy, actual_part, attack_attribute) * damage_multiplier / 100.0
+    varied_damage = apply_player_damage_variance(raw_hit_damage)
     part_damage = calculate_part_damage(varied_damage, weapon, actual_part)
     critical = StatusEffectService.sleeping_critical!(battle_enemy) || critical_hit?(player, weapon, battle_enemy, actual_part, part_damage, sword_skill: sword_skill)
     hit_damage = critical ? varied_damage * 2 : varied_damage
@@ -523,11 +527,11 @@
 
   def self.area_damage_multiplier(damage_multiplier, target_count)
     reduction = { 1 => 1.0, 2 => 0.75, 3 => 0.62, 4 => 0.52, 5 => 0.45 }.fetch(target_count, 0.5)
-    (damage_multiplier * reduction).ceil
+    damage_multiplier * reduction
   end
 
 def self.calculate_player_damage(player, weapon, battle_enemy, part, attack_attribute)
-  weapon_power = weapon&.effective_attack_power.to_i
+  weapon_power = weapon&.effective_attack_power.to_f
   stat_power = weapon ? weapon.stat_attack_power(player) : player.effective_strength
   attack_power = (stat_power * 0.7) + (weapon_power * 1.3)
   attack_power *= attribute_multiplier(weapon, battle_enemy.mob, part, attack_attribute)
@@ -538,7 +542,7 @@ def self.calculate_player_damage(player, weapon, battle_enemy, part, attack_attr
   base_damage *= StatusEffectService.damage_dealt_multiplier(player)
   base_damage *= StatusEffectService.damage_taken_multiplier(battle_enemy)
   base_damage *= BuffEffectService.defense_damage_taken_multiplier(battle_enemy)
-  [(base_damage * part.damage_multiplier.to_i / 100.0).ceil, 1].max
+  [base_damage * part.damage_multiplier.to_i / 100.0, 1.0].max
 end
 
 def self.attribute_multiplier(weapon, mob, part, attack_attribute)
@@ -610,6 +614,7 @@ end
     respawn_location = player.death_respawn_location
     StatusEffectService.clear_all!(player)
     player.clear_sword_skill_cooldowns!
+    player.clear_potion_healing!
     player.hp = player.effective_max_hp
     player.floor = respawn_location&.floor || 1
     player.col = 0
@@ -629,6 +634,8 @@ end
     messages = []
     message = StatusEffectService.apply_battle_turn_start!(player)
     messages << message if message.present?
+    potion_heal = player.tick_potion_healing!
+    messages << "ポーションの回復効果。HPが#{potion_heal}回復した。" if potion_heal.to_i.positive?
 
     battle.alive_enemies.each do |battle_enemy|
       message = StatusEffectService.apply_battle_turn_start!(battle_enemy)
@@ -668,6 +675,7 @@ end
     skill_message = gain_weapon_skill_for_victory!(player, weapon, defeated_enemies.count, skill_gain, sword_skill, skill_key)
     BuffEffectService.clear_battle_effects!(player)
     player.clear_sword_skill_cooldowns!
+    player.clear_potion_healing!
     player.save!
     battle.destroy!
 
@@ -682,7 +690,7 @@ end
   end
 
   def self.apply_player_damage_variance(damage)
-    [(damage.to_i * rand(75..100) / 100.0).ceil, 1].max
+    [(damage.to_f * rand(75..100) / 100.0).floor, 1].max
   end
 
   def self.calculate_part_damage(hp_damage, weapon, part)
@@ -693,14 +701,20 @@ end
 
   def self.critical_hit?(player, weapon, battle_enemy, part, damage, sword_skill: false)
     return false unless weapon
-    return true if part.weakness? && part_would_break?(battle_enemy, part, damage)
 
     agility_bonus = (player.effective_agility - mob_effective_agility(battle_enemy)) / 5
     stiffness_bonus = enemy_sword_skill_stiffness?(battle_enemy) ? ENEMY_SWORD_SKILL_STIFFNESS_CRITICAL_BONUS : 0
     accuracy_bonus = sword_skill ? weapon.accuracy_level.to_i : 0
+    part_bonus = if part_broken?(battle_enemy, part)
+                   15
+                 elsif part.weakness? && part_would_break?(battle_enemy, part, damage)
+                   10
+                 else
+                   0
+                 end
     chance_cap = (enemy_sword_skill_stiffness?(battle_enemy) ? 75 : 30) + accuracy_bonus
     base_rate = sword_skill ? weapon.sword_skill_critical_rate : weapon.effective_critical_rate
-    chance = [ [ base_rate + agility_bonus + stiffness_bonus, 1 ].max, chance_cap ].min
+    chance = [ [ base_rate + agility_bonus + stiffness_bonus + part_bonus, 1 ].max, chance_cap ].min
     rand(100) < chance
   end
 
@@ -712,10 +726,9 @@ end
   end
 
   def self.resolve_guarded_part(player, battle_enemy, parts, target_part)
-    return { part: target_part, message: "", blocked: false, guarded: false } if part_broken?(battle_enemy, target_part)
     return { part: target_part, message: "", blocked: false, guarded: false } unless enemy_guard_success?(player, battle_enemy, target_part)
 
-    if battle_enemy.mob.equipped_weapon && target_part.weakness?
+    if battle_enemy.mob.equipped_weapon && target_part.weakness? && !part_broken?(battle_enemy, target_part)
       return { part: target_part, message: "#{battle_enemy.mob.equipped_weapon.name}で弾かれた！", blocked: true, guarded: true }
     end
 
@@ -737,7 +750,7 @@ end
   end
 
   def self.enemy_guard_success?(player, battle_enemy, target_part)
-    base_chance = target_part.weakness? ? 65 : 20
+    base_chance = target_part.weakness? || part_broken?(battle_enemy, target_part) ? 65 : 20
     base_chance += 15 if battle_enemy.mob.equipped_weapon && target_part.weakness?
     agility_gap = player.effective_agility - mob_effective_agility(battle_enemy)
     chance = [[base_chance - (agility_gap * 6), 5].max, 90].min
@@ -904,7 +917,7 @@ end
 
     hit_count = sword_skill ? [sword_skill.hits.to_i, 1].max : 1
     Array.new(hit_count).sum do
-      raw_damage = rand(1..enemy_attack_power(battle_enemy, sword_skill))
+      raw_damage = (enemy_attack_power(battle_enemy, sword_skill) * rand(85..100) / 100.0).round
       apply_enemy_damage_mitigation(player, battle_enemy, raw_damage)
     end
   end
@@ -912,8 +925,8 @@ end
   def self.enemy_attack_power(battle_enemy, sword_skill)
     base_power = mob_effective_atk(battle_enemy)
     if sword_skill
-      base_power += battle_enemy.mob.equipped_weapon&.effective_attack_power.to_i
-      base_power = (base_power * sword_skill.damage_multiplier.to_i / 100.0).ceil
+      base_power += battle_enemy.mob.equipped_weapon&.effective_attack_power.to_f
+      base_power *= sword_skill.damage_multiplier.to_i / 100.0
     end
 
     [base_power, 1].max
@@ -1096,7 +1109,7 @@ def self.gain_weapon_skill!(player, weapon, amount)
     return if battle.destroyed?
 
     tick_sword_skill_cooldowns_for_turn!(player, battle)
-    player.start_sword_skill_cooldown!(skill_key, cooldown) if sword_skill
+    player.start_sword_skill_lockout!(skill_key, cooldown) if sword_skill
     player.save!
   end
 

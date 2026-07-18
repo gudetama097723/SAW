@@ -1,7 +1,8 @@
 class ItemService
   POTION_PRICE = 50
   POTION_PRODUCTION_COST = 20
-  POTION_HEAL = 100
+  POTION_HEAL_PERCENT = 0.30
+  POTION_BATTLE_HEAL_TURNS = 5
   HERBS_PER_POTION = 10
   STATUS_CURE_ITEMS = {
     "解毒ポーション" => "poison",
@@ -100,21 +101,43 @@ class ItemService
   def self.consume_healing_potion!(player)
     potion = player.items.find_by(name: "ポーション", category: "healing") || player.items.find_by(name: "ポーション")
     return Result.new(status: :error, message: "ポーションを持っていません。") unless potion&.quantity.to_i.positive?
+    return Result.new(status: :error, message: "ポーションの回復中は他の回復アイテムを使えません。") if player.potion_healing?
 
     potion.quantity -= 1
-    player.hp = [player.hp.to_i + POTION_HEAL, player.effective_max_hp].min
+    heal_amount = potion_heal_amount(player)
+    before_hp = player.hp.to_i
+    player.hp = [player.hp.to_i + heal_amount, player.effective_max_hp].min
+    actual_heal = player.hp.to_i - before_hp
 
     ActiveRecord::Base.transaction do
       potion.quantity.to_i <= 0 ? potion.destroy! : potion.save!
       player.save!
     end
 
-    Result.new(status: :ok, message: "ポーションを使った。HPが#{POTION_HEAL}回復した。")
+    Result.new(status: :ok, message: "ポーションを使った。HPが#{actual_heal}回復した。")
+  end
+
+  def self.start_battle_potion_healing!(player)
+    potion = player.items.find_by(name: "ポーション", category: "healing") || player.items.find_by(name: "ポーション")
+    return Result.new(status: :error, message: "ポーションを持っていません。") unless potion&.quantity.to_i.positive?
+    return Result.new(status: :error, message: "ポーションの回復中は他の回復アイテムを使えません。") if player.potion_healing?
+
+    heal_amount = potion_heal_amount(player)
+    potion.quantity -= 1
+    player.start_potion_healing!(amount: heal_amount, turns: POTION_BATTLE_HEAL_TURNS)
+
+    ActiveRecord::Base.transaction do
+      potion.quantity.to_i <= 0 ? potion.destroy! : potion.save!
+      player.save!
+    end
+
+    Result.new(status: :ok, message: "ポーションを使った。#{POTION_BATTLE_HEAL_TURNS}ターンかけてHPを#{heal_amount}回復する。")
   end
 
   def self.consume_status_cure!(player, item_name)
     status = STATUS_CURE_ITEMS[item_name.to_s]
     return Result.new(status: :error, message: "そのアイテムはまだ使用できません。") unless status
+    return Result.new(status: :error, message: "ポーションの回復中は他の回復アイテムを使えません。") if player.potion_healing?
 
     item = player.items.find_by(name: item_name)
     return Result.new(status: :error, message: "#{item_name}を持っていません。") unless item&.quantity.to_i.positive?
@@ -166,5 +189,9 @@ class ItemService
 
   def self.normalized_quantity(quantity)
     [quantity.to_i, 1].max
+  end
+
+  def self.potion_heal_amount(player)
+    [(player.effective_max_hp * POTION_HEAL_PERCENT).ceil, 1].max
   end
 end

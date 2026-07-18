@@ -113,7 +113,7 @@ module Game
         return
       end
 
-      item_result = params[:item_name] == "ポーション" ? ItemService.consume_healing_potion!(player) : ItemService.consume_status_cure!(player, params[:item_name])
+      item_result = params[:item_name] == "ポーション" ? ItemService.start_battle_potion_healing!(player) : ItemService.consume_status_cure!(player, params[:item_name])
       unless item_result.status == :ok
         redirect_to game_path(battle_command: "item"), alert: item_result.message
         return
@@ -218,6 +218,7 @@ module Game
       if rand(100) < chance
         BuffEffectService.clear_battle_effects!(player)
         player.clear_sword_skill_cooldowns!
+        player.clear_potion_healing!
         player.save!
         battle.destroy
         redirect_to game_path, notice: "逃走に成功した。"

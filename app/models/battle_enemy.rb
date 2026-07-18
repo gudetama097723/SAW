@@ -26,7 +26,7 @@ class BattleEnemy < ApplicationRecord
   end
 
   def display_name
-    level_based? ? "#{mob.name} Lv#{effective_level}" : mob.name
+    level_based? && !mob.field_boss? ? "#{mob.name} Lv#{effective_level}" : mob.name
   end
 
   def distance_key

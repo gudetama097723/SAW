@@ -74,6 +74,30 @@ class ItemTest < ActiveSupport::TestCase
     assert_not StatusEffectService.active?(player, "poison")
   end
 
+  test "potion instantly heals thirty percent outside battle" do
+    player = players(:one)
+    player.update!(hp: 40, max_hp: 200)
+    player.items.create!(name: "ポーション", category: "healing", quantity: 1)
+    expected_hp = player.hp + ItemService.potion_heal_amount(player)
+
+    result = ItemService.consume_healing_potion!(player)
+
+    assert_equal :ok, result.status
+    assert_equal expected_hp, player.reload.hp
+  end
+
+  test "healing items are blocked while battle potion healing is active" do
+    player = players(:one)
+    player.items.create!(name: "解毒ポーション", category: "healing", quantity: 1)
+    player.start_potion_healing!(amount: 30, turns: 5)
+    player.save!
+
+    result = ItemService.consume_status_cure!(player, "解毒ポーション")
+
+    assert_equal :error, result.status
+    assert_includes result.message, "ポーションの回復中"
+  end
+
   test "herb is food and restores hp and satiety when eaten" do
     player = players(:one)
     player.update!(hp: 1, max_hp: 100, satiety: 50)

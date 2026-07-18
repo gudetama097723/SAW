@@ -15,7 +15,7 @@
             <p class="mb-1">重さ: <%= Item.new(name: selected_shop_item.item_name, category: selected_shop_item.category).weight %></p>
             <p class="mb-1">現所持数: <%= owned_quantity %>個</p>
             <% if selected_shop_item.item_name == "ポーション" %>
-              <p class="mb-2">効果: HPを100回復</p>
+              <p class="mb-2">効果: 最大HPの30%回復（戦闘中は5ターン）</p>
             <% elsif selected_shop_item.item_name == "解毒ポーション" %>
               <p class="mb-2">効果: 毒を治療</p>
             <% elsif selected_shop_item.item_name == "火傷治し" %>

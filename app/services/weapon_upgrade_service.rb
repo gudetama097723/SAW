@@ -5,6 +5,7 @@ class WeaponUpgradeService
     :material_rank, :success_rate, :blacksmith_bonus, :processing_level,
     keyword_init: true
   )
+  EffectPreview = Struct.new(:label, :before_value, :after_value, :unit, :precision, keyword_init: true)
 
   MATERIALS_BY_TYPE = {
     "S" => { "low" => "硬い甲殻", "medium" => "厚い甲殻", "high" => "コボルドの短刃片", "rare" => "小さな魔石" },
@@ -81,7 +82,7 @@ class WeaponUpgradeService
     if succeeded
       Result.new(
         status: :ok,
-        message: "――強化成功！ #{context.name}が#{weapon.name}の《#{quote.name}》を強化した。#{type} +1（+#{previous_level} → +#{weapon.enhancement_level}）"
+        message: "――強化成功！ #{context.name}が#{weapon.name}の《#{quote.name}》を強化した。#{quote.name} +1（+#{previous_level} → +#{weapon.enhancement_level}）"
       )
     else
       Result.new(
@@ -125,6 +126,44 @@ class WeaponUpgradeService
     rate.round.clamp(5, 95)
   end
 
+  def self.effect_previews_for(weapon, enhancement_type)
+    type = normalize_type(enhancement_type)
+    return [] unless weapon && type
+
+    upgraded = weapon.dup
+    attribute = Weapon::ENHANCEMENT_TYPES.fetch(type).fetch(:attribute)
+    upgraded.public_send("#{attribute}=", upgraded.public_send(attribute).to_i + 1)
+
+    case type
+    when "S", "H"
+      [
+        effect_preview("強化後攻撃力", weapon.base_effective_attack_power, upgraded.base_effective_attack_power, precision: 2),
+        effect_preview("部位破壊力", weapon.effective_part_break_power, upgraded.effective_part_break_power, unit: "pt", precision: 1)
+      ]
+    when "Q"
+      [ 1, 2, 3, 4, 5 ].map do |hit_count|
+        label = hit_count == 5 ? "ソードスキル倍率補正（5Hit以上）" : "ソードスキル倍率補正（#{hit_count}Hit）"
+        effect_preview(
+          label,
+          weapon.sword_skill_damage_bonus_percent(hit_count),
+          upgraded.sword_skill_damage_bonus_percent(hit_count),
+          unit: "%",
+          precision: 1
+        )
+      end
+    when "A"
+      [
+        effect_preview("ソードスキル命中率補正", weapon.sword_skill_accuracy_bonus, upgraded.sword_skill_accuracy_bonus, unit: "pt"),
+        effect_preview("ソードスキル会心率", weapon.sword_skill_critical_rate, upgraded.sword_skill_critical_rate, unit: "%")
+      ]
+    when "D"
+      [
+        effect_preview("最大耐久値", weapon.effective_max_durability, upgraded.effective_max_durability),
+        effect_preview("耐久消費率", weapon.durability_cost_multiplier * 100, upgraded.durability_cost_multiplier * 100, unit: "%", precision: 1)
+      ]
+    end
+  end
+
   def self.normalize_type(value)
     type = value.to_s.upcase
     type if Weapon::ENHANCEMENT_TYPES.key?(type)
@@ -133,6 +172,17 @@ class WeaponUpgradeService
   def self.enhancement_limit_message(weapon)
     weapon.fully_enhanced? ? "この武器は完全強化されている。" : "この武器はこれ以上強化できない。"
   end
+
+  def self.effect_preview(label, before_value, after_value, unit: "", precision: 0)
+    EffectPreview.new(
+      label: label,
+      before_value: before_value,
+      after_value: after_value,
+      unit: unit,
+      precision: precision
+    )
+  end
+  private_class_method :effect_preview
 
   def self.required_materials_for(type, step, difficulty)
     materials = MATERIALS_BY_TYPE.fetch(type)

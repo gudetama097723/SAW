@@ -43,6 +43,12 @@ class WeaponShopTest < ActionDispatch::IntegrationTest
     armor = @player.armors.find_by!(name: "レザーグローブ")
     assert_equal "hands", armor.slot
     assert_equal armor.max_durability, armor.durability
+
+    post weapon_shop_path, params: { equipment_type: "weapon", equipment_name: "ブロンズソード", confirm_purchase: "1" }
+    assert_redirected_to game_path(panel: "weapon_shop", shop_menu: "weapons")
+    weapon = @player.weapons.find_by!(name: "ブロンズソード")
+    assert_equal "片手直剣", weapon.weapon_type
+    assert_equal weapon.max_durability, weapon.durability
   end
 
 
@@ -174,6 +180,8 @@ class WeaponShopTest < ActionDispatch::IntegrationTest
 
     get game_path, params: { panel: "blacksmith" }
     assert_not_includes response.body, "自分で鍛冶を行う"
+    assert_not_includes response.body, "鍛冶を行う者を選択"
+    assert_not_includes response.body, "NPCへ依頼"
     assert_nil BlacksmithService.context_for(@player, mode: "player")
     assert_no_difference -> { @player.weapons.count } do
       post produce_weapon_path, params: {
@@ -190,6 +198,7 @@ class WeaponShopTest < ActionDispatch::IntegrationTest
     get game_path, params: { panel: "blacksmith" }
 
     assert_includes response.body, "自分で鍛冶を行う"
+    assert_includes response.body, "鍛冶を行う者を選択"
     assert BlacksmithService.context_for(@player, mode: "player").player?
   end
 

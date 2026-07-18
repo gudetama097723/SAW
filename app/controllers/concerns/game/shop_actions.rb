@@ -192,6 +192,17 @@ module Game
     end
 
     weapon = player.weapons.find_by(id: params[:weapon_id])
+    unless params[:confirm_upgrade] == "1"
+      redirect_to game_path(
+        panel: "blacksmith",
+        blacksmith_menu: "upgrade",
+        weapon_id: weapon&.id,
+        smith_mode: params[:smith_mode],
+        confirm_upgrade_type: WeaponUpgradeService.normalize_type(params[:enhancement_type])
+      ), alert: "強化する内容を確認してください。"
+      return
+    end
+
     result = WeaponUpgradeService.upgrade!(player, weapon, params[:enhancement_type], blacksmith_mode: params[:smith_mode])
     redirect_to game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: weapon&.id, smith_mode: params[:smith_mode]), flash_for(result)
   end
@@ -365,7 +376,7 @@ module Game
         if kind == "armor"
           player.armors.create!(definition.to_h.except(:location, :price, :description).merge(equipped: false))
         else
-          player.weapons.create!(definition.to_h.except(:location, :price, :production_only).merge(equipped: false))
+          player.weapons.create!(definition.to_h.except(:location, :price, :production_only, :required_blacksmith_proficiency).merge(equipped: false))
         end
       end
       redirect_to game_path(panel: "weapon_shop", shop_menu: kind == "armor" ? "armors" : "weapons"), notice: "#{definition.name}を購入した。"

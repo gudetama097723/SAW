@@ -121,7 +121,7 @@ class WeaponTest < ActiveSupport::TestCase
     )
 
     assert_equal 13, weapon.enhancement_level
-    assert_equal 110, weapon.base_effective_attack_power
+    assert_in_delta 110.0, weapon.base_effective_attack_power, 0.0001
     assert_equal 109, weapon.effective_part_break_power
     assert_equal 150, weapon.effective_max_durability
     assert_equal 6, weapon.sword_skill_accuracy_bonus

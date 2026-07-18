@@ -200,7 +200,7 @@ class BattleServiceTest < ActiveSupport::TestCase
     end
   end
 
-  test "sword skill starts individual cooldown and blocks repeated use" do
+  test "sword skill starts lockout before individual cooldown and blocks all sword skills" do
     player = players(:one)
     player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
     player.weapons.destroy_all
@@ -226,13 +226,14 @@ class BattleServiceTest < ActiveSupport::TestCase
     )
 
     assert_equal :ok, result.status
-    assert_equal 1, player.reload.sword_skill_cooldown("vertical")
+    assert_equal 1, player.reload.sword_skill_lockout_turns
+    assert_equal 0, player.sword_skill_cooldown("vertical")
 
     blocked = BattleService.resolve_player_attack!(
       battle: battle.reload,
       player: player,
       mob_part_id: nil,
-      label: "バーチカル",
+      label: "ホリゾンタル",
       damage_multiplier: 100,
       durability_cost: 1,
       skill_gain: 1,
@@ -240,13 +241,31 @@ class BattleServiceTest < ActiveSupport::TestCase
       hits: 1,
       sword_skill: true,
       attack_attribute: "斬撃",
-      skill_key: "vertical",
+      skill_key: "horizontal",
       cooldown: 1
     )
 
     assert_equal :error, blocked.status
-    assert_includes blocked.message, "バーチカルはクールタイム中です。"
+    assert_includes blocked.message, "ソードスキル発動後の反動"
     assert_equal 99, weapon.reload.durability
+
+    normal_attack = BattleService.resolve_player_attack!(
+      battle: battle.reload,
+      player: player,
+      mob_part_id: nil,
+      label: "通常攻撃",
+      damage_multiplier: 100,
+      durability_cost: 1,
+      skill_gain: 0,
+      stiffness: false,
+      hits: 1,
+      sword_skill: false,
+      attack_attribute: "斬撃"
+    )
+
+    assert_equal :ok, normal_attack.status
+    assert_equal 0, player.reload.sword_skill_lockout_turns
+    assert_equal 1, player.sword_skill_cooldown("vertical")
   end
 
   test "sword skill only receives enemy attack during stiffness" do
@@ -305,6 +324,37 @@ class BattleServiceTest < ActiveSupport::TestCase
 
     assert_equal :ok, result.status
     assert_equal 0, player.reload.sword_skill_cooldown("vertical")
+  end
+
+  test "sword skill lockout pauses existing cooldowns until pending cooldown starts" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
+    player.weapons.destroy_all
+    player.weapons.create!(name: "CT停止テスト剣", weapon_type: "片手直剣", attack_power: 1, durability: 100, max_durability: 100, equipped: true)
+    player.start_sword_skill_cooldown!("horizontal", 2)
+    player.start_sword_skill_lockout!("vertical", 1)
+    player.save!
+    mob = Mob.create!(name: "CT停止テストmob", hp: 999, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 999)
+
+    result = BattleService.resolve_player_attack!(
+      battle: battle,
+      player: player,
+      mob_part_id: nil,
+      label: "通常攻撃",
+      damage_multiplier: 100,
+      durability_cost: 1,
+      skill_gain: 0,
+      stiffness: false,
+      hits: 1,
+      sword_skill: false,
+      attack_attribute: "斬撃"
+    )
+
+    assert_equal :ok, result.status
+    assert_equal 0, player.reload.sword_skill_lockout_turns
+    assert_equal 2, player.sword_skill_cooldown("horizontal")
+    assert_equal 1, player.sword_skill_cooldown("vertical")
   end
 
   test "area attack can target arbitrary selected enemy ids" do
@@ -413,6 +463,31 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_includes result.message, "敵はいなくなった。"
     assert_equal 100, player.reload.hp
     assert_not Battle.exists?(battle.id)
+  end
+
+  test "battle potion healing resolves over five player turns" do
+    player = players(:one)
+    player.update!(hp: 40, max_hp: 200)
+    player.items.create!(name: "ポーション", category: "healing", quantity: 1)
+    expected_hp = player.hp + ItemService.potion_heal_amount(player)
+    mob = Mob.create!(name: "ポーション回復確認mob", hp: 999, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 999)
+    battle.battle_enemies.create!(mob: mob, enemy_hp: 999, enemy_level: 1, position: 1)
+
+    result = ItemService.start_battle_potion_healing!(player)
+
+    assert_equal :ok, result.status
+    assert_equal 40, player.reload.hp
+    assert player.potion_healing?
+
+    5.times do
+      messages = BattleService.apply_battle_turn_start_effects!(player, battle)
+      player.save!
+      assert messages.any? { |message| message.include?("ポーションの回復効果") }
+    end
+
+    assert_equal expected_hp, player.reload.hp
+    assert_not player.potion_healing?
   end
 
   test "zero flee rate enemy attacks normally" do

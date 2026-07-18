@@ -1,5 +1,6 @@
 <% blacksmith_menu = params[:blacksmith_menu].presence %>
-<% smith_mode = params[:smith_mode] == "player" ? "player" : "npc" %>
+<% player_blacksmith_skill = BlacksmithService.blacksmith_skill_for(@player) %>
+<% smith_mode = player_blacksmith_skill && params[:smith_mode] == "player" ? "player" : "npc" %>
 <% npc_blacksmith = BlacksmithService.current_for(@player) %>
 <% context = BlacksmithService.context_for(@player, mode: smith_mode, blacksmith: npc_blacksmith) %>
 <div class="card-header">鍛冶屋</div>
@@ -7,14 +8,15 @@
   <div class="border rounded p-2 mb-3">
     <p class="mb-1"><strong>鍛冶師: <%= context&.name || "選択できません" %></strong></p>
     <p class="mb-2"><%= BlacksmithService.skill_label(context) %></p>
-    <div class="d-flex gap-2">
-      <% if npc_blacksmith %>
-        <%= link_to "NPCへ依頼", game_path(panel: "blacksmith", blacksmith_menu: blacksmith_menu, smith_mode: "npc"), class: "btn btn-sm #{smith_mode == 'npc' ? 'btn-warning' : 'btn-outline-warning'} flex-fill" %>
-      <% end %>
-      <% if BlacksmithService.blacksmith_skill_for(@player) %>
-        <%= link_to "自分で鍛冶", game_path(panel: "blacksmith", blacksmith_menu: blacksmith_menu, smith_mode: "player"), class: "btn btn-sm #{smith_mode == 'player' ? 'btn-warning' : 'btn-outline-warning'} flex-fill" %>
-      <% end %>
-    </div>
+    <% if player_blacksmith_skill %>
+      <p class="small text-muted mb-1">鍛冶を行う者を選択</p>
+      <div class="d-flex gap-2">
+        <% if npc_blacksmith %>
+          <%= link_to npc_blacksmith.name, game_path(panel: "blacksmith", blacksmith_menu: blacksmith_menu, smith_mode: "npc"), class: "btn btn-sm #{smith_mode == 'npc' ? 'btn-warning' : 'btn-outline-warning'} flex-fill" %>
+        <% end %>
+        <%= link_to "自分", game_path(panel: "blacksmith", blacksmith_menu: blacksmith_menu, smith_mode: "player"), class: "btn btn-sm #{smith_mode == 'player' ? 'btn-warning' : 'btn-outline-warning'} flex-fill" %>
+      </div>
+    <% end %>
   </div>
 
   <% if blacksmith_menu == "produce" %>
@@ -40,7 +42,7 @@
         <%= form.submit "鍛造する", class: "btn btn-outline-warning w-100" %>
       <% end %>
     <% else %>
-      <p class="text-warning mb-0">鍛冶スキルを取得するか、担当NPC鍛冶師を選択してください。</p>
+      <p class="text-warning mb-0">現在利用できる鍛冶師がいません。</p>
     <% end %>
 
   <% elsif blacksmith_menu == "repair" %>
@@ -107,8 +109,7 @@
     <% if selected_weapon && context %>
       <%= link_to "強化する武器一覧に戻る", game_path(panel: "blacksmith", blacksmith_menu: "upgrade", smith_mode: smith_mode), class: "btn btn-outline-light w-100 mb-3" %>
       <h6><%= selected_weapon.display_name %></h6>
-      <p class="mb-1">強化内訳: <%= selected_weapon.enhancement_breakdown %></p>
-      <p class="mb-2">強化試行: <%= selected_weapon.enhance_attempts %> / <%= selected_weapon.enhance_limit %></p>
+      <p class="small mb-2"><%= selected_weapon.enhancement_breakdown %>／強化試行 <%= selected_weapon.enhance_attempts %> / <%= selected_weapon.enhance_limit %></p>
       <% if selected_weapon.max_enhancement? %>
         <p class="mb-0"><%= WeaponUpgradeService.enhancement_limit_message(selected_weapon) %></p>
       <% else %>
@@ -117,19 +118,51 @@
             <% quote = WeaponUpgradeService.quote_for(selected_weapon, type, player: @player, blacksmith: npc_blacksmith, context: context) %>
             <% next unless quote %>
             <% available = context.proficiency >= quote.processing_level %>
-            <div class="border rounded p-2">
-              <p class="mb-1"><strong><%= type %>：<%= config[:name] %></strong>／成功率 <%= quote.success_rate %>%</p>
-              <p class="mb-1">必要熟練度 <%= quote.processing_level %>／鍛冶補正 +<%= quote.blacksmith_bonus %>pt</p>
-              <p class="mb-2">必要: <%= quote.required_col %>コル／<%= quote.required_materials.map { |name, count| "#{name} ×#{count}" }.join("、") %></p>
-              <%= button_to available ? "#{config[:name]}を強化" : "素材の加工熟練度不足", upgrade_weapon_path(weapon_id: selected_weapon.id, enhancement_type: type, smith_mode: smith_mode), method: :post, disabled: !available, class: "btn btn-outline-warning btn-sm w-100" %>
-            </div>
+            <% effect_previews = WeaponUpgradeService.effect_previews_for(selected_weapon, type) %>
+            <% confirming = params[:confirm_upgrade_type].to_s.upcase == type %>
+            <% if confirming %>
+              <div class="border border-warning rounded p-2">
+                <p class="mb-1"><strong><%= config[:name] %>を強化</strong>／成功率 <%= quote.success_rate %>%</p>
+                <p class="small text-muted mb-1"><%= config[:effect] %></p>
+                <div class="border rounded p-2 mb-2">
+                  <p class="small mb-1"><strong>成功時の変化</strong></p>
+                  <% effect_previews.each do |preview| %>
+                    <p class="small mb-1">
+                      <%= preview.label %>:
+                      <%= formatted_enhancement_preview_value(preview, preview.before_value) %><%= preview.unit %>
+                      →
+                      <%= formatted_enhancement_preview_value(preview, preview.after_value) %><%= preview.unit %>
+                      （<%= formatted_enhancement_preview_change(preview) %>）
+                    </p>
+                  <% end %>
+                </div>
+                <p class="mb-1">必要熟練度 <%= quote.processing_level %>／鍛冶補正 +<%= quote.blacksmith_bonus %>pt</p>
+                <p class="mb-2">必要: <%= quote.required_col %>コル／<%= quote.required_materials.map { |name, count| "#{name} ×#{count}" }.join("、") %></p>
+                <% if available %>
+                <div class="border border-warning rounded p-2">
+                  <p class="mb-1"><strong><%= config[:name] %>を強化しますか？</strong></p>
+                  <p class="small mb-2">成功率 <%= quote.success_rate %>%。失敗時もコル・素材・強化試行回数を消費します。</p>
+                  <div class="d-flex gap-2">
+                    <%= button_to "はい", upgrade_weapon_path(weapon_id: selected_weapon.id, enhancement_type: type, smith_mode: smith_mode, confirm_upgrade: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-warning w-100" %>
+                    <%= link_to "いいえ", game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: selected_weapon.id, smith_mode: smith_mode), class: "btn btn-outline-light flex-fill" %>
+                  </div>
+                </div>
+                <% else %>
+                  <button type="button" class="btn btn-outline-secondary btn-sm w-100" disabled>素材の加工熟練度不足</button>
+                <% end %>
+              </div>
+            <% elsif available %>
+              <%= link_to "#{config[:name]}を強化", game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: selected_weapon.id, smith_mode: smith_mode, confirm_upgrade_type: type), class: "btn btn-outline-warning btn-sm w-100" %>
+            <% else %>
+              <button type="button" class="btn btn-outline-secondary btn-sm w-100" disabled><%= config[:name] %>（加工熟練度不足）</button>
+              <% end %>
           <% end %>
         </div>
       <% end %>
     <% elsif @player.weapons.any? %>
       <div class="d-grid gap-2">
         <% @player.weapons.each do |weapon| %>
-          <%= link_to "#{weapon.display_name}／#{weapon.enhancement_breakdown}／試行 #{weapon.enhance_attempts}/#{weapon.enhance_limit}", game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: weapon.id, smith_mode: smith_mode), class: "btn btn-outline-warning w-100" %>
+          <%= link_to "#{weapon.display_name}／強化試行 #{weapon.enhance_attempts}/#{weapon.enhance_limit}", game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: weapon.id, smith_mode: smith_mode), class: "btn btn-outline-warning w-100" %>
         <% end %>
       </div>
     <% else %>

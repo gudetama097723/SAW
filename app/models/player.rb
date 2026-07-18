@@ -23,6 +23,9 @@
 
   STATUS_LABELS = StatusEffectService::LABELS
   SWORD_SKILL_COOLDOWNS_KEY = "sword_skill_cooldowns"
+  SWORD_SKILL_LOCKOUT_KEY = "sword_skill_lockout_turns"
+  SWORD_SKILL_PENDING_COOLDOWN_KEY = "sword_skill_pending_cooldown"
+  POTION_HEALING_KEY = "potion_healing"
   SLEEP_DEPRIVATION_START_MINUTES = 15 * 60
   SLEEP_DEPRIVATION_INTERVAL_MINUTES = 60
   SLEEP_DEPRIVATION_GAIN = 10
@@ -340,6 +343,14 @@ def sword_skill_on_cooldown?(skill_key)
   sword_skill_cooldown(skill_key).positive?
 end
 
+def sword_skill_lockout_turns
+  skill_counter_data[SWORD_SKILL_LOCKOUT_KEY].to_i
+end
+
+def sword_skill_locked_out?
+  sword_skill_lockout_turns.positive?
+end
+
 def start_sword_skill_cooldown!(skill_key, turns)
   cooldown = turns.to_i
   return if skill_key.blank? || cooldown <= 0
@@ -351,8 +362,36 @@ def start_sword_skill_cooldown!(skill_key, turns)
   self.skill_counters = data.to_json
 end
 
+def start_sword_skill_lockout!(skill_key, cooldown)
+  data = skill_counter_data
+  data[SWORD_SKILL_LOCKOUT_KEY] = 1
+  if skill_key.present? && cooldown.to_i.positive?
+    data[SWORD_SKILL_PENDING_COOLDOWN_KEY] = { "skill_key" => skill_key.to_s, "cooldown" => cooldown.to_i }
+  else
+    data.delete(SWORD_SKILL_PENDING_COOLDOWN_KEY)
+  end
+  self.skill_counters = data.to_json
+end
+
 def tick_sword_skill_cooldowns!
   data = skill_counter_data
+  if data[SWORD_SKILL_LOCKOUT_KEY].to_i.positive?
+    remaining = data[SWORD_SKILL_LOCKOUT_KEY].to_i - 1
+    if remaining.positive?
+      data[SWORD_SKILL_LOCKOUT_KEY] = remaining
+    else
+      data.delete(SWORD_SKILL_LOCKOUT_KEY)
+      pending = data.delete(SWORD_SKILL_PENDING_COOLDOWN_KEY)
+      if pending.is_a?(Hash) && pending["skill_key"].present? && pending["cooldown"].to_i.positive?
+        cooldowns = data[SWORD_SKILL_COOLDOWNS_KEY].is_a?(Hash) ? data[SWORD_SKILL_COOLDOWNS_KEY] : {}
+        cooldowns[pending["skill_key"].to_s] = pending["cooldown"].to_i
+        data[SWORD_SKILL_COOLDOWNS_KEY] = cooldowns
+      end
+    end
+    self.skill_counters = data.to_json
+    return
+  end
+
   cooldowns = data[SWORD_SKILL_COOLDOWNS_KEY].is_a?(Hash) ? data[SWORD_SKILL_COOLDOWNS_KEY] : {}
   cooldowns.keys.each do |key|
     cooldowns[key] = cooldowns[key].to_i - 1
@@ -365,6 +404,65 @@ end
 def clear_sword_skill_cooldowns!
   data = skill_counter_data
   data.delete(SWORD_SKILL_COOLDOWNS_KEY)
+  data.delete(SWORD_SKILL_LOCKOUT_KEY)
+  data.delete(SWORD_SKILL_PENDING_COOLDOWN_KEY)
+  self.skill_counters = data.to_json
+end
+
+def potion_healing_data
+  value = skill_counter_data[POTION_HEALING_KEY]
+  value.is_a?(Hash) ? value : {}
+end
+
+def potion_healing?
+  potion_healing_data["turns_remaining"].to_i.positive? &&
+    potion_healing_data["amount_remaining"].to_i.positive?
+end
+
+def potion_healing_turns_remaining
+  potion_healing_data["turns_remaining"].to_i
+end
+
+def start_potion_healing!(amount:, turns:)
+  data = skill_counter_data
+  data[POTION_HEALING_KEY] = {
+    "amount_remaining" => amount.to_i,
+    "turns_remaining" => turns.to_i
+  }
+  self.skill_counters = data.to_json
+end
+
+def tick_potion_healing!
+  data = skill_counter_data
+  healing = data[POTION_HEALING_KEY]
+  return nil unless healing.is_a?(Hash)
+
+  amount_remaining = healing["amount_remaining"].to_i
+  turns_remaining = healing["turns_remaining"].to_i
+  return nil unless amount_remaining.positive? && turns_remaining.positive?
+
+  amount = (amount_remaining.to_f / turns_remaining).ceil
+  before_hp = hp.to_i
+  self.hp = [hp.to_i + amount, effective_max_hp].min
+  amount_healed = hp.to_i - before_hp
+  amount_remaining -= amount
+  turns_remaining -= 1
+
+  if amount_remaining.positive? && turns_remaining.positive? && hp.to_i < effective_max_hp
+    healing["amount_remaining"] = amount_remaining
+    healing["turns_remaining"] = turns_remaining
+    data[POTION_HEALING_KEY] = healing
+  else
+    data.delete(POTION_HEALING_KEY)
+  end
+
+  self.skill_counters = data.to_json
+  amount_healed
+end
+
+def clear_potion_healing!
+  data = skill_counter_data
+  data.delete(POTION_HEALING_KEY)
   self.skill_counters = data.to_json
 end
 

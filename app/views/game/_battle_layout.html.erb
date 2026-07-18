@@ -11,6 +11,9 @@
 <% selected_skill_definition = selected_skill.present? ? SkillCatalog.find(selected_skill) : nil %>
 <% selected_skill_is_area = selected_skill_definition&.area? %>
 <% selected_skill_cooldown = selected_skill.present? ? @player.sword_skill_cooldown(selected_skill) : 0 %>
+<% sword_skill_lockout_turns = @player.sword_skill_lockout_turns %>
+<% sword_skill_locked_out = sword_skill_lockout_turns.positive? %>
+<% selected_skill_unavailable = sword_skill_locked_out || selected_skill_cooldown.positive? %>
 <% selected_attack_group = params[:attack_group].presence %>
 <% selected_attack_group = "unarmed" if !combat_weapon && selected_attack_group == "weapon_attack" %>
 <% selected_attack_attribute = AttackAttribute.normalize(params[:attack_attribute].presence || combat_weapon&.primary_attack_attribute || "打撃") %>
@@ -99,6 +102,9 @@
             <h6><%= selected_skill_definition.name %></h6>
             <p class="small mb-1">種別: <%= selected_skill_definition.target_label %></p>
             <p class="small mb-1">威力: <%= selected_skill_definition.damage_multiplier %>% / 耐久消費: <%= selected_skill_definition.durability_cost %> / CT: <%= selected_skill_definition.cooldown %></p>
+            <% if sword_skill_locked_out %>
+              <p class="small text-warning mb-1">発動不能: あと<%= sword_skill_lockout_turns %>ターン</p>
+            <% end %>
             <% if selected_skill_cooldown.positive? %>
               <p class="small text-warning mb-1">CT中: あと<%= selected_skill_cooldown %>ターン</p>
             <% end %>
@@ -109,8 +115,8 @@
                 <p class="small text-warning mb-2">これ以上選択できません。</p>
               <% end %>
               <% if selected_group.many? %>
-                <% if selected_skill_cooldown.positive? %>
-                  <div class="btn btn-outline-secondary disabled w-100">CT中</div>
+                <% if selected_skill_unavailable %>
+                  <div class="btn btn-outline-secondary disabled w-100"><%= sword_skill_locked_out ? "発動不能" : "CT中" %></div>
                 <% else %>
                   <%= button_to "#{selected_group.size}体へ発動",
                       sword_skill_path(skill: selected_skill, target_enemy_ids: selected_enemy_ids.join(",")),
@@ -131,9 +137,16 @@
             <div class="d-grid gap-2">
               <% sword_skill_definitions.each do |skill_definition| %>
                 <% cooldown = @player.sword_skill_cooldown(skill_definition.key) %>
-                <%= link_to cooldown.positive? ? "#{skill_definition.name} CT:#{cooldown}" : skill_definition.name,
+                <% label = if sword_skill_locked_out
+                     "#{skill_definition.name} 発動不能:#{sword_skill_lockout_turns}"
+                   elsif cooldown.positive?
+                     "#{skill_definition.name} CT:#{cooldown}"
+                   else
+                     skill_definition.name
+                   end %>
+                <%= link_to label,
                     game_path(battle_command: "sword_skill", skill_group: "sword_skill", selected_skill: skill_definition.key, target_enemy_id: selected_enemy&.id),
-                    class: "btn btn-outline-danger w-100" %>
+                    class: sword_skill_locked_out ? "btn btn-outline-secondary w-100" : "btn btn-outline-danger w-100" %>
               <% end %>
             </div>
           <% else %>
@@ -197,8 +210,10 @@
         <% elsif battle_command == "item" %>
           <% potion = @player.items.find_by(name: "ポーション", category: "healing") || @player.items.find_by(name: "ポーション") %>
           <div class="d-grid gap-2">
-            <% if potion&.quantity.to_i.positive? %>
-              <%= button_to "ポーション × #{potion.quantity}", use_battle_item_path(item_name: "ポーション"), method: :post, class: "btn btn-outline-success w-100" %>
+            <% if @player.potion_healing? %>
+              <div class="btn btn-outline-secondary disabled w-100">ポーション回復中（残り<%= @player.potion_healing_turns_remaining %>ターン）</div>
+            <% elsif potion&.quantity.to_i.positive? %>
+              <%= button_to "ポーション × #{potion.quantity}（5ターン回復）", use_battle_item_path(item_name: "ポーション"), method: :post, class: "btn btn-outline-success w-100" %>
             <% else %>
               <div class="btn btn-outline-secondary disabled w-100">使用可能なアイテムなし</div>
             <% end %>
@@ -215,7 +230,11 @@
           <h5 class="mb-2"><%= selected_detail_weapon.display_name %></h5>
           <p class="mb-1">種別: <%= selected_detail_weapon.weapon_type %></p>
           <p class="mb-1">レアリティ: <%= selected_detail_weapon.rarity %></p>
-          <p class="mb-1">攻撃力: <%= selected_detail_weapon.effective_attack_power %>（本来 <%= selected_detail_weapon.base_effective_attack_power %>）</p>
+          <p class="mb-1">基礎攻撃力: <%= selected_detail_weapon.attack_power %></p>
+          <p class="mb-1">強化後攻撃力: <%= formatted_attack_power(selected_detail_weapon.base_effective_attack_power, precision: 2) %>（補正 +<%= formatted_attack_bonus_percent(selected_detail_weapon) %>%）</p>
+          <% if selected_detail_weapon.durability_attack_multiplier < 1.0 %>
+            <p class="mb-1">現在攻撃力: <%= formatted_attack_power(selected_detail_weapon.effective_attack_power, precision: 2) %>（耐久補正適用）</p>
+          <% end %>
           <p class="mb-1">強化: <%= selected_detail_weapon.enhancement_breakdown %>（試行 <%= selected_detail_weapon.enhance_attempts %>/<%= selected_detail_weapon.enhance_limit %>）</p>
           <p class="mb-1">耐久力: <%= selected_detail_weapon.durability %> / <%= selected_detail_weapon.effective_max_durability %>（<%= selected_detail_weapon.durability_condition_label %>）</p>
           <p class="mb-1">攻撃属性: <%= selected_detail_weapon.attack_attribute_list.join(" / ") %></p>
@@ -258,8 +277,8 @@
               <% state = part_target_states[part.id.to_s] || {} %>
               <% part_label = state["broken"] ? "#{part.name}（破壊済み）" : part.name %>
               <% if battle_command == "sword_skill" %>
-                <% if selected_skill_cooldown.positive? %>
-                  <div class="btn btn-outline-secondary disabled w-100"><%= part_label %> CT中</div>
+                <% if selected_skill_unavailable %>
+                  <div class="btn btn-outline-secondary disabled w-100"><%= part_label %> <%= sword_skill_locked_out ? "発動不能" : "CT中" %></div>
                 <% else %>
                   <%= button_to part_label,
                       sword_skill_path(target_enemy_id: part_target_enemy.id, target_enemy_ids: selected_skill_is_area ? selected_enemy_ids.join(",") : nil, mob_part_id: part.id, skill: selected_skill),

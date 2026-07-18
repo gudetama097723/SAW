@@ -93,7 +93,7 @@
           <div class="game-status-weapon">
             <span><%= weapon.display_name %></span>
             <div class="game-status-weapon-values">
-              <strong>ATK <%= weapon.effective_attack_power %></strong>
+              <strong>ATK <%= formatted_attack_power(weapon.effective_attack_power) %></strong>
               <strong class="game-status-weapon-durability <%= weapon_durability_state_class(weapon) %>" style="--durability-percent: <%= weapon.durability_percent %>%">
                 DUR <%= weapon.durability %>/<%= weapon.effective_max_durability %>
               </strong>

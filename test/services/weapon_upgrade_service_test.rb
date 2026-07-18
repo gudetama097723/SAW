@@ -39,6 +39,8 @@ class WeaponUpgradeServiceTest < ActiveSupport::TestCase
 
       assert_equal :ok, result.status
       assert_includes result.message, "強化成功"
+      assert_includes result.message, "鋭さ +1"
+      assert_not_includes result.message, "S +1"
     end
 
     @weapon.reload

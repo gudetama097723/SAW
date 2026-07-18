@@ -5,7 +5,8 @@
       <div class="border rounded p-2 mb-2">
         <p class="mb-1">武器: <%= weapon.display_name %></p>
         <p class="mb-1">種別: <%= weapon.weapon_type %></p>
-        <p class="mb-1">攻撃力: <%= weapon.effective_attack_power %>（本来 <%= weapon.base_effective_attack_power %>）</p>
+        <p class="mb-1">攻撃力: <%= formatted_attack_power(weapon.effective_attack_power) %></p>
+        <p class="mb-1">基礎: <%= weapon.attack_power %> / 強化補正: +<%= formatted_attack_bonus_percent(weapon) %>%</p>
         <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
         <p class="mb-1">耐久力: <%= weapon.durability %> / <%= weapon.effective_max_durability %>（<%= weapon.durability_condition_label %>）</p>
         <% if weapon.effective_part_break_power > 100 %>

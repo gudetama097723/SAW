@@ -5,6 +5,24 @@ module GameHelper
     format("%+d", value.to_i)
   end
 
+  def formatted_attack_power(value, precision: 1)
+    number_with_precision(value.to_f, precision: precision, strip_insignificant_zeros: false)
+  end
+
+  def formatted_attack_bonus_percent(weapon)
+    number_with_precision(weapon.enhancement_attack_percent, precision: 1, strip_insignificant_zeros: true)
+  end
+
+  def formatted_enhancement_preview_value(preview, value)
+    number_with_precision(value, precision: preview.precision, strip_insignificant_zeros: false)
+  end
+
+  def formatted_enhancement_preview_change(preview)
+    change = preview.after_value - preview.before_value
+    sign = change.positive? ? "+" : ""
+    "#{sign}#{formatted_enhancement_preview_value(preview, change)}#{preview.unit}"
+  end
+
   def game_environment_classes(player, environment_location)
     [
       "game-shell",

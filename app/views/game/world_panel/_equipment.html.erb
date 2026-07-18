@@ -22,7 +22,8 @@
                 <%= render "game/visual_asset", kind: :weapon, record: weapon, label: weapon.display_name, class_name: "saw-visual-detail mb-2" %>
                 <p class="mb-1">種別: <%= weapon.weapon_type %></p>
                 <p class="mb-1">レアリティ: <%= weapon.rarity %></p>
-                <p class="mb-1">攻撃力: <%= weapon.effective_attack_power %>（本来 <%= weapon.base_effective_attack_power %>）</p>
+                <p class="mb-1">攻撃力: <%= formatted_attack_power(weapon.effective_attack_power) %></p>
+                <p class="mb-1">基礎攻撃力: <%= weapon.attack_power %> / 強化補正: +<%= formatted_attack_bonus_percent(weapon) %>%</p>
                 <% if weapon.fully_enhanced? %><p class="text-warning mb-1">【完全強化】</p><% end %>
                 <p class="mb-1">強化: <%= weapon.enhancement_breakdown %>（+<%= weapon.enhancement_level %>）</p>
                 <p class="mb-1">強化試行: <%= weapon.enhance_attempts %> / <%= weapon.enhance_limit %>（残り<%= weapon.remaining_enhance_attempts %>回）</p>
