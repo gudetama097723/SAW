@@ -941,4 +941,56 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_includes result.message, "ノックバックが発生"
     assert_not_includes result.message, "錬技後の硬直中"
   end
+
+  test "resolve_hit! records critical hits and kills for evolvable-origin weapons" do
+    player = players(:one)
+    player.update!(strength: 10, agility: 1)
+    weapon = player.weapons.create!(name: "進化追跡剣", weapon_type: "片手直剣", attack_power: 100, durability: 100, max_durability: 100, equipped: true, origin: "starter")
+    mob = Mob.create!(name: "進化追跡mob", hp: 1000, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    part = mob.mob_parts.create!(name: "胴体", damage_multiplier: 100, weakness: false)
+    battle = player.battles.create!(mob: mob, enemy_hp: 1000)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 1000, enemy_level: 1, position: 1)
+
+    original_critical_hit = BattleService.method(:critical_hit?)
+    BattleService.singleton_class.define_method(:rand) { |arg = nil| arg.is_a?(Range) ? arg.end : 0 }
+    BattleService.define_singleton_method(:critical_hit?) { |*| true }
+    begin
+      BattleService.resolve_hit!(
+        player: player, weapon: weapon, battle_enemy: enemy, mob_part_id: part.id,
+        damage_multiplier: 100, attack_attribute: "斬撃"
+      )
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+      BattleService.define_singleton_method(:critical_hit?, original_critical_hit)
+    end
+
+    assert_equal 1, weapon.reload.critical_hit_count
+    assert_equal 0, weapon.kill_count
+  end
+
+  test "resolve_hit! records a kill without a critical hit and leaves non-evolvable weapons untouched" do
+    player = players(:one)
+    player.update!(strength: 10, agility: 1)
+    weapon = player.weapons.create!(name: "撃破追跡剣", weapon_type: "片手直剣", attack_power: 100, durability: 100, max_durability: 100, equipped: true, origin: "shop")
+    mob = Mob.create!(name: "撃破追跡mob", hp: 1, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    part = mob.mob_parts.create!(name: "胴体", damage_multiplier: 100, weakness: false)
+    battle = player.battles.create!(mob: mob, enemy_hp: 1)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 1, enemy_level: 1, position: 1)
+
+    original_critical_hit = BattleService.method(:critical_hit?)
+    BattleService.singleton_class.define_method(:rand) { |arg = nil| arg.is_a?(Range) ? arg.end : 0 }
+    BattleService.define_singleton_method(:critical_hit?) { |*| false }
+    begin
+      BattleService.resolve_hit!(
+        player: player, weapon: weapon, battle_enemy: enemy, mob_part_id: part.id,
+        damage_multiplier: 100, attack_attribute: "斬撃"
+      )
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+      BattleService.define_singleton_method(:critical_hit?, original_critical_hit)
+    end
+
+    assert_equal 0, weapon.reload.critical_hit_count
+    assert_equal 0, weapon.kill_count
+  end
 end

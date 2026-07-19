@@ -77,13 +77,14 @@ class WeaponTest < ActiveSupport::TestCase
 
   test "small sword is sellable like a normal unequipped weapon" do
     weapon = Weapon.new(
-      name: "スモールソード",
+      name: "無銘の直剣",
       weapon_type: "片手直剣",
       rarity: "common",
       attack_power: 6,
       durability: 200,
       max_durability: 200,
-      equipped: false
+      equipped: false,
+      origin: "starter"
     )
 
     assert weapon.starter_weapon?

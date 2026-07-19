@@ -50,6 +50,11 @@ class WeaponUpgradeConfirmationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "14.00"
     assert_includes response.body, "14.56"
     assert_includes response.body, "必要熟練度"
+    assert_includes response.body, "最低必要ポイント: 2pt（熟練度による軽減なし）"
+    assert_includes response.body, "100%基準: 13pt − 鍛冶熟練度軽減 0pt ＝ 13pt（10刻み・5.0%軽減）"
+    assert_includes response.body, "基本条件: 500刻銭／強化ポイント 2pt"
+    assert_includes response.body, "今回の配合素材: 硬い甲殻 ×2（投入 2pt）"
+    assert_not_includes response.body, "必要: 500刻銭／硬い甲殻"
   end
 
   test "upgrade requires explicit yes confirmation before consuming an attempt" do
@@ -80,6 +85,44 @@ class WeaponUpgradeConfirmationTest < ActionDispatch::IntegrationTest
     assert_difference -> { @weapon.reload.enhance_attempts }, 1 do
       post upgrade_weapon_path, params: { weapon_id: @weapon.id, enhancement_type: "S", smith_mode: "npc", confirm_upgrade: "1" }
     end
+  end
+
+  test "upgrade confirmation derives success rate from invested points up to one hundred percent" do
+    @player.items.find_by!(name: "硬い甲殻").update!(quantity: 200)
+
+    get game_path(
+      panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: @weapon.id,
+      smith_mode: "npc", confirm_upgrade_type: "S", enhancement_materials: { "硬い甲殻" => 128 }
+    )
+
+    assert_response :success
+    assert_includes response.body, "素材配合"
+    assert_includes response.body, "成功率 100.0%"
+    assert_includes response.body, "硬い甲殻 ×128"
+    assert_includes response.body, "投入 128pt／必要 2pt"
+    assert_includes response.body, "13ptで100%"
+  end
+
+  test "material allocation hides unprocessable materials and offers two ordered guarantee buttons" do
+    @player.items.create!(name: "コボルドの牙", category: "drop", quantity: 3)
+    @player.items.create!(name: "狼王の牙", category: "drop", quantity: 2)
+
+    get game_path(
+      panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: @weapon.id,
+      smith_mode: "npc", confirm_upgrade_type: "S"
+    )
+
+    assert_response :success
+    assert_includes response.body, "コボルドの牙（2pt／所持3）"
+    assert_not_includes response.body, "狼王の牙（20pt／所持2）"
+    assert_includes response.body, "100%まで投入（低pt優先）"
+    assert_includes response.body, "100%まで投入（高pt優先）"
+    assert_includes response.body, 'data-controller="material-allocation"'
+    assert_includes response.body, 'data-material-allocation-guaranteed-points-value="13"'
+    assert_includes response.body, 'data-material-allocation-target="input"'
+    assert_includes response.body, 'data-material-points="1"'
+    assert_includes response.body, 'data-material-points="2"'
+    assert_operator response.body.index("硬い甲殻（1pt／所持10）"), :<, response.body.index("コボルドの牙（2pt／所持3）")
   end
 
   test "blacksmith selection appears only after learning blacksmithing" do

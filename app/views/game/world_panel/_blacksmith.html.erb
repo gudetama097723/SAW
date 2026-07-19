@@ -26,20 +26,69 @@
     <% end %>
     <p class="small text-muted">武器種と3枠の素材から性能を生成します。完成性能と武器名は鍛造まで確定しません。</p>
     <% if context %>
-      <%= form_with url: produce_weapon_path, method: :post, local: true do |form| %>
+      <p class="small mb-2">現在の鍛冶熟練度: <%= context.proficiency %>（<%= BlacksmithService.tier_name_for(context.proficiency) %>帯）</p>
+      <%= form_with url: game_path, method: :get, local: true do |form| %>
+        <%= form.hidden_field :panel, value: "blacksmith" %>
+        <%= form.hidden_field :blacksmith_menu, value: "produce" %>
         <%= form.hidden_field :smith_mode, value: smith_mode %>
+        <% selected_template = WeaponCraftTypeCatalog.find(params[:weapon_type]) %>
         <div class="mb-2">
           <%= form.label :weapon_type, "武器種", class: "form-label" %>
-          <%= form.select :weapon_type, options_for_select(WeaponCraftTypeCatalog.all.map { |entry| [entry.weapon_type, entry.weapon_type] }), {}, class: "form-select" %>
+          <%= form.select :weapon_type, options_for_select(WeaponCraftTypeCatalog.all.map { |entry| [entry.weapon_type, entry.weapon_type] }, params[:weapon_type]), {}, class: "form-select" %>
         </div>
+        <% if selected_template %>
+          <p class="small text-muted mb-2">
+            属性<%= selected_template.attack_attributes %>／攻撃倍率<%= selected_template.attack_multiplier %>／耐久倍率<%= selected_template.durability_multiplier %>／重量倍率<%= selected_template.weight_multiplier %>／強化上限倍率<%= selected_template.enhance_multiplier %><br>
+            必要素材数: 鉱石×<%= selected_template.ore_quantity %>／モンスター素材×<%= selected_template.monster_quantity %>／補助素材×<%= selected_template.support_quantity %>
+          </p>
+        <% end %>
         <% [["ore_material", "鉱石素材", "ore"], ["monster_material", "モンスター素材", "monster_material"], ["support_material", "補助素材", "support_material"]].each do |field, label, category| %>
           <div class="mb-2">
             <%= form.label field, label, class: "form-label" %>
-            <%= form.select field, options_for_select(BlacksmithMaterialCatalog.for_category(category).map { |material| ["#{material.name}（加工Lv#{material.processing_level}／所持#{@player.items.where(name: material.name).sum(:quantity)}）", material.name] }), {}, class: "form-select" %>
+            <% materials = BlacksmithMaterialCatalog.for_category(category).select { |material| material.processing_level <= context.proficiency } %>
+            <% if materials.any? %>
+              <%= form.select field,
+                options_for_select(
+                  materials.map { |material| ["#{material.name}（所持#{@player.items.where(name: material.name).sum(:quantity)}／#{material.effect_summary}）", material.name] },
+                  params[field]
+                ), {}, class: "form-select" %>
+            <% else %>
+              <p class="text-warning small mb-0">現在の熟練度では扱える<%= label %>がありません。</p>
+            <% end %>
           </div>
         <% end %>
-        <p class="small mb-2"><%= context.player? ? "工賃：0刻銭" : "工賃：鉱石ランクと担当鍛冶師により決定" %></p>
-        <%= form.submit "鍛造する", class: "btn btn-outline-warning w-100" %>
+        <%= form.submit "この内容でプレビュー", class: "btn btn-outline-warning w-100" %>
+      <% end %>
+
+      <% if params[:weapon_type].present? && params[:ore_material].present? && params[:monster_material].present? && params[:support_material].present? %>
+        <% preview = WeaponCraftService.preview_for(context: context, weapon_type: params[:weapon_type], ore_material: params[:ore_material], monster_material: params[:monster_material], support_material: params[:support_material]) %>
+        <% if preview.status == :error %>
+          <p class="text-warning mt-2 mb-0"><%= preview.message %></p>
+        <% else %>
+          <div class="border border-warning rounded p-2 mt-3">
+            <p class="mb-1"><strong>鍛造プレビュー</strong>／必要熟練度<%= preview.required_level %>／推定レアリティ<%= preview.rarity %></p>
+            <p class="small mb-1">
+              攻撃力 <%= preview.attack_range.first %>〜<%= preview.attack_range.last %>／
+              耐久値 <%= preview.durability_range.first %>〜<%= preview.durability_range.last %>／
+              重量 <%= preview.weight_range.first %>〜<%= preview.weight_range.last %>／
+              強化試行上限 <%= preview.enhance_limit_range.first %>〜<%= preview.enhance_limit_range.last %>
+            </p>
+            <p class="small mb-2">工賃: <%= context.player? ? "工賃なし" : "#{preview.fee}刻銭" %>／必要素材: <%= preview.quantities.map { |name, count| "#{name} ×#{count}" }.join("、") %></p>
+            <% if preview.available %>
+              <% missing = preview.quantities.find { |name, count| @player.items.where(name: name).sum(:quantity).to_i < count } %>
+              <% if missing %>
+                <button type="button" class="btn btn-outline-secondary btn-sm w-100" disabled>素材が不足しています（<%= missing.first %> ×<%= missing.last %>必要）</button>
+              <% else %>
+                <%= button_to "この内容で鍛造する", produce_weapon_path(
+                  smith_mode: smith_mode, confirm_produce: "1", weapon_type: params[:weapon_type],
+                  ore_material: params[:ore_material], monster_material: params[:monster_material], support_material: params[:support_material]
+                ), method: :post, class: "btn btn-warning w-100" %>
+              <% end %>
+            <% else %>
+              <button type="button" class="btn btn-outline-secondary btn-sm w-100" disabled>素材の加工熟練度不足</button>
+            <% end %>
+          </div>
+        <% end %>
       <% end %>
     <% else %>
       <p class="text-warning mb-0">現在利用できる鍛冶師がいません。</p>
@@ -116,7 +165,7 @@
       <% else %>
         <div class="d-grid gap-2">
           <% Weapon::ENHANCEMENT_TYPES.each do |type, config| %>
-            <% quote = WeaponUpgradeService.quote_for(selected_weapon, type, player: @player, blacksmith: npc_blacksmith, context: context) %>
+            <% quote = WeaponUpgradeService.quote_for(selected_weapon, type, player: @player, blacksmith: npc_blacksmith, context: context, material_quantities: params[:enhancement_materials]&.to_unsafe_h) %>
             <% next unless quote %>
             <% available = context.proficiency >= quote.processing_level %>
             <% effect_previews = WeaponUpgradeService.effect_previews_for(selected_weapon, type) %>
@@ -137,17 +186,48 @@
                     </p>
                   <% end %>
                 </div>
+                <% material_options = WeaponUpgradeService.material_options_for(@player, type, WeaponEnhancementCatalog.step_for(quote.target_level).material_rank, proficiency: context.proficiency) %>
+                <%= form_with url: game_path, method: :get, local: true, class: "border rounded p-2 mb-2", data: { controller: "material-allocation", material_allocation_guaranteed_points_value: quote.guaranteed_points } do %>
+                  <%= hidden_field_tag :panel, "blacksmith" %>
+                  <%= hidden_field_tag :blacksmith_menu, "upgrade" %>
+                  <%= hidden_field_tag :weapon_id, selected_weapon.id %>
+                  <%= hidden_field_tag :smith_mode, smith_mode %>
+                  <%= hidden_field_tag :confirm_upgrade_type, type %>
+                  <p class="small mb-1"><strong>素材配合</strong></p>
+                  <p class="small mb-1">最低必要ポイント: <%= quote.required_points %>pt（熟練度による軽減なし）</p>
+                  <p class="small mb-1">100%基準: <%= quote.base_guaranteed_points %>pt − 鍛冶熟練度軽減 <%= quote.guaranteed_point_reduction %>pt ＝ <%= quote.guaranteed_points %>pt（10刻み・<%= (quote.proficiency_reduction_rate * 100).round(1) %>%軽減）</p>
+                  <% if material_options.any? %>
+                    <% material_options.each do |material, owned| %>
+                      <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="small flex-grow-1"><%= material.name %>（<%= material.enhancement_points %>pt／所持<%= owned %>）</span>
+                        <%= number_field_tag "enhancement_materials[#{material.name}]", quote.required_materials.fetch(material.name, 0), min: 0, max: owned, class: "form-control form-control-sm", style: "width: 6rem", data: { material_allocation_target: "input", material_points: material.enhancement_points } %>
+                      </div>
+                    <% end %>
+                    <div class="d-flex gap-2 mb-2">
+                      <button type="button" class="btn btn-outline-light btn-sm flex-fill" data-action="material-allocation#fillLowFirst">100%まで投入（低pt優先）</button>
+                      <button type="button" class="btn btn-outline-light btn-sm flex-fill" data-action="material-allocation#fillHighFirst">100%まで投入（高pt優先）</button>
+                    </div>
+                  <% else %>
+                    <p class="small text-warning">現在の熟練度で加工できる所持素材がありません。</p>
+                  <% end %>
+                  <p class="small mb-1">投入 <%= quote.invested_points %>pt／必要 <%= quote.required_points %>pt<%= "（あと#{quote.point_shortage}pt）" unless quote.points_satisfied? %></p>
+                  <p class="small mb-2">現在の成功率: <strong><%= quote.success_rate %>%</strong>（<%= quote.guaranteed_points %>ptで100%）</p>
+                  <%= submit_tag "配合を再計算", class: "btn btn-outline-warning btn-sm w-100" %>
+                <% end %>
                 <p class="mb-1">必要熟練度 <%= quote.processing_level %>／鍛冶補正 +<%= quote.blacksmith_bonus %>pt</p>
-                <p class="mb-2">必要: <%= quote.required_col %>刻銭／<%= quote.required_materials.map { |name, count| "#{name} ×#{count}" }.join("、") %></p>
-                <% if available %>
+                <p class="mb-1">基本条件: <%= quote.required_col %>刻銭／強化ポイント <%= quote.required_points %>pt</p>
+                <p class="mb-2">今回の配合素材: <%= quote.required_materials.map { |name, count| "#{name} ×#{count}" }.join("、") %>（投入 <%= quote.invested_points %>pt）</p>
+                <% if available && quote.points_satisfied? %>
                 <div class="border border-warning rounded p-2">
                   <p class="mb-1"><strong><%= config[:name] %>を強化しますか？</strong></p>
                   <p class="small mb-2">成功率 <%= quote.success_rate %>%。失敗時も刻銭・素材・強化試行回数を消費します。</p>
                   <div class="d-flex gap-2">
-                    <%= button_to "はい", upgrade_weapon_path(weapon_id: selected_weapon.id, enhancement_type: type, smith_mode: smith_mode, confirm_upgrade: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-warning w-100" %>
+                    <%= button_to "はい", upgrade_weapon_path(weapon_id: selected_weapon.id, enhancement_type: type, smith_mode: smith_mode, enhancement_materials: quote.required_materials, confirm_upgrade: "1"), method: :post, form: { class: "flex-fill" }, class: "btn btn-warning w-100" %>
                     <%= link_to "いいえ", game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: selected_weapon.id, smith_mode: smith_mode), class: "btn btn-outline-light flex-fill" %>
                   </div>
                 </div>
+                <% elsif !quote.points_satisfied? %>
+                  <button type="button" class="btn btn-outline-secondary btn-sm w-100" disabled>強化ポイント不足</button>
                 <% else %>
                   <button type="button" class="btn btn-outline-secondary btn-sm w-100" disabled>素材の加工熟練度不足</button>
                 <% end %>
@@ -172,16 +252,30 @@
 
   <% elsif blacksmith_menu == "evolve" %>
     <% selected_weapon = @player.weapons.find_by(id: params[:weapon_id]) %>
-    <% rule = WeaponEvolutionRule.find_by(source_weapon_name: selected_weapon&.name) %>
-    <% if selected_weapon && rule %>
+    <% quote = selected_weapon && WeaponEvolutionService.quote_for(@player, selected_weapon, blacksmith_mode: smith_mode, blacksmith: npc_blacksmith) %>
+    <% if selected_weapon && quote %>
       <h6><%= selected_weapon.display_name %></h6>
-      <p>進化先: <%= rule.target_weapon_name %>／必要強化値 +<%= rule.required_enhancement_level %>／必要Lv <%= rule.required_player_level %></p>
-      <%= button_to "進化する", evolve_weapon_path(weapon_id: selected_weapon.id), method: :post, class: "btn btn-outline-warning w-100" %>
+      <p class="mb-1">進化先: <%= quote.rule.target_weapon_name %></p>
+      <p class="mb-1 small">達成条件:</p>
+      <ul class="small">
+        <% quote.condition_summaries.each do |summary| %>
+          <li><%= summary %></li>
+        <% end %>
+      </ul>
+      <p class="small mb-1">必要鍛冶熟練度: <%= quote.required_smith_proficiency %>（現在<%= quote.smith_proficiency %>）</p>
+      <p class="small mb-1">必要刻銭: <%= quote.required_col %>刻銭</p>
+      <% if quote.required_items.any? %>
+        <p class="small mb-1">必要素材: <%= quote.required_items.map { |name, qty| "#{name}×#{qty}" }.join("／") %></p>
+      <% end %>
+      <% unless quote.executable? %>
+        <p class="text-warning small mb-2">まだ進化させられません（条件・熟練度・素材/刻銭のいずれかが不足しています）。</p>
+      <% end %>
+      <%= button_to "進化する", evolve_weapon_path(weapon_id: selected_weapon.id, smith_mode: smith_mode, confirm_evolve: 1), method: :post, class: "btn btn-outline-warning w-100", disabled: !quote.executable? %>
     <% else %>
       <div class="d-grid gap-2">
         <% @player.weapons.each do |weapon| %>
-          <% next unless WeaponEvolutionRule.exists?(source_weapon_name: weapon.name) %>
-          <%= link_to weapon.display_name, game_path(panel: "blacksmith", blacksmith_menu: "evolve", weapon_id: weapon.id), class: "btn btn-outline-warning w-100" %>
+          <% next unless WeaponEvolutionService.eligible_rule_for(weapon) %>
+          <%= link_to weapon.display_name, game_path(panel: "blacksmith", blacksmith_menu: "evolve", weapon_id: weapon.id, smith_mode: smith_mode), class: "btn btn-outline-warning w-100" %>
         <% end %>
       </div>
     <% end %>

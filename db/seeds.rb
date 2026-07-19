@@ -280,13 +280,17 @@ respawnable: to_bool(row["respawnable"]),
 )
 end
 
+current_evolution_source_names = []
+SimpleCsv.foreach(Rails.root.join("db", "seeds", "weapon_evolution_rules.csv")) { |row| current_evolution_source_names << row["source_weapon_name"] }
+WeaponEvolutionRule.where.not(source_weapon_name: current_evolution_source_names).delete_all
 seed_rows("weapon_evolution_rules.csv") do |row|
   rule = WeaponEvolutionRule.find_or_initialize_by(source_weapon_name: row["source_weapon_name"], target_weapon_name: row["target_weapon_name"])
   rule.update!(
-    required_enhancement_level: to_int(row["required_enhancement_level"]) || 10,
+    required_conditions_data: row["required_conditions_data"].presence || "[]",
     required_player_level: to_int(row["required_player_level"]) || 1,
     required_floor: to_int(row["required_floor"]),
     blacksmith_location_name: row["blacksmith_location_name"].presence,
+    required_smith_proficiency: to_int(row["required_smith_proficiency"]) || 0,
     required_materials_data: row["required_materials_data"].presence || "{}"
   )
 end

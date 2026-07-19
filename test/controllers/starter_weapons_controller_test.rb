@@ -21,7 +21,7 @@ class StarterWeaponsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "最初の武器を選択"
-    assert_includes response.body, "スモールソード"
+    assert_includes response.body, "無銘の直剣"
     assert_includes response.body, "スモールレイピア"
     assert_includes response.body, "ここで選ばなかった武器も、ゲーム開始後に入手・装備できます。"
     assert_includes response.body, "追加でスキル枠を1つ使用します。"

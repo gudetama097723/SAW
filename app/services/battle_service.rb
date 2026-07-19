@@ -654,10 +654,18 @@
     battle_enemy.enemy_hp = [battle_enemy.enemy_hp.to_i - hit_damage, 0].max
     break_message = apply_part_damage!(player, battle_enemy, actual_part, part_damage)
     battle_enemy.save!
+    record_evolution_progress!(weapon, critical: critical, defeated: battle_enemy.enemy_hp <= 0)
 
     critical_message = critical ? "クリティカル！" : ""
     defeated_message = battle_enemy.enemy_hp <= 0 ? " #{battle_enemy.mob.name}を倒した！" : ""
     "#{battle_enemy.mob.name}: #{guard_result[:message]}#{critical_message}#{actual_part.name}へ#{hit_damage}ダメージ#{break_message}#{defeated_message}"
+  end
+
+  def self.record_evolution_progress!(weapon, critical:, defeated:)
+    return unless weapon&.evolvable_origin?
+
+    weapon.increment!(:critical_hit_count) if critical
+    weapon.increment!(:kill_count) if defeated
   end
 
   def self.resolve_throw_hit!(player:, item:, battle_enemy:, mob_part_id:)
@@ -1404,7 +1412,8 @@ def self.gain_weapon_skill!(player, weapon, amount)
       part_break_power: weapon.part_break_power,
       enhance_limit: weapon.enhance_limit,
       enhancement_difficulty: weapon.enhancement_difficulty,
-      equipped: false
+      equipped: false,
+      origin: mob.boss_type == "normal" ? "mob_drop" : "boss_drop"
     )
 
     " #{mob.name}が#{weapon.name}を落とした！"

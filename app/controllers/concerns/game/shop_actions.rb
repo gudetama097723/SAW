@@ -198,12 +198,19 @@ module Game
         blacksmith_menu: "upgrade",
         weapon_id: weapon&.id,
         smith_mode: params[:smith_mode],
-        confirm_upgrade_type: WeaponUpgradeService.normalize_type(params[:enhancement_type])
+        confirm_upgrade_type: WeaponUpgradeService.normalize_type(params[:enhancement_type]),
+        enhancement_materials: params[:enhancement_materials]&.to_unsafe_h
       ), alert: "強化する内容を確認してください。"
       return
     end
 
-    result = WeaponUpgradeService.upgrade!(player, weapon, params[:enhancement_type], blacksmith_mode: params[:smith_mode])
+    result = WeaponUpgradeService.upgrade!(
+      player,
+      weapon,
+      params[:enhancement_type],
+      blacksmith_mode: params[:smith_mode],
+      material_quantities: params[:enhancement_materials]&.to_unsafe_h
+    )
     redirect_to game_path(panel: "blacksmith", blacksmith_menu: "upgrade", weapon_id: weapon&.id, smith_mode: params[:smith_mode]), flash_for(result)
   end
 
@@ -226,33 +233,15 @@ module Game
     end
 
     weapon = player.weapons.find_by(id: params[:weapon_id])
-    rule = WeaponEvolutionRule.find_by(source_weapon_name: weapon&.name)
-    if !weapon || !rule
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve"), alert: "進化できる武器ではありません。"
-      return
-    end
-    unless weapon.enhancement_level >= rule.required_enhancement_level.to_i
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve", weapon_id: weapon.id), alert: "+#{rule.required_enhancement_level}まで強化した武器のみ進化できます。"
-      return
-    end
-    if current_player.level.to_i < rule.required_player_level.to_i
-      redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve", weapon_id: weapon.id), alert: "鍛冶屋「お前にはまだ早い」"
+    unless params[:confirm_evolve] == "1"
+      redirect_to game_path(
+        panel: "blacksmith", blacksmith_menu: "evolve", weapon_id: weapon&.id, smith_mode: params[:smith_mode]
+      ), alert: "進化する内容を確認してください。"
       return
     end
 
-    weapon.update!(
-      name: rule.target_weapon_name,
-      enhancement_level: 0,
-      enhance_attempts: 0,
-      sharpness_level: 0,
-      quickness_level: 0,
-      accuracy_level: 0,
-      heaviness_level: 0,
-      durability_level: 0,
-      durability_loss_remainder: 0,
-      durability: [ weapon.durability.to_i, weapon.max_durability.to_i ].min
-    )
-    redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve"), notice: "#{rule.target_weapon_name}へ進化した。"
+    result = WeaponEvolutionService.evolve!(player, weapon, blacksmith_mode: params[:smith_mode])
+    redirect_to game_path(panel: "blacksmith", blacksmith_menu: "evolve", smith_mode: params[:smith_mode]), flash_for(result)
   end
 
     def blacksmith
@@ -377,7 +366,7 @@ module Game
         if kind == "armor"
           player.armors.create!(definition.to_h.except(:location, :price, :description).merge(equipped: false))
         else
-          player.weapons.create!(definition.to_h.except(:location, :price, :production_only, :required_blacksmith_proficiency).merge(equipped: false))
+          player.weapons.create!(definition.to_h.except(:location, :price, :production_only, :required_blacksmith_proficiency).merge(equipped: false, origin: "shop"))
         end
       end
       redirect_to game_path(panel: "weapon_shop", shop_menu: kind == "armor" ? "armors" : "weapons"), notice: "#{definition.name}を購入した。"
@@ -398,6 +387,11 @@ module Game
 
       unless facility_open_for?(player, "blacksmith")
         redirect_to game_path, alert: FacilityHoursService.closed_message("blacksmith", player)
+        return
+      end
+
+      unless params[:confirm_produce] == "1"
+        redirect_to game_path(panel: "blacksmith", blacksmith_menu: "produce", smith_mode: params[:smith_mode])
         return
       end
 

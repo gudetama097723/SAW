@@ -15,7 +15,7 @@ class BlacksmithProficiencyService
     when -350..-251 then 1
     else 0
     end
-    action_multiplier = { craft: 1.0, maintenance: 0.6, enhance: 0.8 }.fetch(action.to_sym)
+    action_multiplier = { craft: 1.0, maintenance: 0.6, enhance: 0.8, evolve: 1.0 }.fetch(action.to_sym)
     gained = (base * action_multiplier * completion_ratio.to_f.clamp(0.0, 1.0)).floor
     skill.gain_skill_exp!(gained, growth_scale: GROWTH_SCALE) if gained.positive?
     gained

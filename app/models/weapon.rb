@@ -24,6 +24,9 @@ class Weapon < ApplicationRecord
     "斧" => { "蟹の脚殻" => 1 }
   }.freeze
 
+  ORIGINS = %w[starter shop crafted mob_drop boss_drop quest_reward].freeze
+  EVOLVABLE_ORIGINS = %w[starter boss_drop quest_reward].freeze
+
   belongs_to :player, optional: true
   belongs_to :mob, optional: true
   belongs_to :player_base, optional: true
@@ -38,6 +41,10 @@ class Weapon < ApplicationRecord
 
   def stored?
     player_base_id.present?
+  end
+
+  def evolvable_origin?
+    EVOLVABLE_ORIGINS.include?(origin)
   end
 
   def broken?
@@ -63,7 +70,7 @@ class Weapon < ApplicationRecord
   end
 
   def starter_weapon?
-    StarterWeaponCatalog.all.any? { |choice| choice.name == name }
+    origin == "starter"
   end
 
   def apply_durability_loss!(amount)

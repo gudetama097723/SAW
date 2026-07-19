@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_18_000003) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_19_000002) do
   create_table "armors", force: :cascade do |t|
     t.integer "agility_bonus", default: 0, null: false
     t.string "armor_type", null: false
@@ -525,10 +525,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_000003) do
   create_table "weapon_evolution_rules", force: :cascade do |t|
     t.string "blacksmith_location_name"
     t.datetime "created_at", null: false
-    t.integer "required_enhancement_level", default: 10, null: false
+    t.text "required_conditions_data", default: "[]", null: false
     t.integer "required_floor"
     t.text "required_materials_data", default: "{}", null: false
     t.integer "required_player_level", default: 1, null: false
+    t.integer "required_smith_proficiency", default: 0, null: false
     t.string "source_weapon_name", null: false
     t.string "target_weapon_name", null: false
     t.datetime "updated_at", null: false
@@ -545,6 +546,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_000003) do
     t.boolean "crafted", default: false, null: false
     t.string "crafted_by_name"
     t.datetime "created_at", null: false
+    t.integer "critical_hit_count", default: 0, null: false
     t.integer "critical_rate", default: 5, null: false
     t.text "description"
     t.boolean "discardable", default: true, null: false
@@ -561,10 +563,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_000003) do
     t.boolean "favorite", default: false, null: false
     t.integer "heaviness_level", default: 0, null: false
     t.integer "hp_bonus", default: 0, null: false
+    t.integer "kill_count", default: 0, null: false
     t.integer "maintenance_level", default: 0, null: false
     t.integer "max_durability", default: 10, null: false
     t.integer "mob_id"
     t.string "name", null: false
+    t.string "origin", default: "shop", null: false
     t.integer "part_break_power", default: 100, null: false
     t.integer "player_base_id"
     t.integer "player_id"
@@ -584,12 +588,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_000003) do
     t.index ["player_id"], name: "index_weapons_on_player_id"
   end
 
-  add_foreign_key "armors", "player_bases", column: "player_base_id"
-  add_foreign_key "armors", "players"
-  add_foreign_key "battle_enemies", "battles"
-  add_foreign_key "battle_enemies", "mobs"
-  add_foreign_key "battles", "mobs"
-  add_foreign_key "battles", "players"
   add_foreign_key "field_areas", "routes"
   add_foreign_key "items", "players"
   add_foreign_key "key_items", "players"

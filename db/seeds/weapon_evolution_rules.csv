@@ -1,5 +1,3 @@
-﻿source_weapon_name,target_weapon_name,required_enhancement_level,required_player_level,required_floor,blacksmith_location_name,required_materials_data
-スモールソード,スモールソード改,10,5,1,ヒルテンドルフ,"{""items"":{""スライムの核"":3}}"
-ブロンズソード,アイアンショートソード,10,8,1,ヒルテンドルフ,"{""items"":{""硬い甲殻"":2,""コボルドの牙"":2}}"
-ブロンズレイピア,スティンガーレイピア,10,8,1,ヒルテンドルフ,"{""items"":{""薄羽蜂の針"":3,""ホーンラビットの角"":1}}"
-ウッドメイス,クラブハンマー,10,7,1,ヒルテンドルフ,"{""items"":{""蟹の脚殻"":3,""小さな魔石"":1}}"
+﻿source_weapon_name,target_weapon_name,required_conditions_data,required_player_level,required_floor,blacksmith_location_name,required_smith_proficiency,required_materials_data
+無銘の直剣,目覚めの直剣,"[{""type"":""enhancement_maxed""}]",5,,,250,"{""items"":{""硬い甲殻"":3},""col"":300}"
+目覚めの直剣,真銘の直剣,"[{""type"":""critical_hits"",""min"":30},{""type"":""kills"",""min"":50}]",15,,,500,"{""items"":{""群狼の爪"":5,""小さな魔石"":2},""col"":3000}"

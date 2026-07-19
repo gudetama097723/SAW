@@ -199,6 +199,7 @@ class WeaponShopTest < ActionDispatch::IntegrationTest
     assert_no_difference -> { @player.weapons.count } do
       post produce_weapon_path, params: {
         smith_mode: "player",
+        confirm_produce: "1",
         weapon_type: "片手直剣",
         ore_material: "鉄鉱",
         monster_material: "ホーンラビットの角",
@@ -213,6 +214,35 @@ class WeaponShopTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "自分で鍛冶を行う"
     assert_includes response.body, "鍛冶を行う者を選択"
     assert BlacksmithService.context_for(@player, mode: "player").player?
+  end
+
+  test "weapon production shows a preview before requiring confirmation to craft" do
+    @player.town_discovery_for.update!(found_blacksmith: true)
+    @player.skills.create!(name: "鍛冶", proficiency: 100, skill_exp: 0, skill_category: "production")
+    @player.items.create!(name: "鉄鉱", category: "material", quantity: 10)
+    @player.items.create!(name: "ホーンラビットの角", category: "material", quantity: 3)
+    @player.items.create!(name: "精錬石", category: "material", quantity: 2)
+
+    get game_path, params: { panel: "blacksmith", blacksmith_menu: "produce", smith_mode: "player" }
+    assert_response :success
+    assert_not_includes response.body, "鍛造プレビュー"
+
+    preview_params = {
+      panel: "blacksmith", blacksmith_menu: "produce", smith_mode: "player",
+      weapon_type: "片手直剣", ore_material: "鉄鉱", monster_material: "ホーンラビットの角", support_material: "精錬石"
+    }
+    get game_path, params: preview_params
+    assert_response :success
+    assert_includes response.body, "鍛造プレビュー"
+    assert_includes response.body, "この内容で鍛造する"
+
+    assert_no_difference -> { @player.weapons.count } do
+      post produce_weapon_path, params: preview_params.except(:panel, :blacksmith_menu)
+    end
+
+    assert_difference -> { @player.weapons.count }, 1 do
+      post produce_weapon_path, params: preview_params.except(:panel, :blacksmith_menu).merge(confirm_produce: "1")
+    end
   end
 
   test "direct blacksmith access is rejected where no facility exists" do

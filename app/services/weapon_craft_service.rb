@@ -1,5 +1,11 @@
 class WeaponCraftService
   Result = Struct.new(:status, :message, :weapon, :skill_exp_gained, keyword_init: true)
+  Preview = Struct.new(
+    :status, :message, :template, :ore, :monster_material, :support_material,
+    :required_level, :available, :rarity, :fee, :quantities,
+    :attack_range, :durability_range, :weight_range, :enhance_limit_range,
+    keyword_init: true
+  )
 
   def self.call(player:, blacksmith:, weapon_type:, ore_material:, monster_material:, support_material:, rng: Random)
     unless BlacksmithFacilityAccessService.available?(player)
@@ -10,14 +16,8 @@ class WeaponCraftService
       return error("この場所ではその鍛冶師を利用できない。")
     end
 
-    template = WeaponCraftTypeCatalog.find(weapon_type)
-    ore = BlacksmithMaterialCatalog.find(ore_material, category: "ore")
-    monster = BlacksmithMaterialCatalog.find(monster_material, category: "monster_material")
-    support = BlacksmithMaterialCatalog.find(support_material, category: "support_material")
-    return error("武器種を選択してください。") unless template
-    return error("鉱石素材を選択してください。") unless ore
-    return error("モンスター素材を選択してください。") unless monster
-    return error("補助素材を選択してください。") unless support
+    template, ore, monster, support, resolve_error = resolve_materials(weapon_type, ore_material, monster_material, support_material)
+    return error(resolve_error) if resolve_error
 
     materials = [ ore, monster, support ]
     required_level = materials.map(&:processing_level).max
@@ -40,6 +40,7 @@ class WeaponCraftService
       proficiency: blacksmith.proficiency, ore: ore, monster_material: monster,
       support_material: support, template: template, rng: rng
     )
+    generated = apply_floor_enhancement_limit(generated, player.floor)
     name = CraftedWeaponNameGenerator.call(template: template, ore: ore, monster_material: monster)
     attributes = weapon_attributes(name, blacksmith, template, ore, monster, support, generated)
     attributes[:name] = SpecialCraftedWeaponResolver.resolve(attributes: attributes, materials: materials) || name
@@ -79,6 +80,48 @@ class WeaponCraftService
     [ (200 + ore.craft_rank * 100) * blacksmith.fee_multiplier(:craft), 1 ].max.round
   end
 
+  # 生産フォームの選択内容から、鍛造前に見せる推定レンジ・レアリティ・工賃を計算する
+  def self.preview_for(context:, weapon_type:, ore_material:, monster_material:, support_material:)
+    template, ore, monster, support, resolve_error = resolve_materials(weapon_type, ore_material, monster_material, support_material)
+    return Preview.new(status: :error, message: resolve_error) if resolve_error
+
+    required_level = [ ore, monster, support ].map(&:processing_level).max
+    lowest, highest = CraftedWeaponStatGenerator.range_for(
+      proficiency: context.proficiency, ore: ore, monster_material: monster, support_material: support, template: template
+    )
+    lowest = apply_floor_enhancement_limit(lowest, context.player.floor)
+    highest = apply_floor_enhancement_limit(highest, context.player.floor)
+
+    Preview.new(
+      status: :ok, template: template, ore: ore, monster_material: monster, support_material: support,
+      required_level: required_level, available: context.proficiency >= required_level,
+      rarity: rarity_for(ore.craft_rank), fee: fee_for(context, ore),
+      quantities: {
+        ore.name => template.ore_quantity,
+        monster.name => template.monster_quantity,
+        support.name => template.support_quantity
+      },
+      attack_range: [ lowest[:attack_power], highest[:attack_power] ].minmax,
+      durability_range: [ lowest[:max_durability], highest[:max_durability] ].minmax,
+      weight_range: [ lowest[:weight], highest[:weight] ].minmax,
+      enhance_limit_range: [ lowest[:enhance_limit], highest[:enhance_limit] ].minmax
+    )
+  end
+
+  def self.resolve_materials(weapon_type, ore_material, monster_material, support_material)
+    template = WeaponCraftTypeCatalog.find(weapon_type)
+    ore = BlacksmithMaterialCatalog.find(ore_material, category: "ore")
+    monster = BlacksmithMaterialCatalog.find(monster_material, category: "monster_material")
+    support = BlacksmithMaterialCatalog.find(support_material, category: "support_material")
+    return [ nil, nil, nil, nil, "武器種を選択してください。" ] unless template
+    return [ nil, nil, nil, nil, "鉱石素材を選択してください。" ] unless ore
+    return [ nil, nil, nil, nil, "モンスター素材を選択してください。" ] unless monster
+    return [ nil, nil, nil, nil, "補助素材を選択してください。" ] unless support
+
+    [ template, ore, monster, support, nil ]
+  end
+  private_class_method :resolve_materials
+
   def self.error(message)
     Result.new(status: :error, message: message)
   end
@@ -93,7 +136,7 @@ class WeaponCraftService
       part_break_power: generated[:part_break_power], attack_attributes: template.attack_attributes,
       enhance_limit: generated[:enhance_limit], enhancement_difficulty: (1.0 + rank / 100.0).round(2),
       maintenance_level: [ ore.processing_level, monster.processing_level ].max,
-      crafted: true, crafted_by_name: blacksmith.name, equipped: false,
+      crafted: true, crafted_by_name: blacksmith.name, equipped: false, origin: "crafted",
       craft_data: {
         ore: ore.name, monster_material: monster.name, support_material: support.name,
         qualities: generated[:qualities], craft_rank: rank, tags: monster.craft_tags
@@ -113,6 +156,13 @@ class WeaponCraftService
     end
   end
   private_class_method :rarity_for
+
+  def self.apply_floor_enhancement_limit(attributes, floor)
+    return attributes unless floor.to_i == 1
+
+    attributes.merge(enhance_limit: [ attributes[:enhance_limit].to_i, 8 ].min)
+  end
+  private_class_method :apply_floor_enhancement_limit
 
   def self.consume_materials!(player, materials)
     materials.each do |name, required|

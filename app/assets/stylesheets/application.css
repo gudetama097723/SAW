@@ -391,7 +391,15 @@
   color: rgba(248, 249, 250, 0.68) !important;
 }
 
+.game-shell .card.bg-secondary .text-muted,
+.card.bg-danger .text-muted,
+.card.bg-secondary .text-muted,
+.card.bg-dark .text-muted {
+  color: rgba(248, 249, 250, 0.76) !important;
+}
+
 .game-shell .text-secondary,
+.game-shell .text-muted,
 .game-environment-note {
   color: var(--shell-muted) !important;
 }
@@ -472,18 +480,30 @@
 .game-shell .btn-outline-warning,
 .game-shell .btn-outline-danger,
 .game-shell .btn-outline-success,
+.game-shell .btn-outline-info,
+.game-shell .btn-outline-primary,
+.game-shell .btn-outline-secondary,
 .game-shell .btn-outline-light,
 .card.bg-danger .btn-outline-warning,
 .card.bg-danger .btn-outline-danger,
 .card.bg-danger .btn-outline-success,
+.card.bg-danger .btn-outline-info,
+.card.bg-danger .btn-outline-primary,
+.card.bg-danger .btn-outline-secondary,
 .card.bg-danger .btn-outline-light,
 .card.bg-secondary .btn-outline-warning,
 .card.bg-secondary .btn-outline-danger,
 .card.bg-secondary .btn-outline-success,
+.card.bg-secondary .btn-outline-info,
+.card.bg-secondary .btn-outline-primary,
+.card.bg-secondary .btn-outline-secondary,
 .card.bg-secondary .btn-outline-light,
 .card.bg-dark .btn-outline-warning,
 .card.bg-dark .btn-outline-danger,
 .card.bg-dark .btn-outline-success,
+.card.bg-dark .btn-outline-info,
+.card.bg-dark .btn-outline-primary,
+.card.bg-dark .btn-outline-secondary,
 .card.bg-dark .btn-outline-light {
   background-color: rgba(0, 0, 0, 0.18);
 }
@@ -491,20 +511,81 @@
 .game-shell .btn-outline-warning:hover,
 .game-shell .btn-outline-danger:hover,
 .game-shell .btn-outline-success:hover,
+.game-shell .btn-outline-info:hover,
+.game-shell .btn-outline-primary:hover,
+.game-shell .btn-outline-secondary:hover,
 .game-shell .btn-outline-light:hover,
 .card.bg-danger .btn-outline-warning:hover,
 .card.bg-danger .btn-outline-danger:hover,
 .card.bg-danger .btn-outline-success:hover,
+.card.bg-danger .btn-outline-info:hover,
+.card.bg-danger .btn-outline-primary:hover,
+.card.bg-danger .btn-outline-secondary:hover,
 .card.bg-danger .btn-outline-light:hover,
 .card.bg-secondary .btn-outline-warning:hover,
 .card.bg-secondary .btn-outline-danger:hover,
 .card.bg-secondary .btn-outline-success:hover,
+.card.bg-secondary .btn-outline-info:hover,
+.card.bg-secondary .btn-outline-primary:hover,
+.card.bg-secondary .btn-outline-secondary:hover,
 .card.bg-secondary .btn-outline-light:hover,
 .card.bg-dark .btn-outline-warning:hover,
 .card.bg-dark .btn-outline-danger:hover,
 .card.bg-dark .btn-outline-success:hover,
+.card.bg-dark .btn-outline-info:hover,
+.card.bg-dark .btn-outline-primary:hover,
+.card.bg-dark .btn-outline-secondary:hover,
 .card.bg-dark .btn-outline-light:hover {
-  color: #111;
+  color: #f8f9fa !important;
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+.game-shell .btn-outline-warning:hover,
+.card.bg-danger .btn-outline-warning:hover,
+.card.bg-secondary .btn-outline-warning:hover,
+.card.bg-dark .btn-outline-warning:hover {
+  background-color: rgba(255, 193, 7, 0.2);
+  color: #fff3bf !important;
+}
+
+.game-shell .btn-outline-danger:hover,
+.card.bg-danger .btn-outline-danger:hover,
+.card.bg-secondary .btn-outline-danger:hover,
+.card.bg-dark .btn-outline-danger:hover {
+  background-color: rgba(220, 53, 69, 0.22);
+  color: #ffe5e8 !important;
+}
+
+.game-shell .btn-outline-success:hover,
+.card.bg-danger .btn-outline-success:hover,
+.card.bg-secondary .btn-outline-success:hover,
+.card.bg-dark .btn-outline-success:hover {
+  background-color: rgba(25, 135, 84, 0.22);
+  color: #d8f8e7 !important;
+}
+
+.game-shell .btn-outline-info:hover,
+.card.bg-danger .btn-outline-info:hover,
+.card.bg-secondary .btn-outline-info:hover,
+.card.bg-dark .btn-outline-info:hover {
+  background-color: rgba(13, 202, 240, 0.2);
+  color: #d9faff !important;
+}
+
+.game-shell .btn-outline-primary:hover,
+.card.bg-danger .btn-outline-primary:hover,
+.card.bg-secondary .btn-outline-primary:hover,
+.card.bg-dark .btn-outline-primary:hover {
+  background-color: rgba(13, 110, 253, 0.24);
+  color: #e4efff !important;
+}
+
+.game-shell .btn-outline-secondary:hover,
+.card.bg-danger .btn-outline-secondary:hover,
+.card.bg-secondary .btn-outline-secondary:hover,
+.card.bg-dark .btn-outline-secondary:hover {
+  background-color: rgba(108, 117, 125, 0.28);
+  color: #eef1f4 !important;
 }
 
 @media (max-width: 1199.98px) {
@@ -715,7 +796,7 @@
 .battle-command-card .btn-outline-info:hover,
 .battle-command-card .btn-outline-success:hover,
 .battle-command-card .btn-outline-light:hover {
-  color: #111;
+  color: #f8f9fa;
 }
 
 .battle-hp-bar {

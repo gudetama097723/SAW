@@ -63,6 +63,12 @@ class ShopCatalog
     @armor_definitions ||= load_armor_definitions
   end
 
+  def self.reload!
+    @item_definitions = nil
+    @weapon_definitions = nil
+    @armor_definitions = nil
+  end
+
   def self.load_item_definitions
     path = Rails.root.join("db", "seeds", "item_shop_items.csv")
     rows = []

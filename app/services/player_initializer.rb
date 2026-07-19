@@ -47,7 +47,7 @@ class PlayerInitializer
       part_break_power: choice.part_break_power,
       attack_attributes: choice.attack_attributes,
       enhancement_level: 0,
-      enhance_limit: 10,
+      enhance_limit: 1,
       enhancement_difficulty: 0.7,
       equipped: true,
       weight: choice.weight,
@@ -55,7 +55,8 @@ class PlayerInitializer
       agility_ratio: choice.agility_ratio,
       description: choice.description,
       discardable: false,
-      protected_from_death_penalty: true
+      protected_from_death_penalty: true,
+      origin: "starter"
     )
   end
 

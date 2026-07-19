@@ -32,9 +32,16 @@ class BlacksmithService
     end
   end
 
+  # floor1〜50: 100→800 / floor50〜80: 800→1000 / floor80以降: 1000固定
   def self.proficiency_cap_for_floor(floor)
     normalized_floor = floor.to_i.clamp(1, 100)
-    (100 + (normalized_floor - 1) * (700.0 / 49)).round
+    if normalized_floor <= 50
+      (100 + (normalized_floor - 1) * (700.0 / 49)).round
+    elsif normalized_floor <= 80
+      (800 + (normalized_floor - 50) * (200.0 / 30)).round
+    else
+      1000
+    end
   end
 
   def self.current_for(player)
@@ -85,11 +92,21 @@ class BlacksmithService
     return "鍛冶スキル未取得" unless context
     return "鍛冶熟練度：#{context.proficiency} / 1000" if context.player?
 
-    case context.proficiency
-    when 0...250 then "駆け出しの鍛冶師"
-    when 250...500 then "腕利きの鍛冶師"
-    when 500...800 then "熟練の鍛冶師"
-    else "名工"
+    tier_name_for(context.proficiency)
+  end
+
+  # 鍛冶熟練度帯の正式名称(docs/naming.md参照)。素材の加工Lv表示にも共用する
+  TIERS = [
+    [ 0, "駆け出しの鍛冶師" ],
+    [ 250, "腕利きの鍛冶師" ],
+    [ 500, "熟練の鍛冶師" ],
+    [ 800, "名工" ]
+  ].freeze
+
+  def self.tier_name_for(value)
+    TIERS.reverse_each do |threshold, name|
+      return name if value.to_i >= threshold
     end
+    TIERS.first.last
   end
 end

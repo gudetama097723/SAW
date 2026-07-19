@@ -6,9 +6,9 @@ class WeaponCraftServiceTest < ActiveSupport::TestCase
     location = Location.create!(name: "生産試験工房", floor: 1, danger_level: 0, safe_area: true, has_blacksmith_facility: true)
     @player.update!(name: "鍛冶試験者", col: 5_000, location: location)
     @skill = @player.skills.create!(name: "鍛冶", proficiency: 100, skill_exp: 31_608, skill_category: "production")
-    add_item("鉄鉱", 3)
-    add_item("ホーンラビットの角", 1)
-    add_item("精錬石", 1)
+    add_item("鉄鉱", 10)
+    add_item("ホーンラビットの角", 3)
+    add_item("精錬石", 2)
   end
 
   test "player crafting consumes three material slots without a fee and creates variable crafted stats" do
