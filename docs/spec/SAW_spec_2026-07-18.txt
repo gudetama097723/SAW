@@ -580,7 +580,13 @@ modified_chance(65, stealth_effectiveness) + (プレイヤーレベル - 敵最�
 格上ほど先制しにくく、格下ほど先制しやすい。先制時はinitiative_type=player_ambush。
 
 ドロップ: 敵撃破報酬・宝箱報酬・ボス初回撃破報酬(unique_drops)は共通の
-報酬適用経路(ExplorationRewardService.apply_reward!)を通る。
+報酬適用経路(ExplorationRewardService.apply_reward!)を通る。敵撃破ドロップは
+db/seeds/mob_drops.csv の drop_chance で「その敵が何かを落とす確率」を定義し、
+抽選に通った場合だけ同CSVの weight で候補アイテムを重み付き抽選する。weight は
+個別アイテムの直接ドロップ率ではない。drop_chance未設定時の既定値は40%。
+第一層の通常敵は35〜40%、群れ出現する群狼は25%、素材特化の岩場敵は50〜60%を
+目安に調整する。部位破壊ドロップは mob_parts.csv の drop_rate をそのまま使用し、
+最低保証率は設けない。武器ドロップは mob_weapons.csv の drop_rate で別枠抽選する。
 
 ## 4.4 NPC親密度（affinity）システム
 NpcDiscoveryにaffinity(1-100)とaffinity_cap（初期値はNPC定義依存）を保持。

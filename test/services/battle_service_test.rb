@@ -730,6 +730,42 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_includes high_level_names, "スライムコア"
   end
 
+  test "mob defeat drops use configured mob chance" do
+    mob = Mob.create!(name: "群狼", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 8, flee_rate: 0)
+
+    MobDropCatalog.singleton_class.define_method(:rand) { |_max| 24 }
+    begin
+      assert MobDropCatalog.roll_defeat_drop(mob, enemy_level: 1)
+    ensure
+      MobDropCatalog.singleton_class.remove_method(:rand)
+    end
+
+    MobDropCatalog.singleton_class.define_method(:rand) { |_max| 25 }
+    begin
+      assert_nil MobDropCatalog.roll_defeat_drop(mob, enemy_level: 1)
+    ensure
+      MobDropCatalog.singleton_class.remove_method(:rand)
+    end
+  end
+
+  test "part drops respect csv drop rate without minimum floor" do
+    part = MobPart.new(name: "低確率部位", drop_item_name: "部位素材", drop_rate: 20)
+
+    MobDropCatalog.singleton_class.define_method(:rand) { |_max| 19 }
+    begin
+      assert_equal "部位素材", MobDropCatalog.roll_part_drop(part)
+    ensure
+      MobDropCatalog.singleton_class.remove_method(:rand)
+    end
+
+    MobDropCatalog.singleton_class.define_method(:rand) { |_max| 20 }
+    begin
+      assert_nil MobDropCatalog.roll_part_drop(part)
+    ensure
+      MobDropCatalog.singleton_class.remove_method(:rand)
+    end
+  end
+
   test "default mob status attacks are limited to intended enemies" do
     assert_empty Mob.new(name: "スライム").status_attacks
     assert_empty Mob.new(name: "蒼狼フェンリル").status_attacks

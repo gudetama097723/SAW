@@ -9,6 +9,17 @@ class Item < ApplicationRecord
     "misc" => "その他"
   }.freeze
 
+  # 同じ品名が複数の入手経路(採取/ドロップ/部位破壊 等)で別categoryとして
+  # 付与されると携行録が分裂表示されるため、入手経路によらず品名だけで
+  # カテゴリが確定する品目はここで正規化する。
+  CATEGORY_OVERRIDES = {
+    "鉄鉱" => "gathered",
+    "鋭鉄鉱" => "gathered",
+    "黒鋼鉱" => "gathered",
+    "砥石片" => "gathered",
+    "磨り減った認識票" => "valuable"
+  }.freeze
+
   UNIQUE_ITEM_MIN_SELL_PRICE = 1000
   MIN_TASTINESS_TO_EAT = 30
   MAINTENANCE_KIT_NAME = "武器整備キット"
@@ -106,6 +117,10 @@ class Item < ApplicationRecord
     "上等な持ち運びテント" => { encounter_multiplier: 0.5, weight: 10.to_d, price: 280 },
     "高級持ち運びテント" => { encounter_multiplier: 0.3, weight: 12.to_d, price: 600 }
   }.freeze
+
+  def self.canonical_category(name, category)
+    CATEGORY_OVERRIDES.fetch(name.to_s, category)
+  end
 
   def category_name
     CATEGORIES.fetch(category, "その他")

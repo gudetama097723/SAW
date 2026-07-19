@@ -12,6 +12,7 @@ class ItemService
   Result = Struct.new(:status, :message, :item, keyword_init: true)
 
   def self.add_item!(player, name, category, quantity = 1, unique: false)
+    category = Item.canonical_category(name, category)
     item = player.items.find_or_create_by!(name: name, category: category) do |new_item|
       new_item.quantity = 0
       new_item.apply_item_defaults

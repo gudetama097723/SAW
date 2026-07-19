@@ -1,8 +1,7 @@
 class MobDropCatalog
-  DROP_CHANCE = 50
-  PART_DROP_MIN_CHANCE = 80
+  DEFAULT_DROP_CHANCE = 40
 
-  DropDefinition = Struct.new(:mob_name, :item_name, :category, :weight, :min_level, :max_level, keyword_init: true) do
+  DropDefinition = Struct.new(:mob_name, :item_name, :category, :weight, :min_level, :max_level, :drop_chance, keyword_init: true) do
     def available_for_level?(level)
       effective_level = [level.to_i, 1].max
       effective_level >= min_level.to_i && effective_level <= max_level.to_i
@@ -11,15 +10,20 @@ class MobDropCatalog
 
   def self.roll_defeat_drop(mob, enemy_level: nil)
     return nil unless mob
-    return nil unless rand(100) < DROP_CHANCE
 
-    weighted_sample(definitions_for(mob, enemy_level: enemy_level))
+    candidates = definitions_for(mob, enemy_level: enemy_level)
+    return nil if candidates.empty?
+
+    chance = candidates.map(&:drop_chance).compact.max || DEFAULT_DROP_CHANCE
+    return nil unless rand(100) < chance.clamp(0, 100)
+
+    weighted_sample(candidates)
   end
 
   def self.roll_part_drop(part)
     return nil if part.drop_item_name.blank?
 
-    chance = [part.drop_rate.to_i, PART_DROP_MIN_CHANCE].max
+    chance = part.drop_rate.to_i.clamp(0, 100)
     rand(100) < chance ? part.drop_item_name : nil
   end
 
@@ -52,7 +56,8 @@ class MobDropCatalog
         category: row["category"].presence || "drop",
         weight: row["weight"].presence&.to_i || 1,
         min_level: row["min_level"].presence&.to_i || 1,
-        max_level: row["max_level"].presence&.to_i || 999
+        max_level: row["max_level"].presence&.to_i || 999,
+        drop_chance: row["drop_chance"].presence&.to_i
       )
     end
   end

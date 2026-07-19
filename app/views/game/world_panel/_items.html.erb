@@ -166,7 +166,7 @@
             <p class="mb-0">キーアイテムはまだありません。</p>
           <% end %>
 
-        <% elsif params[:item_category].in?(%w[healing gathered drop valuable]) %>
+        <% elsif params[:item_category].in?(%w[healing gathered drop valuable misc]) %>
 
           <div class="d-flex gap-1 mb-2 flex-wrap">
             <%= sort_link.call("名前", "name", "asc") %>
