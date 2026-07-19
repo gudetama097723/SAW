@@ -17,6 +17,15 @@ class FieldServiceTest < ActiveSupport::TestCase
     assert_equal 1, definition.weight
   end
 
+  test "rockfield gathering can yield throwable stones" do
+    definition = GatheringCatalog.definitions_for(Route.new(name: "骨石の岩場")).find do |candidate|
+      candidate.item_name == "石ころ"
+    end
+
+    assert_equal "gathered", definition.category
+    assert_operator definition.weight, :>, 0
+  end
+
   test "field rest requires a tent unless rest encounter chance is zero" do
     player = players(:one)
     area = field_areas(:one)
@@ -78,22 +87,17 @@ class FieldServiceTest < ActiveSupport::TestCase
     route = routes(:one)
     route.update!(name: "ゆりかごの野")
     player.update!(field_route: route, current_time: 12 * 60)
-    rolls = 0
+    original_hunt_ambush = FieldService.method(:hunt_ambush?)
 
     FieldService.singleton_class.define_method(:rand) do |arg = nil|
-      rolls += 1
-      if rolls == 1
-        0
-      elsif rolls == 2
-        99
-      else
-        arg.is_a?(Range) ? arg.begin : 0
-      end
+      arg.is_a?(Range) ? arg.begin : 0
     end
+    FieldService.singleton_class.define_method(:hunt_ambush?) { |_hunt_player, _encounters = nil| false }
     begin
       result = FieldService.hunt!(player)
     ensure
       FieldService.singleton_class.remove_method(:rand)
+      FieldService.singleton_class.define_method(:hunt_ambush?, original_hunt_ambush)
     end
 
     assert_equal :ok, result.status
@@ -115,6 +119,22 @@ class FieldServiceTest < ActiveSupport::TestCase
 
     assert_operator FieldService.stealth_adjusted_encounter_chance(40, player), :<, detection_without_stealth
     assert_operator FieldService.hunt_ambush_chance(player), :>, ambush_without_stealth
+  end
+
+  test "hunt ambush chance is lower against higher level enemies and higher against weaker enemies" do
+    player = players(:one)
+    player.update!(level: 10)
+    route = routes(:one)
+    player.update!(field_route: route, current_time: 12 * 60)
+    weak_mob = mobs(:one)
+    strong_mob = mobs(:two)
+
+    weak = [FieldService::Encounter.new(mob: weak_mob, level: 6)]
+    even = [FieldService::Encounter.new(mob: weak_mob, level: 10)]
+    strong = [FieldService::Encounter.new(mob: strong_mob, level: 14)]
+
+    assert_operator FieldService.hunt_ambush_chance(player, weak), :>, FieldService.hunt_ambush_chance(player, even)
+    assert_operator FieldService.hunt_ambush_chance(player, strong), :<, FieldService.hunt_ambush_chance(player, even)
   end
 
   test "mapping gain is lower in dangerous areas" do

@@ -144,6 +144,91 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_not battle.reload.ambush?
   end
 
+  test "throwing item cannot be used at near distance" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
+    item = player.items.create!(name: "石ころ", category: "gathered", quantity: 1)
+    mob = Mob.create!(name: "近距離投擲確認mob", hp: 50, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 50)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 50, enemy_level: 1, position: 1, distance: "near")
+
+    result = BattleService.resolve_throw_item!(
+      battle: battle,
+      player: player,
+      item_id: item.id,
+      mob_part_id: nil,
+      target_enemy_id: enemy.id
+    )
+
+    assert_equal :error, result.status
+    assert_includes result.message, "近距離では投擲できません"
+    assert_equal 1, item.reload.quantity
+  end
+
+  test "throwing item damages target and consumes one item at middle distance" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 20, agility: 20)
+    item = player.items.create!(name: "石ころ", category: "gathered", quantity: 1)
+    mob = Mob.create!(name: "投擲確認mob", hp: 50, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 50)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 50, enemy_level: 1, position: 1, distance: "middle")
+
+    rolls = [99, 0, 100, 99, 99, 1]
+    BattleService.singleton_class.define_method(:rand) do |range = nil|
+      value = rolls.shift || (range.is_a?(Range) ? range.begin : 0)
+      range.is_a?(Range) ? value.clamp(range.begin, range.end) : value
+    end
+    begin
+      result = BattleService.resolve_throw_item!(
+        battle: battle,
+        player: player,
+        item_id: item.id,
+        mob_part_id: nil,
+        target_enemy_id: enemy.id
+      )
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+
+    assert_equal :ok, result.status
+    assert_includes result.message, "石ころを投擲した"
+    assert_operator enemy.reload.enemy_hp, :<, 50
+    assert_nil Item.find_by(id: item.id)
+    assert_equal 100, player.reload.hp
+  end
+
+  test "throwing item only allows non target enemies to counterattack" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 20, agility: 20)
+    item = player.items.create!(name: "石ころ", category: "gathered", quantity: 1)
+    target_mob = Mob.create!(name: "投擲対象mob", hp: 50, atk: 30, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    other_mob = Mob.create!(name: "反撃確認mob", hp: 50, atk: 30, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: target_mob, enemy_hp: 50)
+    target = battle.battle_enemies.create!(mob: target_mob, enemy_hp: 50, enemy_level: 1, position: 1, distance: "middle")
+    battle.battle_enemies.create!(mob: other_mob, enemy_hp: 50, enemy_level: 1, position: 2, distance: "near")
+
+    rolls = [99, 0, 100, 99, 99, 1]
+    BattleService.singleton_class.define_method(:rand) do |range = nil|
+      value = rolls.shift || (range.is_a?(Range) ? range.begin : 0)
+      range.is_a?(Range) ? value.clamp(range.begin, range.end) : value
+    end
+    begin
+      result = BattleService.resolve_throw_item!(
+        battle: battle,
+        player: player,
+        item_id: item.id,
+        mob_part_id: nil,
+        target_enemy_id: target.id
+      )
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+
+    assert_equal :ok, result.status
+    assert_includes result.message, "反撃確認mobの攻撃"
+    assert_operator player.reload.hp, :<, 100
+  end
+
   test "backstep is blocked when surrounded by nearby enemies" do
     player = players(:one)
     player.update!(hp: 100, max_hp: 100, agility: 10)
@@ -521,6 +606,107 @@ class BattleServiceTest < ActiveSupport::TestCase
     ensure
       BattleService.singleton_class.remove_method(:rand)
     end
+  end
+
+  test "shield defense applies only while defending" do
+    player = players(:one)
+    player.armors.destroy_all
+    body = player.armors.create!(name: "防御用胴", armor_type: "body", slot: "body", rarity: "common", defense: 10, durability: 100, max_durability: 100, equipped: true)
+    shield = player.armors.create!(name: "防御用盾", armor_type: "盾", slot: "shield", rarity: "common", defense: 90, durability: 100, max_durability: 100, equipped: true)
+    mob = Mob.create!(name: "盾計算mob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 10)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 1)
+
+    normal_damage = BattleService.apply_enemy_damage_mitigation(player, enemy, 100)
+
+    assert_equal 50, normal_damage
+    assert_equal 99, body.reload.durability
+    assert_equal 100, shield.reload.durability
+
+    guarded_damage = BattleService.apply_enemy_damage_mitigation(player, enemy, 100, shield_guard: true)
+
+    assert_equal 10, guarded_damage
+    assert_equal 99, body.reload.durability
+    assert_equal 99, shield.reload.durability
+  end
+
+  test "defense action requires an equipped shield" do
+    player = players(:one)
+    player.armors.where(slot: "shield").destroy_all
+    mob = Mob.create!(name: "盾なし防御mob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 10)
+
+    result = BattleService.resolve_defense!(player, battle)
+
+    assert_equal :error, result.status
+    assert_includes result.message, "盾を装備していないため、防御できません。"
+  end
+
+  test "successful parry staggers enemy and skips its next action" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 50, agility: 10)
+    weapon = player.weapons.create!(name: "パリィ成功剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+    mob = Mob.create!(name: "パリィ成功mob", hp: 10, atk: 10, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 10)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 1)
+
+    BattleService.singleton_class.define_method(:rand) { |_arg = nil| 0 }
+    begin
+      result = BattleService.resolve_parry!(player, battle)
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+
+    assert_equal :ok, result.status
+    assert_includes result.message, "パリィした"
+    assert BattleService.enemy_sword_skill_stiffness?(enemy.reload)
+    assert_operator weapon.reload.durability, :>, 90
+
+    before_hp = player.reload.hp
+    enemy_result = BattleService.apply_enemy_attack!(player, battle)
+
+    assert_includes enemy_result.message, "体勢を崩して動けない"
+    assert_equal before_hp, player.reload.hp
+  end
+
+  test "failed parry consumes heavy durability and receives critical damage" do
+    player = players(:one)
+    player.update!(hp: 100, max_hp: 100, strength: 1, agility: 10)
+    weapon = player.weapons.create!(name: "盾用パリィ剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+    shield = player.armors.create!(name: "パリィ失敗盾", armor_type: "盾", slot: "shield", defense: 2, durability: 20, max_durability: 20, equipped: true)
+    mob = Mob.create!(name: "パリィ失敗mob", hp: 10, atk: 30, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 10)
+    battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 1)
+
+    BattleService.singleton_class.define_method(:rand) do |arg = nil|
+      arg.is_a?(Range) ? arg.end : 99
+    end
+    begin
+      result = BattleService.resolve_parry!(player, battle)
+    ensure
+      BattleService.singleton_class.remove_method(:rand)
+    end
+
+    assert_equal :ok, result.status
+    assert_includes result.message, "パリィに失敗した"
+    assert_includes result.message, "クリティカル"
+    assert_equal 0, shield.reload.durability
+    assert_equal 100, weapon.reload.durability
+    assert_operator player.reload.hp, :<, 50
+  end
+
+  test "parry requires one on one combat" do
+    player = players(:one)
+    player.weapons.create!(name: "多対一パリィ剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+    mob = Mob.create!(name: "多対一パリィmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = player.battles.create!(mob: mob, enemy_hp: 10)
+    battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 1)
+    battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 2)
+
+    result = BattleService.resolve_parry!(player, battle)
+
+    assert_equal :error, result.status
+    assert_includes result.message, "敵と1対1"
   end
 
   test "experience uses base reward and level gap only" do

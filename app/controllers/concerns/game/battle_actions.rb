@@ -45,6 +45,17 @@ module Game
       redirect_with_result(result, battle_command: "attack", attack_group: attack_group, target_enemy_id: params[:target_enemy_id], attack_attribute: unarmed_attack ? "打撃" : params[:attack_attribute])
     end
 
+    def throw_item
+      result = BattleService.resolve_throw_item!(
+        battle: current_battle,
+        player: current_player,
+        item_id: params[:item_id],
+        mob_part_id: params[:mob_part_id],
+        target_enemy_id: params[:target_enemy_id]
+      )
+      redirect_with_result(result, battle_command: "throw", throw_item_id: params[:item_id], target_enemy_id: params[:target_enemy_id])
+    end
+
     def sword_skill
       player = current_player
       weapon = BattleService.combat_weapon_for(player)
@@ -141,6 +152,16 @@ module Game
 
     def evade
       result = BattleService.resolve_evasive_action!(current_player, current_battle)
+      redirect_with_result(result, battle_command: "battle", target_enemy_id: params[:target_enemy_id])
+    end
+
+    def defend
+      result = BattleService.resolve_defense!(current_player, current_battle)
+      redirect_with_result(result, battle_command: "battle", target_enemy_id: params[:target_enemy_id])
+    end
+
+    def parry
+      result = BattleService.resolve_parry!(current_player, current_battle)
       redirect_with_result(result, battle_command: "battle", target_enemy_id: params[:target_enemy_id])
     end
 

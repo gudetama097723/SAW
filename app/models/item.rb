@@ -13,6 +13,14 @@ class Item < ApplicationRecord
   MIN_TASTINESS_TO_EAT = 30
   MAINTENANCE_KIT_NAME = "武器整備キット"
 
+  THROWABLE_DEFINITIONS = {
+    "石ころ" => {
+      attack_power: 0,
+      attack_attribute: "打撃",
+      description: "手頃な大きさの石。武器としての攻撃力はないが、投げることはできる。"
+    }
+  }.freeze
+
   SELL_PRICES = {
     "薬草" => 3,
     "毒キノコ" => 2,
@@ -65,6 +73,7 @@ class Item < ApplicationRecord
     "亀甲片" => 24,
     "砂搔き鼬の毛皮" => 16,
     "磨り減った認識票" => 200,
+    "石ころ" => 1,
     "鉄鉱" => 10,
     "鋭鉄鉱" => 18,
     "黒鋼鉱" => 60
@@ -126,8 +135,28 @@ class Item < ApplicationRecord
     TENT_DEFINITIONS[name] || {}
   end
 
+  def throwable_definition
+    THROWABLE_DEFINITIONS[name] || {}
+  end
+
   def portable_tent?
     tent_definition.present?
+  end
+
+  def throwable?
+    throwable_definition.present?
+  end
+
+  def throw_attack_power
+    throwable_definition.fetch(:attack_power, 0)
+  end
+
+  def throw_attack_attribute
+    throwable_definition.fetch(:attack_attribute, "打撃")
+  end
+
+  def throw_weapon?
+    throwable_definition.fetch(:weapon, false)
   end
 
   def tent_encounter_multiplier
@@ -174,6 +203,9 @@ class Item < ApplicationRecord
 
   def apply_item_defaults
     apply_food_defaults
+    if throwable?
+      self.description = throwable_definition[:description] if has_attribute?(:description) && description.blank?
+    end
     if valuable?
       self.description = valuable_description if has_attribute?(:description) && description.blank?
       self.weight = 0.to_d if has_attribute?(:weight)

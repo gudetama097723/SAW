@@ -195,6 +195,16 @@ class PlayerTest < ActiveSupport::TestCase
     assert_equal 1, unique_item.reload.quantity
   end
 
+  test "shield defense is separate from normal armor damage cut" do
+    player = players(:one)
+    player.armors.destroy_all
+    player.armors.create!(name: "胴防具", armor_type: "革鎧", slot: "body", defense: 7, durability: 100, max_durability: 100, equipped: true)
+    player.armors.create!(name: "盾防具", armor_type: "盾", slot: "shield", defense: 5, durability: 100, max_durability: 100, equipped: true)
+
+    assert_equal 7, player.damage_cut
+    assert_equal 5, player.shield_defense
+  end
+
   test "battle enemy can be affected by statuses" do
     battle = battles(:one)
     enemy = battle.battle_enemies.create!(mob: mobs(:one), enemy_hp: 100, enemy_max_hp: 100, enemy_level: 1, position: 1)

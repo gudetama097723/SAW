@@ -187,6 +187,7 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     get game_path, params: { battle_command: "battle" }
     assert_response :success
     assert_includes response.body, "素手攻撃"
+    assert_not_includes response.body, "action=\"/defend"
     assert_not_includes response.body, "パリィを狙う"
 
     get game_path, params: { battle_command: "attack" }
@@ -198,6 +199,47 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "素手攻撃"
     assert_not_includes response.body, "片手直剣スキル"
+  end
+
+  test "defense command appears only with an equipped shield" do
+    @player.weapons.create!(name: "盾用片手剣", weapon_type: "片手直剣", attack_power: 1, durability: 10, max_durability: 10, equipped: true)
+    shield = @player.armors.create!(name: "表示用盾", armor_type: "盾", slot: "shield", defense: 3, durability: 10, max_durability: 10)
+    mob = Mob.create!(name: "防御表示テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    @player.battles.create!(mob: mob, enemy_hp: 10)
+
+    get game_path, params: { battle_command: "battle" }
+    assert_response :success
+    assert_not_includes response.body, "action=\"/defend"
+
+    shield.update!(equipped: true)
+
+    get game_path, params: { battle_command: "battle" }
+    assert_response :success
+    assert_includes response.body, "action=\"/defend"
+  end
+
+  test "parry command appears only in one on one combat with parry equipment" do
+    @player.weapons.create!(name: "パリィ表示剣", weapon_type: "片手直剣", attack_power: 1, durability: 10, max_durability: 10, equipped: true)
+    mob = Mob.create!(name: "パリィ表示テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = @player.battles.create!(mob: mob, enemy_hp: 10)
+    battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 1)
+
+    get game_path, params: { battle_command: "battle" }
+    assert_response :success
+    assert_includes response.body, "action=\"/parry"
+
+    battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 2)
+
+    get game_path, params: { battle_command: "battle" }
+    assert_response :success
+    assert_not_includes response.body, "action=\"/parry"
+
+    @player.weapons.destroy_all
+    battle.battle_enemies.where(position: 2).destroy_all
+
+    get game_path, params: { battle_command: "battle" }
+    assert_response :success
+    assert_not_includes response.body, "action=\"/parry"
   end
 
   test "battle actions reject direct weapon commands without combat weapon" do
@@ -214,6 +256,22 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     post sword_skill_path, params: { skill: "vertical", mob_part_id: part.id }
     assert_redirected_to game_path(battle_command: "attack")
     assert_equal "武器を装備していないため、錬技は使用できません。", flash[:alert]
+  end
+
+  test "throw command appears only with throwable item and non near target" do
+    @player.items.create!(name: "石ころ", category: "gathered", quantity: 1)
+    mob = Mob.create!(name: "投擲表示テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)
+    battle = @player.battles.create!(mob: mob, enemy_hp: 10)
+    enemy = battle.battle_enemies.create!(mob: mob, enemy_hp: 10, enemy_level: 1, position: 1, distance: "middle")
+
+    get game_path, params: { battle_command: "battle", target_enemy_id: enemy.id }
+    assert_response :success
+    assert_match(/battle_command=throw/, response.body)
+
+    enemy.update!(distance: "near")
+    get game_path, params: { battle_command: "battle", target_enemy_id: enemy.id }
+    assert_response :success
+    assert_no_match(/battle_command=throw/, response.body)
   end
 
   test "battle command links keep selected single enemy target" do

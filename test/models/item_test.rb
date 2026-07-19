@@ -40,6 +40,18 @@ class ItemTest < ActiveSupport::TestCase
     assert_not item.food?
   end
 
+  test "stone is a gathered throwable item with no attack power" do
+    item = Item.new(name: "石ころ", category: "gathered", quantity: 1)
+    item.apply_item_defaults
+
+    assert item.throwable?
+    assert_equal 0, item.throw_attack_power
+    assert_equal "打撃", item.throw_attack_attribute
+    assert_equal "採取アイテム", item.category_name
+    assert_not item.food?
+    assert_includes item.description, "投げることはできる"
+  end
+
   test "boss drop rewards become protected unique items" do
     player = players(:one)
 

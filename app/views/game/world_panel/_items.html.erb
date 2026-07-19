@@ -215,6 +215,9 @@
                 <% if item.valuable? %>
                   <p class="mb-1 text-warning">用途: 換金専用</p>
                 <% end %>
+                <% if item.throwable? %>
+                  <p class="mb-1">投擲: 可能（攻撃力 <%= item.throw_attack_power %>）</p>
+                <% end %>
                 <% if item.food? %>
                   <p class="mb-1">食材: おいしさ <%= item.effective_tastiness %></p>
                 <% end %>

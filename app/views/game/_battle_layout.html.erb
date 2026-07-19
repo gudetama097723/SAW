@@ -1,5 +1,7 @@
 <% battle_command = params[:battle_command].presence %>
 <% combat_weapon = BattleService.combat_weapon_for(@player) %>
+<% equipped_shield = @player.equipped_shield %>
+<% parry_tool = BattleService.parry_tool_for(@player) %>
 <% battle_command = "attack" if battle_command == "sword_skill" && !combat_weapon %>
 <% battle_enemies = @battle_enemies.presence || @battle.alive_enemies.to_a %>
 <% skill_set = combat_weapon ? BattleService.weapon_skill_name(combat_weapon) : nil %>
@@ -17,6 +19,8 @@
 <% selected_attack_group = params[:attack_group].presence %>
 <% selected_attack_group = "unarmed" if !combat_weapon && selected_attack_group == "weapon_attack" %>
 <% selected_attack_attribute = AttackAttribute.normalize(params[:attack_attribute].presence || combat_weapon&.primary_attack_attribute || "打撃") %>
+<% throwable_items = @player.items.select { |item| item.throwable? && item.quantity.to_i.positive? } %>
+<% selected_throw_item = throwable_items.find { |item| item.id == params[:throw_item_id].to_i } %>
 <% area_target_limit = selected_skill_definition&.max_targets || 4 %>
 <% selected_enemy_ids = params[:target_enemy_ids].to_s.split(",").map(&:to_i).reject(&:zero?) %>
 <% if selected_skill_is_area && !params.key?(:target_enemy_ids) %>
@@ -33,14 +37,15 @@
 <% part_target_enemy = selected_skill_is_area && selected_group.one? ? selected_group.first : selected_enemy %>
 <% part_target_parts = part_target_enemy ? BattleService.ensure_mob_parts!(part_target_enemy.mob) : [] %>
 <% part_target_states = part_target_enemy ? (@part_states_by_enemy || {})[part_target_enemy.id] || {} : {} %>
-<% show_parts = part_target_enemy.present? && part_target_parts.any? && ((battle_command == "attack" && selected_attack_group.present?) || (battle_command == "sword_skill" && selected_skill.present? && (!selected_skill_is_area || selected_group.one?))) %>
+<% throw_available_for_selected = selected_enemy && selected_enemy.distance_key != "near" %>
+<% show_parts = part_target_enemy.present? && part_target_parts.any? && ((battle_command == "attack" && selected_attack_group.present?) || (battle_command == "throw" && selected_throw_item.present?) || (battle_command == "sword_skill" && selected_skill.present? && (!selected_skill_is_area || selected_group.one?))) %>
 
 <div class="battle-layout">
   <div class="battle-command-layout">
     <div class="card bg-secondary text-light battle-command-card">
       <div class="card-header">コマンド</div>
       <div class="card-body d-grid gap-2">
-        <%= link_to "戦闘", game_path(selected_target_params.merge(battle_command: "battle")), class: battle_command == "battle" || battle_command == "attack" ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
+        <%= link_to "戦闘", game_path(selected_target_params.merge(battle_command: "battle")), class: battle_command.in?(["battle", "attack", "throw"]) ? "btn btn-warning w-100" : "btn btn-outline-warning w-100" %>
         <% if combat_weapon %>
           <%= link_to "スキル", game_path(selected_target_params.merge(battle_command: "sword_skill")), class: battle_command == "sword_skill" ? "btn btn-danger w-100" : "btn btn-outline-danger w-100" %>
         <% end %>
@@ -59,6 +64,11 @@
             <%= link_to combat_weapon ? "通常攻撃" : "素手攻撃",
                 game_path(battle_command: "attack", attack_group: combat_weapon ? nil : "unarmed", attack_attribute: combat_weapon ? nil : "打撃", target_enemy_id: selected_enemy&.id),
                 class: "btn btn-outline-warning w-100" %>
+            <% if throwable_items.any? && throw_available_for_selected %>
+              <%= link_to "投擲",
+                  game_path(battle_command: "throw", target_enemy_id: selected_enemy&.id),
+                  class: "btn btn-outline-warning w-100" %>
+            <% end %>
             <%= button_to "バックステップ",
                 backstep_path(target_enemy_id: selected_enemy&.id),
                 method: :post,
@@ -67,9 +77,17 @@
                 evade_path(target_enemy_id: selected_enemy&.id),
                 method: :post,
                 class: "btn btn-outline-light w-100" %>
-            <div class="btn btn-outline-secondary disabled w-100">防御</div>
-            <% if combat_weapon %>
-              <div class="btn btn-outline-secondary disabled w-100">パリィを狙う</div>
+            <% if equipped_shield %>
+              <%= button_to "防御",
+                  defend_path(target_enemy_id: selected_enemy&.id),
+                  method: :post,
+                  class: "btn btn-outline-light w-100" %>
+            <% end %>
+            <% if parry_tool && battle_enemies.one? %>
+              <%= button_to "パリィを狙う",
+                  parry_path(target_enemy_id: selected_enemy&.id),
+                  method: :post,
+                  class: "btn btn-outline-light w-100" %>
             <% end %>
           </div>
         <% elsif battle_command == "attack" %>
@@ -92,6 +110,25 @@
             <% else %>
               <p class="small mb-0">右の敵部位から攻撃先を選択してください。</p>
             <% end %>
+          <% end %>
+        <% elsif battle_command == "throw" %>
+          <% if throwable_items.empty? %>
+            <p class="small mb-0">投擲できるアイテムがありません。</p>
+          <% elsif !throw_available_for_selected %>
+            <p class="small mb-0">近距離では投擲できません。</p>
+          <% elsif selected_throw_item %>
+            <h6><%= selected_throw_item.name %> × <%= selected_throw_item.quantity %></h6>
+            <p class="small mb-1">属性: <%= selected_throw_item.throw_attack_attribute %> / 攻撃力: <%= selected_throw_item.throw_attack_power %></p>
+            <p class="small mb-0">右の敵部位から投擲先を選択してください。</p>
+            <%= link_to "投擲品一覧へ", game_path(battle_command: "throw", target_enemy_id: selected_enemy&.id), class: "btn btn-outline-light w-100 mt-2" %>
+          <% else %>
+            <div class="d-grid gap-2">
+              <% throwable_items.each do |item| %>
+                <%= link_to "#{item.name} × #{item.quantity}",
+                    game_path(battle_command: "throw", throw_item_id: item.id, target_enemy_id: selected_enemy&.id),
+                    class: "btn btn-outline-warning w-100" %>
+              <% end %>
+            </div>
           <% end %>
         <% elsif battle_command == "sword_skill" %>
           <% if !combat_weapon %>
@@ -285,6 +322,11 @@
                       method: :post,
                       class: "btn btn-outline-danger w-100" %>
                 <% end %>
+              <% elsif battle_command == "throw" %>
+                <%= button_to part_label,
+                    throw_item_path(target_enemy_id: part_target_enemy.id, mob_part_id: part.id, item_id: selected_throw_item.id),
+                    method: :post,
+                    class: "btn btn-outline-warning w-100" %>
               <% else %>
                 <%= button_to part_label,
                     attack_path(target_enemy_id: part_target_enemy.id, mob_part_id: part.id, attack_attribute: selected_attack_attribute, attack_group: selected_attack_group),
@@ -327,9 +369,10 @@
              else
                {
                  battle_command: battle_command,
-                 attack_group: selected_attack_group,
-                 attack_attribute: selected_attack_attribute,
-                 selected_skill: selected_skill,
+                  attack_group: selected_attack_group,
+                  attack_attribute: selected_attack_attribute,
+                  throw_item_id: selected_throw_item&.id,
+                  selected_skill: selected_skill,
                  skill_group: params[:skill_group],
                  target_enemy_id: enemy.id
                }

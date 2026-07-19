@@ -5,8 +5,22 @@
   ENEMY_SWORD_SKILL_STIFFNESS_KEY = "enemy_sword_skill_stiffness"
   ENEMY_SWORD_SKILL_STIFFNESS_CRITICAL_BONUS = 35
   BACKSTEP_ACTION_SKIP_KEY = "backstep_action_skip"
+  PARRY_ACTION_SKIP_KEY = "parry_action_skip"
   MIDDLE_REACH_WEAPON_TYPES = %w[大剣 斧 槍 両手剣].freeze
   FAR_REACH_WEAPON_TYPES = %w[投擲 弓].freeze
+  PARRY_BASE_RATES = {
+    "shield" => 55,
+    "片手直剣" => 45,
+    "細剣" => 35,
+    "短剣" => 50,
+    "棍" => 40,
+    "片手棍" => 45,
+    "片手斧" => 35,
+    "斧" => 28,
+    "大剣" => 30,
+    "両手剣" => 30,
+    "槍" => 25
+  }.freeze
 
   def self.ensure_mob_parts!(mob)
     return [] unless mob
@@ -157,16 +171,23 @@
     )
   end
 
-  def self.apply_enemy_attack!(player, battle, prefix: "", allow_evasion: true, evasion_focus: false)
+  def self.apply_enemy_attack!(player, battle, prefix: "", allow_evasion: true, evasion_focus: false, except_enemy_ids: [], shield_guard: false, parry_attempt: false, parry_tool: nil)
     return Result.new(status: :ok, message: "") if battle.destroyed?
 
     ensure_battle_enemies!(battle)
     messages = []
 
+    skipped_ids = Array(except_enemy_ids).map(&:to_i)
     battle.alive_enemies.each do |battle_enemy|
+      next if skipped_ids.include?(battle_enemy.id)
+
       mob_name = battle_enemy.mob.name
       if enemy_action_skipped_by_backstep?(battle_enemy)
         messages << enemy_message("#{prefix}#{mob_name}は踏み込みが間に合わなかった。")
+        next
+      end
+      if enemy_action_skipped_by_parry?(battle_enemy)
+        messages << enemy_message("#{prefix}#{mob_name}は体勢を崩して動けない。")
         next
       end
 
@@ -201,7 +222,15 @@
         end
       end
 
-      if !evasion_focus && enemy_sword_skill_weapon_guarded?(player, battle_enemy, sword_skill)
+      if parry_attempt
+        parry_result = resolve_enemy_attack_parry!(player, battle, battle_enemy, sword_skill, parry_tool, prefix, enemy_approach_message)
+        return parry_result if parry_result.status == :defeated
+
+        messages << parry_result.message
+        next
+      end
+
+      if !evasion_focus && !shield_guard && enemy_sword_skill_weapon_guarded?(player, battle_enemy, sword_skill)
         start_enemy_sword_skill_cooldown!(battle_enemy, sword_skill)
         battle_enemy.save!
         player.save!
@@ -218,17 +247,18 @@
         next
       end
 
-      enemy_damage = enemy_attack_damage(player, battle_enemy, sword_skill)
+      enemy_damage = enemy_attack_damage(player, battle_enemy, sword_skill, shield_guard: shield_guard)
       player.hp = player.hp.to_i - enemy_damage
       apply_mob_status_attacks!(player, battle_enemy)
+      guard_message = shield_guard ? "盾で受け、" : ""
 
       if player.hp <= 0
-        return handle_player_defeat!(player, battle, "#{enemy_message("#{prefix}#{enemy_approach_message}#{mob_name}の#{enemy_attack_name(sword_skill)}！#{enemy_skill_hit_text(sword_skill)}#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。")
+        return handle_player_defeat!(player, battle, "#{enemy_message("#{prefix}#{enemy_approach_message}#{mob_name}の#{enemy_attack_name(sword_skill)}！#{enemy_skill_hit_text(sword_skill)}#{guard_message}#{enemy_damage}ダメージを受けた！")}あなたは倒れた……。")
       end
 
       BuffEffectService.tick_battle_turn!(battle_enemy)
       battle_enemy.save!
-      messages << enemy_message("#{prefix}#{enemy_approach_message}#{mob_name}の#{enemy_attack_name(sword_skill)}！#{enemy_skill_hit_text(sword_skill)}#{enemy_damage}ダメージを受けた！")
+      messages << enemy_message("#{prefix}#{enemy_approach_message}#{mob_name}の#{enemy_attack_name(sword_skill)}！#{enemy_skill_hit_text(sword_skill)}#{guard_message}#{enemy_damage}ダメージを受けた！")
     end
 
     player.save!
@@ -241,6 +271,47 @@
     end
 
     Result.new(status: :ok, message: messages.join)
+  end
+
+  def self.resolve_throw_item!(battle:, player:, item_id:, mob_part_id:, target_enemy_id:)
+    return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
+
+    ensure_battle_enemies!(battle)
+    turn_messages = apply_battle_turn_start_effects!(player, battle)
+    return handle_player_defeat!(player, battle, "#{turn_messages.join}あなたは倒れた……。") if player.hp.to_i <= 0
+
+    blocked_result = resolve_player_action_block_after_turn_start!(player, battle, turn_messages)
+    return blocked_result if blocked_result
+
+    item = player.items.find_by(id: item_id)
+    return Result.new(status: :error, message: "投擲できるアイテムがありません。") unless item&.throwable? && item.quantity.to_i.positive?
+
+    target = target_enemies_for(battle, target_enemy_id, nil, false).first
+    return Result.new(status: :error, message: "攻撃対象がいません。") unless target
+    return Result.new(status: :error, message: "近距離では投擲できません。") if target.distance_key == "near"
+
+    result = resolve_throw_hit!(
+      player: player,
+      item: item,
+      battle_enemy: target,
+      mob_part_id: mob_part_id
+    )
+    consume_throwable_item!(item)
+    consume_player_ambush_opening!(battle)
+
+    if battle.alive_enemies.reload.empty?
+      return finish_battle_victory!(player, battle, nil, "投擲", result, 0, false, nil)
+    end
+
+    BuffEffectService.tick_battle_turn!(player)
+    player.save!
+    battle.save!
+    enemy_result = apply_enemy_attack!(player, battle, except_enemy_ids: [target.id])
+    return enemy_result if enemy_result.status == :defeated
+
+    tick_sword_skill_cooldowns_for_turn!(player, battle)
+    player.save!
+    Result.new(status: :ok, message: "#{turn_messages.join}#{item.name}を投擲した！#{result}！#{enemy_result.message}")
   end
 
   def self.resolve_backstep!(player, battle, target_enemy_id: nil)
@@ -302,6 +373,66 @@
     tick_sword_skill_cooldowns_for_turn!(player, battle)
     player.save!
     Result.new(status: :ok, message: "#{turn_messages.join}回避行動を取った。#{enemy_result.message}")
+  end
+
+  def self.resolve_defense!(player, battle)
+    return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
+
+    ensure_battle_enemies!(battle)
+    turn_messages = apply_battle_turn_start_effects!(player, battle)
+    return handle_player_defeat!(player, battle, "#{turn_messages.join}あなたは倒れた……。") if player.hp.to_i <= 0
+
+    blocked_result = resolve_player_action_block_after_turn_start!(player, battle, turn_messages)
+    return blocked_result if blocked_result
+
+    shield = player.equipped_shield
+    return Result.new(status: :error, message: "盾を装備していないため、防御できません。") unless shield
+
+    BuffEffectService.tick_battle_turn!(player)
+    consume_player_ambush_opening!(battle)
+    player.save!
+
+    enemy_result = apply_enemy_attack!(player, battle, prefix: "防御中、", allow_evasion: false, shield_guard: true)
+    return enemy_result if enemy_result.status == :defeated
+
+    tick_sword_skill_cooldowns_for_turn!(player, battle)
+    player.save!
+    Result.new(status: :ok, message: "#{turn_messages.join}防御姿勢を取った。#{enemy_result.message}")
+  end
+
+  def self.resolve_parry!(player, battle)
+    return Result.new(status: :error, message: "戦闘中ではありません。") unless battle
+
+    ensure_battle_enemies!(battle)
+    turn_messages = apply_battle_turn_start_effects!(player, battle)
+    return handle_player_defeat!(player, battle, "#{turn_messages.join}あなたは倒れた……。") if player.hp.to_i <= 0
+
+    alive_enemies = battle.alive_enemies.reload.to_a
+    return Result.new(status: :error, message: "パリィは敵と1対1の時だけ狙えます。") unless alive_enemies.one?
+
+    blocked_result = resolve_player_action_block_after_turn_start!(player, battle, turn_messages)
+    return blocked_result if blocked_result
+
+    parry_tool = parry_tool_for(player)
+    return Result.new(status: :error, message: "盾または武器を装備していないため、パリィできません。") unless parry_tool
+
+    BuffEffectService.tick_battle_turn!(player)
+    consume_player_ambush_opening!(battle)
+    player.save!
+
+    enemy_result = apply_enemy_attack!(
+      player,
+      battle,
+      prefix: "パリィを狙い、",
+      allow_evasion: false,
+      parry_attempt: true,
+      parry_tool: parry_tool
+    )
+    return enemy_result if enemy_result.status == :defeated
+
+    tick_sword_skill_cooldowns_for_turn!(player, battle)
+    player.save!
+    Result.new(status: :ok, message: "#{turn_messages.join}パリィを狙った。#{enemy_result.message}")
   end
 
   def self.resolve_player_action_block!(player, battle)
@@ -471,6 +602,20 @@
     true
   end
 
+  def self.mark_parry_action_skip!(battle_enemy)
+    BuffEffectService.apply_battle_effect!(battle_enemy, PARRY_ACTION_SKIP_KEY, {}, turns: 2)
+    battle_enemy.save!
+  end
+
+  def self.enemy_action_skipped_by_parry?(battle_enemy)
+    data = BuffEffectService.battle_effects(battle_enemy)
+    return false unless data.delete(PARRY_ACTION_SKIP_KEY)
+
+    battle_enemy.battle_effects = data.to_json
+    battle_enemy.save!
+    true
+  end
+
   def self.encircled?(battle)
     battle.alive_enemies.to_a.count { |battle_enemy| battle_enemy.distance_key == "near" } >= 3
   end
@@ -515,6 +660,38 @@
     "#{battle_enemy.mob.name}: #{guard_result[:message]}#{critical_message}#{actual_part.name}へ#{hit_damage}ダメージ#{break_message}#{defeated_message}"
   end
 
+  def self.resolve_throw_hit!(player:, item:, battle_enemy:, mob_part_id:)
+    parts = ensure_mob_parts!(battle_enemy.mob)
+    ensure_part_states!(battle_enemy, parts)
+    target_part = if mob_part_id.present?
+      parts.find { |mob_part| mob_part.id == mob_part_id.to_i } || parts.first
+    else
+      weighted_random_part(parts, battle_enemy)
+    end
+    return "#{battle_enemy.mob.name}に攻撃可能部位がない" unless target_part
+
+    guard_result = resolve_guarded_part(player, battle_enemy, parts, target_part)
+    return "#{battle_enemy.mob.name}: #{guard_result[:message]}" if guard_result[:blocked]
+
+    actual_part = guard_result[:part]
+    unless guard_result[:guarded] || player_throw_hit?(player, battle_enemy)
+      return "#{battle_enemy.mob.name}: #{guard_result[:message]}躱された！"
+    end
+
+    raw_hit_damage = calculate_throw_damage(player, item, battle_enemy, actual_part)
+    varied_damage = apply_player_damage_variance(raw_hit_damage)
+    part_damage = calculate_part_damage(varied_damage, nil, actual_part)
+    critical = StatusEffectService.sleeping_critical!(battle_enemy)
+    hit_damage = critical ? varied_damage * 2 : varied_damage
+    battle_enemy.enemy_hp = [battle_enemy.enemy_hp.to_i - hit_damage, 0].max
+    break_message = apply_part_damage!(player, battle_enemy, actual_part, part_damage)
+    battle_enemy.save!
+
+    critical_message = critical ? "クリティカル！" : ""
+    defeated_message = battle_enemy.enemy_hp <= 0 ? " #{battle_enemy.mob.name}を倒した！" : ""
+    "#{battle_enemy.mob.name}: #{guard_result[:message]}#{critical_message}#{actual_part.name}へ#{hit_damage}ダメージ#{break_message}#{defeated_message}"
+  end
+
   def self.weighted_random_part(parts, battle_enemy)
     candidates = parts.reject { |part| part_broken?(battle_enemy, part) }
     candidates = parts if candidates.empty?
@@ -543,6 +720,22 @@ def self.calculate_player_damage(player, weapon, battle_enemy, part, attack_attr
   base_damage *= StatusEffectService.damage_taken_multiplier(battle_enemy)
   base_damage *= BuffEffectService.defense_damage_taken_multiplier(battle_enemy)
   [base_damage * part.damage_multiplier.to_i / 100.0, 1.0].max
+end
+
+def self.calculate_throw_damage(player, item, battle_enemy, part)
+  base_power = player.effective_strength.to_f + item.throw_attack_power.to_f
+  base_power *= throw_distance_multiplier(battle_enemy)
+  base_power *= attribute_multiplier(nil, battle_enemy.mob, part, item.throw_attack_attribute)
+  defense_rate = 100.0 / (100 + [battle_enemy.effective_durability, 0].max)
+  base_damage = base_power * defense_rate
+  base_damage *= StatusEffectService.damage_dealt_multiplier(player)
+  base_damage *= StatusEffectService.damage_taken_multiplier(battle_enemy)
+  base_damage *= BuffEffectService.defense_damage_taken_multiplier(battle_enemy)
+  [base_damage * part.damage_multiplier.to_i / 100.0, 1.0].max
+end
+
+def self.throw_distance_multiplier(battle_enemy)
+  battle_enemy.distance_key == "far" ? 0.55 : 0.8
 end
 
 def self.attribute_multiplier(weapon, mob, part, attack_attribute)
@@ -583,6 +776,14 @@ end
     chance += weapon.sword_skill_accuracy_bonus if sword_skill && weapon
     chance = chance.clamp(55, sword_skill ? 100 : 98)
 
+    rand(100) < chance
+  end
+
+  def self.player_throw_hit?(player, battle_enemy)
+    player_agility = (player.effective_agility * BuffEffectService.agility_multiplier(player)).round
+    agility_gap = player_agility - mob_effective_agility(battle_enemy)
+    distance_penalty = battle_enemy.distance_key == "far" ? 30 : 15
+    chance = [[45 + (agility_gap * 4) - distance_penalty + BuffEffectService.accuracy_modifier(player), 5].max, 70].min
     rand(100) < chance
   end
 
@@ -740,6 +941,97 @@ end
     message.to_s.include?("で弾かれた！")
   end
 
+  def self.resolve_enemy_attack_parry!(player, battle, battle_enemy, sword_skill, parry_tool, prefix, enemy_approach_message)
+    mob_name = battle_enemy.mob.name
+    tool_name = parry_tool_name(parry_tool)
+    if parry_success?(player, battle_enemy, parry_tool)
+      apply_parry_durability_loss!(parry_tool, battle_enemy, sword_skill, success: true)
+      start_enemy_sword_skill_cooldown!(battle_enemy, sword_skill) if sword_skill
+      mark_enemy_stagger!(battle_enemy)
+      mark_parry_action_skip!(battle_enemy)
+      BuffEffectService.tick_battle_turn!(battle_enemy)
+      battle_enemy.save!
+      player.save!
+      broken_message = parry_tool.is_a?(Weapon) ? destroy_weapon_if_broken!(parry_tool) : ""
+
+      return Result.new(
+        status: :ok,
+        message: enemy_message("#{prefix}#{enemy_approach_message}#{mob_name}の#{enemy_attack_name(sword_skill)}を#{tool_name}でパリィした！#{mob_name}は体勢を崩した！#{broken_message}")
+      )
+    end
+
+    apply_parry_durability_loss!(parry_tool, battle_enemy, sword_skill, success: false)
+    enemy_damage = enemy_attack_damage(player, battle_enemy, sword_skill, forced_critical: true)
+    player.hp = player.hp.to_i - enemy_damage
+    apply_mob_status_attacks!(player, battle_enemy)
+    broken_message = parry_tool.is_a?(Weapon) ? destroy_weapon_if_broken!(parry_tool) : ""
+
+    if player.hp <= 0
+      return handle_player_defeat!(
+        player,
+        battle,
+        "#{enemy_message("#{prefix}#{enemy_approach_message}パリィに失敗した！#{mob_name}の#{enemy_attack_name(sword_skill)}！クリティカル！#{enemy_damage}ダメージを受けた！#{broken_message}")}あなたは倒れた……。"
+      )
+    end
+
+    BuffEffectService.tick_battle_turn!(battle_enemy)
+    battle_enemy.save!
+    player.save!
+    Result.new(
+      status: :ok,
+      message: enemy_message("#{prefix}#{enemy_approach_message}パリィに失敗した！#{mob_name}の#{enemy_attack_name(sword_skill)}！クリティカル！#{enemy_damage}ダメージを受けた！#{broken_message}")
+    )
+  end
+
+  def self.parry_tool_for(player)
+    shield = player.equipped_shield
+    return shield if shield
+
+    weapon = combat_weapon_for(player)
+    weapon unless weapon&.broken?
+  end
+
+  def self.parry_tool_name(parry_tool)
+    parry_tool.respond_to?(:display_name) ? parry_tool.display_name : parry_tool.name
+  end
+
+  def self.parry_success?(player, battle_enemy, parry_tool)
+    strength_gap = player.effective_strength - mob_effective_strength_for_parry(battle_enemy)
+    chance = (parry_base_rate(parry_tool) + strength_gap * 4).clamp(10, 90)
+    rand(100) < chance
+  end
+
+  def self.parry_base_rate(parry_tool)
+    return PARRY_BASE_RATES.fetch("shield") if parry_tool.is_a?(Armor)
+
+    PARRY_BASE_RATES.fetch(parry_tool.weapon_type, 30)
+  end
+
+  def self.mob_effective_strength_for_parry(battle_enemy)
+    mob_effective_atk(battle_enemy)
+  end
+
+  def self.apply_parry_durability_loss!(parry_tool, battle_enemy, sword_skill, success:)
+    loss = parry_durability_loss(parry_tool, battle_enemy, sword_skill, success: success)
+    parry_tool.apply_durability_loss!(loss)
+    parry_tool.save! if parry_tool.is_a?(Weapon)
+  end
+
+  def self.parry_durability_loss(parry_tool, battle_enemy, sword_skill, success:)
+    pressure = enemy_attack_power(battle_enemy, sword_skill)
+    sturdiness = parry_tool_sturdiness(parry_tool)
+    base_loss = [(pressure * 12.0 / [sturdiness, 10].max).ceil, 1].max
+    success ? base_loss : [base_loss * 3, base_loss + 2].max
+  end
+
+  def self.parry_tool_sturdiness(parry_tool)
+    if parry_tool.is_a?(Armor)
+      parry_tool.max_durability.to_i + parry_tool.defense.to_i * 5
+    else
+      parry_tool.effective_max_durability + parry_tool.durability_level.to_i * 10 + parry_tool.part_break_power.to_i
+    end
+  end
+
   def self.enemy_sword_skill_weapon_guarded?(player, battle_enemy, sword_skill)
     weapon = combat_weapon_for(player)
     return false unless sword_skill && weapon && !weapon.broken?
@@ -869,6 +1161,10 @@ end
   def self.mark_enemy_sword_skill_stiffness!(battle_enemy, sword_skill)
     return unless sword_skill
 
+    mark_enemy_stagger!(battle_enemy)
+  end
+
+  def self.mark_enemy_stagger!(battle_enemy)
     BuffEffectService.apply_battle_effect!(
       battle_enemy,
       ENEMY_SWORD_SKILL_STIFFNESS_KEY,
@@ -912,13 +1208,13 @@ end
     "#{sword_skill.hits.to_i}ヒット "
   end
 
-  def self.enemy_attack_damage(player, battle_enemy, sword_skill)
+  def self.enemy_attack_damage(player, battle_enemy, sword_skill, shield_guard: false, forced_critical: false)
     start_enemy_sword_skill_cooldown!(battle_enemy, sword_skill) if sword_skill
 
     hit_count = sword_skill ? [sword_skill.hits.to_i, 1].max : 1
     Array.new(hit_count).sum do
       raw_damage = (enemy_attack_power(battle_enemy, sword_skill) * rand(85..100) / 100.0).round
-      apply_enemy_damage_mitigation(player, battle_enemy, raw_damage)
+      apply_enemy_damage_mitigation(player, battle_enemy, raw_damage, shield_guard: shield_guard, forced_critical: forced_critical)
     end
   end
 
@@ -932,14 +1228,22 @@ end
     [base_power, 1].max
   end
 
-  def self.apply_enemy_damage_mitigation(player, battle_enemy, raw_damage)
-    player.equipped_armors.each { |armor| armor.apply_durability_loss!(1) }
-    defense_rate = 100.0 / (100 + [player.damage_cut.to_i, 0].max * 10)
+  def self.apply_enemy_damage_mitigation(player, battle_enemy, raw_damage, shield_guard: false, forced_critical: false)
+    defense_cut = player.damage_cut.to_i
+    defense_cut += player.shield_defense if shield_guard
+
+    if shield_guard
+      player.equipped_shield&.apply_durability_loss!(1)
+    else
+      player.equipped_body_armors.each { |armor| armor.apply_durability_loss!(1) }
+    end
+
+    defense_rate = 100.0 / (100 + [defense_cut, 0].max * 10)
     enemy_damage = [(raw_damage * defense_rate).ceil, 1].max
     enemy_damage = (enemy_damage * StatusEffectService.damage_dealt_multiplier(battle_enemy)).ceil
     enemy_damage = (enemy_damage * StatusEffectService.damage_taken_multiplier(player)).ceil
     enemy_damage = (enemy_damage * BuffEffectService.defense_damage_taken_multiplier(player)).ceil
-    enemy_damage *= 2 if StatusEffectService.sleeping_critical!(player)
+    enemy_damage *= 2 if forced_critical || StatusEffectService.sleeping_critical!(player)
     enemy_damage
   end
 
@@ -966,6 +1270,11 @@ end
   def self.enemy_flees?(battle_enemy)
     rate = battle_enemy.mob.effective_flee_rate
     rate.positive? && rand(100) < rate
+  end
+
+  def self.consume_throwable_item!(item)
+    item.quantity = item.quantity.to_i - 1
+    item.quantity.positive? ? item.save! : item.destroy!
   end
 
   def self.gain_exp_message(player, defeated_enemies)

@@ -253,6 +253,18 @@ end
     armors.where(equipped: true)
   end
 
+  def equipped_body_armors
+    equipped_armors.where.not(slot: "shield")
+  end
+
+  def equipped_shield
+    equipped_armors.find_by(slot: "shield")
+  end
+
+  def shield_defense
+    equipped_shield&.effective_defense.to_i
+  end
+
   def armor_for(slot)
     equipped_armors.find_by(slot: slot)
   end
@@ -563,7 +575,7 @@ end
   end
 
   def damage_cut
-    equipped_armors.sum(&:effective_defense)
+    equipped_body_armors.sum(&:effective_defense)
   end
 
   def used_skill_slots

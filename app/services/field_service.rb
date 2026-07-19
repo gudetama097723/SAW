@@ -153,8 +153,9 @@ class FieldService
     player.advance_time!(15)
 
     if rand(100) < 85
-      ambush = hunt_ambush?(player)
-      battle = create_battle!(player, encounter_mobs_for(player), initiative_type: ambush ? "player_ambush" : "normal")
+      encounters = encounter_mobs_for(player)
+      ambush = hunt_ambush?(player, encounters)
+      battle = create_battle!(player, encounters, initiative_type: ambush ? "player_ambush" : "normal")
       message = "#{battle.alive_enemies.map { |enemy| enemy.mob.name }.join('、')}を発見した！"
       message += "先制攻撃のチャンス！" if ambush
     else
@@ -498,12 +499,28 @@ class FieldService
     (chance / stealth_effectiveness_for(context)).round.clamp(0, 100)
   end
 
-  def self.hunt_ambush?(player)
-    rand(100) < hunt_ambush_chance(player)
+  def self.hunt_ambush?(player, encounters = nil)
+    rand(100) < hunt_ambush_chance(player, encounters)
   end
 
-  def self.hunt_ambush_chance(player)
-    modified_chance(65, stealth_effectiveness_for(player))
+  def self.hunt_ambush_chance(player, encounters = nil)
+    (modified_chance(65, stealth_effectiveness_for(player)) + hunt_level_gap_modifier(player, encounters)).clamp(15, 85)
+  end
+
+  def self.hunt_level_gap_modifier(player, encounters)
+    return 0 unless player
+
+    enemy_level = Array(encounters).filter_map { |encounter| encounter_level_for_hunt_modifier(encounter) }.max
+    return 0 unless enemy_level
+
+    ((player.effective_level - enemy_level) * 5).clamp(-40, 40)
+  end
+
+  def self.encounter_level_for_hunt_modifier(encounter)
+    return encounter.level if encounter.respond_to?(:level)
+    return encounter.effective_level if encounter.respond_to?(:effective_level)
+
+    nil
   end
 
   def self.time_period_key_for(context)
