@@ -23,7 +23,10 @@ module Game
 
       PlayerBase.transaction do
         player.player_bases.where(base_type: "home").update_all(active: false) if base_type == "home"
-        player.player_bases.where(location: location, base_type: "home").update_all(active: false) if base_type == "temporary"
+        if base_type == "temporary"
+          player.player_bases.where(location: location, base_type: "home").update_all(active: false)
+          player.player_bases.where(base_type: "temporary").update_all(active: false)
+        end
         player.player_bases.find_or_create_by!(location: location, base_type: base_type).update!(
           active: true,
           rent: base_type == "home" ? (location.name == "ヴィーゲンブルク" ? 0 : 300) : 50,

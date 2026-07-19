@@ -442,6 +442,45 @@ class BattleServiceTest < ActiveSupport::TestCase
     assert_equal 1, player.sword_skill_cooldown("vertical")
   end
 
+  test "one handed sword mods reduce sword skill cooldown and durability cost" do
+    player = players(:one)
+    skill = player.skills.find_or_create_by!(name: "片手直剣") do |created|
+      created.skill_category = "weapon"
+      created.weapon_skill = true
+      created.proficiency = 1000
+      created.skill_exp = 0
+    end
+    skill.update!(
+      proficiency: 1000,
+      skill_category: "weapon",
+      weapon_skill: true,
+      sword_skill_levels: { "vertical" => { "level" => 30, "exp" => 0 } }.to_json,
+      learn_condition_data: { "skill_mods" => { "cooldown_assist" => 1, "nick_control" => 1, "final_tuning" => 1 } }.to_json
+    )
+    weapon = player.weapons.create!(name: "補助式確認剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+
+    assert_equal 1, BattleService.effective_sword_skill_cooldown(player, weapon, 3)
+    assert_equal 3, BattleService.effective_sword_skill_durability_cost(player, weapon, "vertical", 4, 3)
+  end
+
+  test "one handed sword veteran mod raises proficiency attack bonus cap" do
+    player = players(:one)
+    skill = player.skills.find_or_create_by!(name: "片手直剣") do |created|
+      created.skill_category = "weapon"
+      created.weapon_skill = true
+      created.skill_exp = 0
+    end
+    skill.update!(
+      proficiency: 1000,
+      skill_category: "weapon",
+      weapon_skill: true,
+      learn_condition_data: { "skill_mods" => { "veteran_sword" => 2 } }.to_json
+    )
+    weapon = player.weapons.create!(name: "百戦確認剣", weapon_type: "片手直剣", attack_power: 10, durability: 100, max_durability: 100, equipped: true)
+
+    assert_in_delta 1.25, BattleService.weapon_proficiency_attack_bonus(player, weapon), 0.001
+  end
+
   test "area attack can target arbitrary selected enemy ids" do
     player = players(:one)
     mob = Mob.create!(name: "複数選択テストmob", hp: 10, atk: 1, rarity: "normal", level: 1, agility: 1, durability: 1, exp_reward: 10, flee_rate: 0)

@@ -22,7 +22,6 @@ class Item < ApplicationRecord
 
   UNIQUE_ITEM_MIN_SELL_PRICE = 1000
   MIN_TASTINESS_TO_EAT = 30
-  MAINTENANCE_KIT_NAME = "武器整備キット"
 
   THROWABLE_DEFINITIONS = {
     "石ころ" => {
@@ -124,22 +123,6 @@ class Item < ApplicationRecord
 
   def category_name
     CATEGORIES.fetch(category, "その他")
-  end
-
-  def maintenance_kit?
-    name == MAINTENANCE_KIT_NAME
-  end
-
-  def effective_max_durability
-    return 30 if maintenance_kit? && max_durability.to_i <= 0
-
-    max_durability.to_i
-  end
-
-  def effective_durability
-    return effective_max_durability if maintenance_kit? && durability.to_i <= 0
-
-    durability.to_i
   end
 
   def food_definition

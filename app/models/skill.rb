@@ -1,4 +1,6 @@
-﻿class Skill < ApplicationRecord
+class Skill < ApplicationRecord
+  SKILL_MODS_KEY = "skill_mods"
+
   belongs_to :player
 
   def gain_skill_exp!(amount, growth_scale:)
@@ -43,6 +45,53 @@
     {}
   end
 
+  def skill_mod_data
+    value = learn_condition[SKILL_MODS_KEY]
+    value.is_a?(Hash) ? value : {}
+  end
+
+  def skill_mod_rank(mod_key)
+    skill_mod_data[mod_key.to_s].to_i
+  end
+
+  def skill_mod_points_earned
+    return 0 unless weapon_skill?
+
+    (proficiency.to_i.clamp(0, 1000) / 50).floor
+  end
+
+  def skill_mod_points_spent
+    SkillModCatalog.all(name).sum do |mod|
+      mod.total_cost_for_rank(skill_mod_rank(mod.key))
+    end
+  end
+
+  def skill_mod_points_remaining
+    [skill_mod_points_earned - skill_mod_points_spent, 0].max
+  end
+
+  def can_learn_skill_mod?(mod_key)
+    mod = SkillModCatalog.find(mod_key)
+    return false unless mod && mod.skill_name == name
+
+    current_rank = skill_mod_rank(mod.key)
+    current_rank < mod.max_rank && skill_mod_points_remaining >= mod.next_cost(current_rank)
+  end
+
+  def learn_skill_mod!(mod_key)
+    mod = SkillModCatalog.find(mod_key)
+    raise ArgumentError, "unknown skill mod" unless mod && mod.skill_name == name
+    raise ArgumentError, "skill mod cannot be learned" unless can_learn_skill_mod?(mod.key)
+
+    data = learn_condition
+    mods = data[SKILL_MODS_KEY].is_a?(Hash) ? data[SKILL_MODS_KEY] : {}
+    mods[mod.key] = skill_mod_rank(mod.key) + 1
+    data[SKILL_MODS_KEY] = mods
+    self.learn_condition_data = data.to_json
+    save!
+    mods[mod.key]
+  end
+
   def weapon_skill?
     self[:weapon_skill] == true || skill_category == "weapon"
   end
@@ -56,4 +105,3 @@
     value.clamp(0, 1000)
   end
 end
-

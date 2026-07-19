@@ -102,7 +102,14 @@
     approach_messages = target_enemies.filter_map { |battle_enemy| approach_for_player_attack!(weapon, battle_enemy, sword_skill: sword_skill) }
     hit_messages = []
     actual_attack_attribute = attack_attribute_for(weapon, attack_attribute, sword_skill)
-    damage_multiplier = weapon.sword_skill_damage_multiplier(damage_multiplier, hits) if sword_skill && weapon
+    if sword_skill && weapon
+      base_cooldown = cooldown
+      damage_multiplier = weapon.sword_skill_damage_multiplier(damage_multiplier, hits)
+      damage_multiplier = (damage_multiplier * (1.0 + SkillModEffects.sword_skill_damage_percent(player, weapon, skill_key, hits, target_enemies.first) / 100.0)).round
+      SkillModEffects.consume_linked_break!(player)
+      cooldown = effective_sword_skill_cooldown(player, weapon, cooldown)
+      durability_cost = effective_sword_skill_durability_cost(player, weapon, skill_key, durability_cost, base_cooldown)
+    end
     record_normal_attack_use!(player, weapon) if weapon && !sword_skill
 
     knockback_message = ""
@@ -119,7 +126,8 @@
           mob_part_id: (alive_targets.one? ? mob_part_id : nil),
           damage_multiplier: per_target_multiplier,
           attack_attribute: actual_attack_attribute,
-          sword_skill: sword_skill
+          sword_skill: sword_skill,
+          skill_key: skill_key
         )
         hit_messages << hit_message(index, hits, result)
         if sword_skill && weapon_knockback_result?(result)
@@ -131,6 +139,8 @@
     end
 
     consume_player_ambush_opening!(battle)
+    SkillModEffects.mark_trajectory_memory!(player, target_enemies.first) if SkillModEffects.one_handed_sword?(weapon) && !sword_skill && target_enemies.one?
+    SkillModEffects.consume_trajectory_memory!(player) if sword_skill
 
     weapon&.apply_durability_loss!(durability_loss_for(weapon, durability_cost, actual_attack_attribute))
     use_exp_message = gain_weapon_use_exp!(player, weapon)
@@ -157,7 +167,13 @@
 
     stiffness_message = ""
     if stiffness && knockback_message.blank?
-      stiffness_result = apply_enemy_attack!(player, battle, prefix: "錬技後の硬直中、", allow_evasion: false)
+      stiffness_result = apply_enemy_attack!(
+        player,
+        battle,
+        prefix: "錬技後の硬直中、",
+        allow_evasion: false,
+        incoming_damage_multiplier: SkillModEffects.stiffness_damage_taken_multiplier(player, weapon)
+      )
       return stiffness_result if stiffness_result.status == :defeated
 
       stiffness_message = stiffness_result.message
@@ -171,7 +187,7 @@
     )
   end
 
-  def self.apply_enemy_attack!(player, battle, prefix: "", allow_evasion: true, evasion_focus: false, except_enemy_ids: [], shield_guard: false, parry_attempt: false, parry_tool: nil)
+  def self.apply_enemy_attack!(player, battle, prefix: "", allow_evasion: true, evasion_focus: false, except_enemy_ids: [], shield_guard: false, parry_attempt: false, parry_tool: nil, incoming_damage_multiplier: 1.0)
     return Result.new(status: :ok, message: "") if battle.destroyed?
 
     ensure_battle_enemies!(battle)
@@ -247,7 +263,7 @@
         next
       end
 
-      enemy_damage = enemy_attack_damage(player, battle_enemy, sword_skill, shield_guard: shield_guard)
+      enemy_damage = (enemy_attack_damage(player, battle_enemy, sword_skill, shield_guard: shield_guard) * incoming_damage_multiplier.to_f).ceil
       player.hp = player.hp.to_i - enemy_damage
       apply_mob_status_attacks!(player, battle_enemy)
       guard_message = shield_guard ? "盾で受け、" : ""
@@ -628,7 +644,7 @@
     rand(100) < chance
   end
 
-  def self.resolve_hit!(player:, weapon:, battle_enemy:, mob_part_id:, damage_multiplier:, attack_attribute:, sword_skill: false)
+  def self.resolve_hit!(player:, weapon:, battle_enemy:, mob_part_id:, damage_multiplier:, attack_attribute:, sword_skill: false, skill_key: nil)
     parts = ensure_mob_parts!(battle_enemy.mob)
     ensure_part_states!(battle_enemy, parts)
     target_part = if mob_part_id.present?
@@ -642,17 +658,23 @@
     return "#{battle_enemy.mob.name}: #{guard_result[:message]}" if guard_result[:blocked]
 
     actual_part = guard_result[:part]
-    unless guard_result[:guarded] || player_attack_hit?(player, battle_enemy, actual_part, weapon: weapon, sword_skill: sword_skill)
+    unless guard_result[:guarded] || player_attack_hit?(player, battle_enemy, actual_part, weapon: weapon, sword_skill: sword_skill, skill_key: skill_key)
       return "#{battle_enemy.mob.name}: #{guard_result[:message]}躱された！"
     end
 
     raw_hit_damage = calculate_player_damage(player, weapon, battle_enemy, actual_part, attack_attribute) * damage_multiplier / 100.0
+    raw_hit_damage *= 1.0 + SkillModEffects.normal_damage_percent(player, weapon, battle_enemy) / 100.0 unless sword_skill
     varied_damage = apply_player_damage_variance(raw_hit_damage)
     part_damage = calculate_part_damage(varied_damage, weapon, actual_part)
-    critical = StatusEffectService.sleeping_critical!(battle_enemy) || critical_hit?(player, weapon, battle_enemy, actual_part, part_damage, sword_skill: sword_skill)
+    part_damage = (part_damage * (1.0 + SkillModEffects.part_damage_percent(player, weapon) / 100.0)).ceil
+    if SkillModEffects.true_straight_triggers?(player, weapon, actual_part, sword_skill)
+      part_damage += [part_damage / 2, 1].max
+    end
+    critical = StatusEffectService.sleeping_critical!(battle_enemy) || critical_hit?(player, weapon, battle_enemy, actual_part, part_damage, sword_skill: sword_skill, skill_key: skill_key)
     hit_damage = critical ? varied_damage * 2 : varied_damage
     battle_enemy.enemy_hp = [battle_enemy.enemy_hp.to_i - hit_damage, 0].max
     break_message = apply_part_damage!(player, battle_enemy, actual_part, part_damage)
+    SkillModEffects.mark_linked_break!(player, weapon) if break_message.present?
     battle_enemy.save!
     record_evolution_progress!(weapon, critical: critical, defeated: battle_enemy.enemy_hp <= 0)
 
@@ -765,10 +787,11 @@ end
   return 1.0 unless weapon
 
   skill = player.skills.find_by(name: weapon_skill_name(weapon))
-  1.0 + (skill&.proficiency.to_i / 1000.0 * 0.15)
+  cap = SkillModEffects.proficiency_attack_cap(player, weapon)
+  1.0 + (skill&.proficiency.to_i / 1000.0 * cap)
 end
 
-  def self.player_attack_hit?(player, battle_enemy, part, weapon: nil, sword_skill: false)
+  def self.player_attack_hit?(player, battle_enemy, part, weapon: nil, sword_skill: false, skill_key: nil)
     return true if enemy_sword_skill_stiffness?(battle_enemy)
 
     player_agility = (player.effective_agility * BuffEffectService.agility_multiplier(player)).round
@@ -782,6 +805,8 @@ end
     chance += BuffEffectService.accuracy_modifier(player)
     chance -= BuffEffectService.accuracy_modifier(battle_enemy)
     chance += weapon.sword_skill_accuracy_bonus if sword_skill && weapon
+    chance += SkillModEffects.hit_bonus(player, weapon, battle_enemy, part, sword_skill: sword_skill) if weapon
+    chance += SkillModEffects.sword_skill_accuracy_bonus(player, weapon, skill_key) if sword_skill && weapon
     chance = chance.clamp(55, sword_skill ? 100 : 98)
 
     rand(100) < chance
@@ -797,9 +822,24 @@ end
 
   def self.durability_loss_for(weapon, base_cost, attack_attribute)
     return base_cost.to_i unless weapon
+    return 0 if base_cost.to_i.positive? && SkillModEffects.normal_durability_save?(weapon.player, weapon)
     return base_cost.to_i if weapon.matches_attack_attribute?(attack_attribute)
 
     [base_cost.to_i * 2, base_cost.to_i + 1].max
+  end
+
+  def self.effective_sword_skill_cooldown(player, weapon, base_cooldown)
+    cooldown = base_cooldown.to_i
+    return cooldown unless cooldown.positive?
+
+    [cooldown - SkillModEffects.cooldown_reduction(player, weapon, cooldown), 1].max
+  end
+
+  def self.effective_sword_skill_durability_cost(player, weapon, skill_key, base_cost, base_cooldown)
+    cost = base_cost.to_i
+    cost -= SkillModEffects.sword_skill_durability_reduction(player, weapon, skill_key)
+    cost += SkillModEffects.additional_sword_skill_durability_cost(player, weapon, base_cooldown)
+    [cost, 1].max
   end
 
   def self.apply_death_item_penalty!(player)
@@ -908,7 +948,7 @@ end
     [(hp_damage.to_i * 0.35 * weapon_break_power / 100.0 * part_modifier).ceil, 1].max
   end
 
-  def self.critical_hit?(player, weapon, battle_enemy, part, damage, sword_skill: false)
+  def self.critical_hit?(player, weapon, battle_enemy, part, damage, sword_skill: false, skill_key: nil)
     return false unless weapon
 
     agility_bonus = (player.effective_agility - mob_effective_agility(battle_enemy)) / 5
@@ -921,8 +961,10 @@ end
                  else
                    0
                  end
-    chance_cap = (enemy_sword_skill_stiffness?(battle_enemy) ? 75 : 30) + accuracy_bonus
+    counter_reading_bonus = sword_skill ? SkillModEffects.consume_counter_reading_bonus(player) : 0
+    chance_cap = (enemy_sword_skill_stiffness?(battle_enemy) ? 75 : 30) + accuracy_bonus + counter_reading_bonus
     base_rate = sword_skill ? weapon.sword_skill_critical_rate : weapon.effective_critical_rate
+    base_rate += counter_reading_bonus
     chance = [ [ base_rate + agility_bonus + stiffness_bonus + part_bonus, 1 ].max, chance_cap ].min
     rand(100) < chance
   end
@@ -957,6 +999,7 @@ end
       start_enemy_sword_skill_cooldown!(battle_enemy, sword_skill) if sword_skill
       mark_enemy_stagger!(battle_enemy)
       mark_parry_action_skip!(battle_enemy)
+      SkillModEffects.mark_counter_reading!(player, parry_tool)
       BuffEffectService.tick_battle_turn!(battle_enemy)
       battle_enemy.save!
       player.save!
@@ -1005,7 +1048,7 @@ end
 
   def self.parry_success?(player, battle_enemy, parry_tool)
     strength_gap = player.effective_strength - mob_effective_strength_for_parry(battle_enemy)
-    chance = (parry_base_rate(parry_tool) + strength_gap * 4).clamp(10, 90)
+    chance = (parry_base_rate(parry_tool) + strength_gap * 4 + SkillModEffects.parry_bonus(player, parry_tool)).clamp(10, 90)
     rand(100) < chance
   end
 
@@ -1029,7 +1072,10 @@ end
     pressure = enemy_attack_power(battle_enemy, sword_skill)
     sturdiness = parry_tool_sturdiness(parry_tool)
     base_loss = [(pressure * 12.0 / [sturdiness, 10].max).ceil, 1].max
-    success ? base_loss : [base_loss * 3, base_loss + 2].max
+    loss = success ? base_loss : [base_loss * 3, base_loss + 2].max
+    return loss if success
+
+    (loss * SkillModEffects.failed_parry_durability_multiplier(parry_tool.player, parry_tool)).ceil
   end
 
   def self.parry_tool_sturdiness(parry_tool)
@@ -1252,6 +1298,7 @@ end
     enemy_damage = (enemy_damage * StatusEffectService.damage_taken_multiplier(player)).ceil
     enemy_damage = (enemy_damage * BuffEffectService.defense_damage_taken_multiplier(player)).ceil
     enemy_damage *= 2 if forced_critical || StatusEffectService.sleeping_critical!(player)
+    enemy_damage = (enemy_damage * SkillModEffects.enemy_damage_taken_multiplier(player)).ceil
     enemy_damage
   end
 
@@ -1426,16 +1473,17 @@ def self.gain_weapon_skill!(player, weapon, amount)
   def self.finish_player_cooldown_turn!(player, battle, skill_key:, cooldown:, sword_skill:)
     return if battle.destroyed?
 
-    tick_sword_skill_cooldowns_for_turn!(player, battle)
+    tick_sword_skill_cooldowns_for_turn!(player, battle, used_sword_skill: sword_skill)
     player.start_sword_skill_lockout!(skill_key, cooldown) if sword_skill
     player.save!
   end
 
-  def self.tick_sword_skill_cooldowns_for_turn!(player, battle)
+  def self.tick_sword_skill_cooldowns_for_turn!(player, battle, used_sword_skill: false)
     return if battle.destroyed?
     return if battle.alive_enemies.reload.empty?
 
     player.tick_sword_skill_cooldowns!
+    SkillModEffects.reduce_shortest_cooldown!(player, combat_weapon_for(player)) unless used_sword_skill
   end
 
   def self.destroy_weapon_if_broken!(weapon)

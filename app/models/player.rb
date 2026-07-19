@@ -25,6 +25,9 @@
   SWORD_SKILL_COOLDOWNS_KEY = "sword_skill_cooldowns"
   SWORD_SKILL_LOCKOUT_KEY = "sword_skill_lockout_turns"
   SWORD_SKILL_PENDING_COOLDOWN_KEY = "sword_skill_pending_cooldown"
+  SKILL_MOD_TRAJECTORY_MEMORY_KEY = "skill_mod:trajectory_memory_target"
+  SKILL_MOD_COUNTER_READING_KEY = "skill_mod:counter_reading"
+  SKILL_MOD_LINKED_BREAK_KEY = "skill_mod:linked_break"
   POTION_HEALING_KEY = "potion_healing"
   SLEEP_DEPRIVATION_START_MINUTES = 15 * 60
   SLEEP_DEPRIVATION_INTERVAL_MINUTES = 60
@@ -419,6 +422,9 @@ def clear_sword_skill_cooldowns!
   data.delete(SWORD_SKILL_COOLDOWNS_KEY)
   data.delete(SWORD_SKILL_LOCKOUT_KEY)
   data.delete(SWORD_SKILL_PENDING_COOLDOWN_KEY)
+  data.delete(SKILL_MOD_TRAJECTORY_MEMORY_KEY)
+  data.delete(SKILL_MOD_COUNTER_READING_KEY)
+  data.delete(SKILL_MOD_LINKED_BREAK_KEY)
   self.skill_counters = data.to_json
 end
 

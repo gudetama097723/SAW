@@ -1,19 +1,15 @@
 <% if selected_panel == "equipment" %>
+  <% equipped_armors = @player.armors.where(equipped: true).order(:slot, :name) %>
+  <% selected_detail_weapon = equipped_weapons.find { |weapon| weapon.id == params[:detail_weapon_id].to_i } if params[:detail_weapon_id].present? %>
+  <% selected_detail_armor = equipped_armors.find { |armor| armor.id == params[:detail_armor_id].to_i } if params[:detail_armor_id].present? %>
   <h5>装備</h5>
   <% if equipped_weapons.any? %>
     <% equipped_weapons.each do |weapon| %>
       <div class="border rounded p-2 mb-2">
-        <p class="mb-1">武器: <%= weapon.display_name %></p>
-        <p class="mb-1">種別: <%= weapon.weapon_type %></p>
-        <p class="mb-1">攻撃力: <%= formatted_attack_power(weapon.effective_attack_power) %></p>
-        <p class="mb-1">基礎: <%= weapon.attack_power %> / 強化補正: +<%= formatted_attack_bonus_percent(weapon) %>%</p>
-        <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
-        <p class="mb-1">耐久力: <%= weapon.durability %> / <%= weapon.effective_max_durability %>（<%= weapon.durability_condition_label %>）</p>
-        <% if weapon.effective_part_break_power > 100 %>
-          <p class="mb-1">特性: 部位破壊率が高い</p>
-        <% end %>
-        <p class="mb-0">補正: HP <%= signed_bonus(weapon.hp_bonus) %> / 筋力 <%= signed_bonus(weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(weapon.agility_bonus) %></p>
-        <%= button_to "取り外す", unequip_weapon_path(weapon_id: weapon.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
+        <div class="d-flex align-items-center gap-2">
+          <span class="flex-fill">武器: <%= weapon.display_name %></span>
+          <%= link_to "詳細", game_path(panel: "equipment", detail_weapon_id: weapon.id), class: "btn btn-outline-info btn-sm" %>
+        </div>
       </div>
     <% end %>
     <p>武器枠: <%= equipped_weapons.count %> / <%= @player.dual_wield? ? 2 : 1 %></p>
@@ -21,9 +17,29 @@
     <p class="mb-0">装備中の武器なし</p>
   <% end %>
 
+  <% if selected_detail_weapon %>
+    <div class="border border-info rounded p-2 mb-2">
+      <h6>武器詳細</h6>
+      <p class="mb-1">武器: <%= selected_detail_weapon.display_name %></p>
+      <p class="mb-1">種別: <%= selected_detail_weapon.weapon_type %></p>
+      <p class="mb-1">攻撃力: <%= formatted_attack_power(selected_detail_weapon.effective_attack_power) %></p>
+      <p class="mb-1">基礎: <%= selected_detail_weapon.attack_power %> / 強化補正: +<%= formatted_attack_bonus_percent(selected_detail_weapon) %>%</p>
+      <p class="mb-1">クリティカル率: <%= selected_detail_weapon.critical_rate %>%</p>
+      <p class="mb-1">耐久力: <%= selected_detail_weapon.durability %> / <%= selected_detail_weapon.effective_max_durability %>（<%= selected_detail_weapon.durability_condition_label %>）</p>
+      <% if selected_detail_weapon.effective_part_break_power > 100 %>
+        <p class="mb-1">特性: 部位破壊率が高い</p>
+      <% end %>
+      <p class="mb-0">補正: HP <%= signed_bonus(selected_detail_weapon.hp_bonus) %> / 筋力 <%= signed_bonus(selected_detail_weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(selected_detail_weapon.agility_bonus) %></p>
+      <%= button_to "取り外す", unequip_weapon_path(weapon_id: selected_detail_weapon.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
+    </div>
+  <% end %>
+
   <h5 class="mt-3">装備中の防具</h5>
   <p>装備重量: <%= @player.equipment_weight %> / 重量ペナルティ: <%= @player.equipment_weight_penalty %></p>
   <p>防御: <%= @player.damage_cut %></p>
+  <% if equipped_armors.any? %>
+    <%= button_to "防具をすべて外す", unequip_all_armors_path, method: :post, class: "btn btn-outline-light w-100 mb-2" %>
+  <% end %>
   <% Armor::EQUIPPABLE_SLOTS.each do |slot| %>
     <% armor = @player.armor_for(slot) %>
     <p class="mb-1">
@@ -31,12 +47,26 @@
       <% if slot == "shield" && !@player.shield_equippable? %>
         装備不能
       <% elsif armor %>
-        <%= armor.name %>
+        <%= link_to armor.name, game_path(panel: "equipment", detail_armor_id: armor.id), class: "link-light" %>
         <span class="text-secondary ms-1">耐久 <%= armor.durability %> / <%= armor.max_durability %></span>
       <% else %>
         未装備
       <% end %>
     </p>
+  <% end %>
+
+  <% if selected_detail_armor %>
+    <div class="border border-info rounded p-2 mt-2">
+      <h6>防具詳細</h6>
+      <p class="mb-1">防具: <%= selected_detail_armor.name %></p>
+      <p class="mb-1">部位: <%= selected_detail_armor.slot_name %></p>
+      <p class="mb-1">種別: <%= selected_detail_armor.armor_type %></p>
+      <p class="mb-1">防御: <%= selected_detail_armor.defense %>（実効 <%= selected_detail_armor.effective_defense %>）</p>
+      <p class="mb-1">耐久力: <%= selected_detail_armor.durability %> / <%= selected_detail_armor.max_durability %>（<%= selected_detail_armor.durability_condition_label %>）</p>
+      <p class="mb-1">重量: <%= selected_detail_armor.weight %></p>
+      <p class="mb-0">補正: HP <%= signed_bonus(selected_detail_armor.hp_bonus) %>% / 筋力 <%= signed_bonus(selected_detail_armor.strength_bonus) %> / 敏捷 <%= signed_bonus(selected_detail_armor.agility_bonus) %></p>
+      <%= button_to "取り外す", unequip_armor_path(armor_id: selected_detail_armor.id), method: :post, class: "btn btn-outline-light w-100 mt-2" %>
+    </div>
   <% end %>
 <% elsif selected_panel == "items" %>
   <% item_category = params[:item_category].presence %>
@@ -82,16 +112,32 @@
 <% elsif selected_panel == "growth" %>
   <h5>成長</h5>
   <h6>装備込みステータス</h6>
+  <% hp_bonus_parts = [] %>
+  <% hp_bonus_parts << "筋力 #{signed_bonus(@player.strength_hp_bonus)}" if @player.strength_hp_bonus.to_i != 0 %>
+  <% hp_bonus_parts << "武器 #{signed_bonus(@player.weapon_hp_bonus)}" if @player.weapon_hp_bonus.to_i != 0 %>
+  <% if @player.armor_hp_bonus.to_i != 0 || @player.armor_hp_bonus_percent.to_i != 0 %>
+    <% armor_hp_segments = [] %>
+    <% armor_hp_segments << signed_bonus(@player.armor_hp_bonus) if @player.armor_hp_bonus.to_i != 0 %>
+    <% armor_hp_segments << "#{signed_bonus(@player.armor_hp_bonus_percent)}%" if @player.armor_hp_bonus_percent.to_i != 0 %>
+    <% hp_bonus_parts << "防具 #{armor_hp_segments.join("（")}#{armor_hp_segments.size > 1 ? "）" : ""}" %>
+  <% end %>
+  <% strength_bonus_parts = [] %>
+  <% strength_bonus_parts << "武器 #{signed_bonus(@player.weapon_strength_bonus)}" if @player.weapon_strength_bonus.to_i != 0 %>
+  <% strength_bonus_parts << "防具 #{signed_bonus(@player.armor_strength_bonus)}" if @player.armor_strength_bonus.to_i != 0 %>
+  <% agility_bonus_parts = [] %>
+  <% agility_bonus_parts << "武器 #{signed_bonus(@player.weapon_agility_bonus)}" if @player.weapon_agility_bonus.to_i != 0 %>
+  <% agility_bonus_parts << "防具 #{signed_bonus(@player.armor_agility_bonus)}" if @player.armor_agility_bonus.to_i != 0 %>
+  <% agility_bonus_parts << "重量 #{signed_bonus(-@player.equipment_weight_penalty)}" if @player.equipment_weight_penalty.to_i != 0 %>
   <p>レベル: <%= @player.level.to_i %></p>
   <p>
     HP: <%= @player.hp.to_i %> / <%= @player.effective_max_hp %>
     <% @player.condition_labels.each do |label| %>
       <span class="badge bg-warning text-dark ms-1"><%= label %></span>
     <% end %>
-    （基礎最大 <%= @player.max_hp.to_i %> / 筋力 <%= signed_bonus(@player.strength_hp_bonus) %> / 武器 <%= signed_bonus(@player.weapon_hp_bonus) %> / 防具 <%= signed_bonus(@player.armor_hp_bonus) %>（<%= signed_bonus(@player.armor_hp_bonus_percent) %>%））
+    （<%= (["基礎最大 #{@player.max_hp.to_i}"] + hp_bonus_parts).join(" / ") %>）
   </p>
-  <p>筋力: <%= @player.effective_strength %>（基礎 <%= @player.strength.to_i %> / 武器 <%= signed_bonus(@player.weapon_strength_bonus) %> / 防具 <%= signed_bonus(@player.armor_strength_bonus) %>）</p>
-  <p>敏捷: <%= @player.effective_agility %>（基礎 <%= @player.agility.to_i %> / 武器 <%= signed_bonus(@player.weapon_agility_bonus) %> / 防具 <%= signed_bonus(@player.armor_agility_bonus) %> / 重量 <%= signed_bonus(-@player.equipment_weight_penalty) %>）</p>
+  <p>筋力: <%= @player.effective_strength %>（<%= (["基礎 #{@player.strength.to_i}"] + strength_bonus_parts).join(" / ") %>）</p>
+  <p>敏捷: <%= @player.effective_agility %>（<%= (["基礎 #{@player.agility.to_i}"] + agility_bonus_parts).join(" / ") %>）</p>
   <p>防御: <%= @player.damage_cut %></p>
   <p>装備重量: <%= @player.equipment_weight %></p>
   <p>
@@ -267,4 +313,3 @@
 <% else %>
   <p class="mb-0">左のコマンドから情報を選択してください。</p>
 <% end %>
-

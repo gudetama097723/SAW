@@ -254,12 +254,8 @@ class WeaponShopTest < ActionDispatch::IntegrationTest
     assert_includes flash[:alert], "鍛造できる設備がない"
   end
 
-  test "self maintenance is available from equipment while traveling" do
-    @player.skills.create!(name: "鍛冶", proficiency: 0, skill_exp: 0, skill_category: "production")
-    @player.items.create!(
-      name: WeaponMaintenanceService::KIT_NAME, category: "misc", quantity: 1,
-      durability: 30, max_durability: 30
-    )
+  test "maintenance kit is available from equipment while traveling and heals 50 percent, requiring no blacksmith skill" do
+    @player.items.create!(name: WeaponMaintenanceService::KIT_NAME, category: "misc", quantity: 1)
     weapon = @player.weapons.create!(
       name: "街道整備試験剣", weapon_type: "片手直剣", attack_power: 10,
       durability: 40, max_durability: 100, maintenance_level: 0
@@ -270,10 +266,26 @@ class WeaponShopTest < ActionDispatch::IntegrationTest
 
     get game_path, params: { panel: "equipment" }
     assert_response :success
-    assert_includes response.body, "整備キットで自己整備"
+    assert_includes response.body, "武器整備キットを使う"
+
+    post use_maintenance_kit_path, params: { weapon_id: weapon.id }
+    assert_redirected_to game_path(panel: "equipment")
+    assert_equal 90, weapon.reload.durability
+    assert_nil @player.items.find_by(name: WeaponMaintenanceService::KIT_NAME)
+  end
+
+  test "blacksmith panel no longer offers self mode weapon repair via kit" do
+    @player.skills.create!(name: "鍛冶", proficiency: 600, skill_exp: 274_888, skill_category: "production")
+    @player.town_discovery_for.update!(found_blacksmith: true)
+    weapon = @player.weapons.create!(name: "鍛冶屋整備廃止確認剣", weapon_type: "片手直剣", durability: 40, max_durability: 100, maintenance_level: 0)
+
+    get game_path, params: { panel: "blacksmith", blacksmith_menu: "repair" }
+    assert_response :success
+    assert_not_includes response.body, "鍛冶を行う者を選択"
 
     post blacksmith_path, params: { weapon_id: weapon.id, smith_mode: "player" }
     assert_redirected_to game_path(panel: "equipment")
-    assert_equal 100, weapon.reload.durability
+    assert_includes flash[:alert], "携帯用の武器整備キット"
+    assert_equal 40, weapon.reload.durability
   end
 end

@@ -3,7 +3,8 @@
 
   DEFINITIONS = [
     Candidate.new(name: "生存本能", skill_category: "passive", weapon_skill: false),
-    Candidate.new(name: "昼寝", skill_category: "rest", weapon_skill: false)
+    Candidate.new(name: "昼寝", skill_category: "rest", weapon_skill: false),
+    Candidate.new(name: "鍛冶", skill_category: "passive", weapon_skill: false)
   ].freeze
 
   def self.available_for(player)
@@ -14,6 +15,8 @@
         player.skill_counter("severe_hunt_count") >= 1000
       when "昼寝"
         player.skill_counter("field_sleep_count") >= 100
+      when "鍛冶"
+        player.skill_counter(WeaponMaintenanceService::KIT_USE_COUNTER_KEY) >= WeaponMaintenanceService::KIT_SKILL_UNLOCK_USES
       else
         definition.weapon_skill && player.skill_counter(weapon_attack_counter_key(definition.name)) >= 100
       end

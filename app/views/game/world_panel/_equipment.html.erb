@@ -49,13 +49,17 @@
                     toggle_weapon_favorite_path(weapon_id: weapon.id),
                     method: :post,
                     class: "btn btn-outline-light w-100 mt-2" %>
-                <% if weapon.durability.to_i < weapon.effective_max_durability && BlacksmithService.blacksmith_skill_for(@player) %>
-                  <%= button_to "整備キットで自己整備", blacksmith_path(weapon_id: weapon.id, smith_mode: "player"), method: :post, class: "btn btn-outline-warning w-100 mt-2" %>
+                <% if weapon.durability.to_i < weapon.effective_max_durability %>
+                  <% kit_quantity = @player.items.find_by(name: WeaponMaintenanceService::KIT_NAME)&.quantity.to_i || 0 %>
+                  <%= button_to "武器整備キットを使う(残り#{kit_quantity}個)", use_maintenance_kit_path(weapon_id: weapon.id), method: :post, disabled: kit_quantity <= 0, class: "btn btn-outline-warning w-100 mt-2" %>
                 <% end %>
               </div>
             </div>
           <% end %>
         <% else %>
+          <% if @player.armors.where(equipped: true).exists? %>
+            <%= button_to "防具をすべて外す", unequip_all_armors_path, method: :post, class: "btn btn-outline-light w-100 mb-3" %>
+          <% end %>
           <% @player.armors.order(:slot, :name).each do |armor| %>
             <div class="border rounded mb-2">
               <button class="btn btn-dark w-100 text-start"

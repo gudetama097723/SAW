@@ -1,6 +1,7 @@
 <% blacksmith_menu = params[:blacksmith_menu].presence %>
 <% player_blacksmith_skill = BlacksmithService.blacksmith_skill_for(@player) %>
-<% smith_mode = player_blacksmith_skill && params[:smith_mode] == "player" ? "player" : "npc" %>
+<% self_mode_selectable = player_blacksmith_skill.present? && blacksmith_menu != "repair" %>
+<% smith_mode = self_mode_selectable && params[:smith_mode] == "player" ? "player" : "npc" %>
 <% npc_blacksmith = BlacksmithService.current_for(@player) %>
 <% context = BlacksmithService.context_for(@player, mode: smith_mode, blacksmith: npc_blacksmith) %>
 <div class="card-header">鍛冶屋</div>
@@ -8,7 +9,7 @@
   <div class="border rounded p-2 mb-3">
     <p class="mb-1"><strong>鍛冶師: <%= context&.name || "選択できません" %></strong></p>
     <p class="mb-2"><%= BlacksmithService.skill_label(context) %></p>
-    <% if player_blacksmith_skill %>
+    <% if self_mode_selectable %>
       <p class="small text-muted mb-1">鍛冶を行う者を選択</p>
       <div class="d-flex gap-2">
         <% if npc_blacksmith %>
@@ -118,10 +119,7 @@
     <% end %>
 
     <h6>武器整備</h6>
-    <% if context&.player? %>
-      <% kit = @player.items.find_by(name: WeaponMaintenanceService::KIT_NAME) %>
-      <p class="small">武器整備キット: <%= kit ? "#{kit.effective_durability} / #{kit.effective_max_durability}（#{kit.quantity}個）" : "未所持" %>／今回の消耗 <%= WeaponMaintenanceService.kit_cost_for(context.proficiency) %></p>
-    <% end %>
+    <p class="small text-muted">自分の武器を無料で直したい場合は、装備画面から携帯用の「武器整備キット」を使ってください。</p>
     <% if damaged_weapons.any? && context %>
       <div class="d-grid gap-2">
         <% damaged_weapons.each do |weapon| %>

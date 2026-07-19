@@ -5,7 +5,7 @@
           <% if current_base %>
             <% storage_tab = params[:storage_tab].presence || "store" %>
             <% item_category = params[:item_category].presence %>
-            <% category_buttons = [[nil, "全部"], ["weapons", "武器"], ["armors", "防具"], ["healing", "回復"], ["gathered", "採取"], ["drop", "ドロップ"]] %>
+            <% category_buttons = [[nil, "全部"], ["weapons", "武器"], ["armors", "防具"], ["healing", "回復"], ["gathered", "採取"], ["drop", "ドロップ"], ["valuable", "換金"], ["misc", "その他"]] %>
             <ul class="nav nav-tabs mb-2">
               <li class="nav-item"><%= link_to "預ける", game_path(panel: "inn", inn_menu: "storage", storage_tab: "store", item_category: item_category), class: "nav-link #{storage_tab == 'store' ? 'active' : ''}" %></li>
               <li class="nav-item"><%= link_to "取り出す", game_path(panel: "inn", inn_menu: "storage", storage_tab: "withdraw", item_category: item_category), class: "nav-link #{storage_tab == 'withdraw' ? 'active' : ''}" %></li>

@@ -24,13 +24,51 @@
                   <% if selected_sword_skill&.key == s.key %>
                     <div class="border rounded p-2 mt-2">
                       <%= render "game/visual_asset", kind: :skill, asset_key: s.key, label: s.name, class_name: "saw-visual-detail mb-2" %>
+                      <% technique_level = skill.sword_skill_level(s.key) %>
                       <p class="mb-1">威力倍率: <%= s.damage_multiplier %>%</p>
+                      <p class="mb-1">技Lv: <%= technique_level %> / 100</p>
                       <% cooldown = @player.sword_skill_cooldown(s.key) %>
                       <p class="mb-1">CT: <%= cooldown.positive? ? "#{cooldown}（残り）" : s.cooldown %></p>
+                      <p class="mb-1">技Lv補正: 威力 +<%= technique_level / 5 %>% / 命中 +<%= technique_level / 20 * 2 %> / 耐久 -<%= technique_level / 30 %></p>
                       <p class="mb-1">ヒット数: <%= s.hits %></p>
                       <p class="mb-1">種別: <%= s.target_label %></p>
                       <p class="mb-0"><%= s.description %></p>
                     </div>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+          <% skill_mods = SkillModCatalog.all(skill.name) %>
+          <% if skill_mods.any? %>
+            <h6>補助式</h6>
+            <p class="small mb-2">
+              補助式pt:
+              <%= skill.skill_mod_points_remaining %> /
+              <%= skill.skill_mod_points_earned %>
+              （使用済み <%= skill.skill_mod_points_spent %>）
+            </p>
+            <div class="d-grid gap-2">
+              <% skill_mods.each do |mod| %>
+                <% rank = skill.skill_mod_rank(mod.key) %>
+                <% maxed = rank >= mod.max_rank %>
+                <% next_cost = mod.next_cost(rank) %>
+                <% learnable = skill.can_learn_skill_mod?(mod.key) %>
+                <div class="border rounded p-2">
+                  <div class="d-flex justify-content-between gap-2">
+                    <strong><%= mod.name %></strong>
+                    <span class="small"><%= mod.category %> / <%= rank %>/<%= mod.max_rank %></span>
+                  </div>
+                  <p class="small mb-2"><%= mod.effect_summary %></p>
+                  <% if maxed %>
+                    <div class="btn btn-outline-secondary disabled w-100">最大段階</div>
+                  <% elsif learnable %>
+                    <%= button_to "習得する（#{next_cost}pt）",
+                        learn_skill_mod_path(skill_set: skill.name, mod_key: mod.key),
+                        method: :post,
+                        class: "btn btn-outline-info w-100" %>
+                  <% else %>
+                    <div class="btn btn-outline-secondary disabled w-100">必要pt <%= next_cost %></div>
                   <% end %>
                 </div>
               <% end %>

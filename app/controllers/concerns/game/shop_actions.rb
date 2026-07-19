@@ -127,6 +127,13 @@ module Game
     redirect_to game_path(panel: "items", item_category: item.category), notice: "#{item.name}を#{quantity}個捨てた。"
   end
 
+  def use_maintenance_kit
+    player = current_player
+    weapon = player.weapons.find_by(id: params[:weapon_id])
+    result = WeaponMaintenanceService.use_kit!(player: player, weapon: weapon)
+    redirect_to game_path(panel: "equipment"), flash_for(result)
+  end
+
   def discard_weapon
     weapon = current_player.weapons.find_by(id: params[:weapon_id])
     unless weapon&.discardable_by_player?
@@ -142,13 +149,13 @@ module Game
   def discard_armor
     armor = current_player.armors.find_by(id: params[:armor_id])
     unless armor&.discardable_by_player?
-      redirect_to game_path(panel: "equipment"), alert: "その防具は捨てられません。"
+      redirect_to game_path(panel: "equipment", equipment_tab: "armors"), alert: "その防具は捨てられません。"
       return
     end
 
     name = armor.name
     armor.destroy!
-    redirect_to game_path(panel: "equipment"), notice: "#{name}を捨てた。"
+    redirect_to game_path(panel: "equipment", equipment_tab: "armors"), notice: "#{name}を捨てた。"
   end
 
   def toggle_weapon_favorite
@@ -165,12 +172,12 @@ module Game
   def toggle_armor_favorite
     armor = current_player.armors.find_by(id: params[:armor_id])
     unless armor
-      redirect_to game_path(panel: "equipment"), alert: "その防具は所持していません。"
+      redirect_to game_path(panel: "equipment", equipment_tab: "armors"), alert: "その防具は所持していません。"
       return
     end
 
     armor.update!(favorite: !armor.favorite?)
-    redirect_to game_path(panel: "equipment"), notice: armor.favorite? ? "#{armor.name}をお気に入り登録した。" : "#{armor.name}のお気に入りを解除した。"
+    redirect_to game_path(panel: "equipment", equipment_tab: "armors"), notice: armor.favorite? ? "#{armor.name}をお気に入り登録した。" : "#{armor.name}のお気に入りを解除した。"
   end
 
   def upgrade_weapon
@@ -565,11 +572,11 @@ module Game
       end
 
       unless armor
-        redirect_to game_path(panel: "equipment"), alert: "その防具は所持していません。"
+        redirect_to game_path(panel: "equipment", equipment_tab: "armors"), alert: "その防具は所持していません。"
         return
       end
       if armor.slot == "shield" && !player.shield_equippable?
-        redirect_to game_path(panel: "equipment"), alert: "盾は片手武器を装備している場合のみ装備できます。"
+        redirect_to game_path(panel: "equipment", equipment_tab: "armors"), alert: "盾は片手武器を装備している場合のみ装備できます。"
         return
       end
 
@@ -589,7 +596,7 @@ module Game
         return
       end
 
-      redirect_to game_path(panel: "equipment"), notice: "#{armor.name}を装備した。"
+      redirect_to game_path(panel: "equipment", equipment_tab: "armors"), notice: "#{armor.name}を装備した。"
     end
 
     def unequip_armor
@@ -597,7 +604,7 @@ module Game
       armor = player.armors.find_by(id: params[:armor_id])
 
       unless armor&.equipped?
-        redirect_to game_path(panel: "equipment"), alert: "その防具は装備していません。"
+        redirect_to game_path(panel: "equipment", equipment_tab: "armors"), alert: "その防具は装備していません。"
         return
       end
 
@@ -606,7 +613,29 @@ module Game
         StatusEffectService.clamp_hp_to_max!(player)
         player.save!
       end
-      redirect_to game_path(panel: "equipment"), notice: "#{armor.name}を外した。"
+      redirect_to game_path(panel: "equipment", equipment_tab: "armors"), notice: "#{armor.name}を外した。"
+    end
+
+    def unequip_all_armors
+      player = current_player
+      if current_battle
+        redirect_to game_path(battle_command: "weapon", equipment_category: "armors"), alert: "戦闘中は防具を一括で外せません。"
+        return
+      end
+
+      equipped_armors = player.armors.where(equipped: true)
+      unless equipped_armors.exists?
+        redirect_to game_path(panel: "equipment", equipment_tab: "armors"), alert: "装備中の防具はありません。"
+        return
+      end
+
+      ActiveRecord::Base.transaction do
+        equipped_armors.update_all(equipped: false)
+        StatusEffectService.clamp_hp_to_max!(player)
+        player.save!
+      end
+
+      redirect_to game_path(panel: "equipment", equipment_tab: "armors"), notice: "防具をすべて外した。"
     end
 
     private

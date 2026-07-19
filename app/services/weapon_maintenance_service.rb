@@ -1,10 +1,13 @@
 class WeaponMaintenanceService
   Result = Struct.new(:status, :message, :skill_exp_gained, keyword_init: true)
   KIT_NAME = "武器整備キット"
-  KIT_MAX_DURABILITY = 30
+  KIT_REPAIR_PERCENT = 0.5
+  KIT_USE_COUNTER_KEY = "maintenance_kit_use_count"
+  KIT_SKILL_UNLOCK_USES = 100
 
   def self.call(player:, weapon:, blacksmith:)
     return error("鍛冶を行える実行者がいません。") unless blacksmith
+    return error("自分での整備は携帯用の武器整備キットから行ってください。") if blacksmith.player?
     return error("この鍛冶実行者は利用できません。") unless blacksmith.player == player
     return error("その武器は所持していません。") unless weapon&.player_id == player.id
     if blacksmith.npc? && !BlacksmithFacilityAccessService.npc_available?(player, blacksmith.npc)
@@ -15,26 +18,21 @@ class WeaponMaintenanceService
       return error("この武器を整備するには鍛冶の技量が足りない。")
     end
 
-    fee = blacksmith.player? ? 0 : (weapon.repair_cost * blacksmith.fee_multiplier(:maintenance)).round
-    kit = player.items.find_by(name: KIT_NAME) if blacksmith.player?
-    return error("武器整備キットが必要です。") if blacksmith.player? && !kit&.quantity.to_i&.positive?
+    fee = (weapon.repair_cost * blacksmith.fee_multiplier(:maintenance)).round
     return error("刻銭が足りません。整備には#{fee}刻銭必要です。") if player.col.to_i < fee
 
     missing = weapon.effective_max_durability - weapon.durability.to_i
     ratio = missing.to_f / [ weapon.effective_max_durability, 1 ].max
-    kit_cost = kit_cost_for(blacksmith.proficiency)
     gained = 0
     insufficient_after_lock = false
     ActiveRecord::Base.transaction do
       player.lock!
       weapon.lock!
-      still_missing_kit = blacksmith.player? && !player.items.find_by(name: KIT_NAME)&.quantity.to_i&.positive?
-      if still_missing_kit || player.col.to_i < fee
+      if player.col.to_i < fee
         insufficient_after_lock = true
         raise ActiveRecord::Rollback
       end
 
-      consume_kit!(kit, kit_cost) if blacksmith.player?
       player.col = player.col.to_i - fee
       player.advance_time!(20)
       weapon.update!(durability: weapon.effective_max_durability)
@@ -44,20 +42,40 @@ class WeaponMaintenanceService
         completion_ratio: ratio < 0.05 ? 0.0 : ratio
       )
     end
-    return error(blacksmith.player? ? "武器整備キットが必要です。" : "刻銭が足りません。整備には#{fee}刻銭必要です。") if insufficient_after_lock
+    return error("刻銭が足りません。整備には#{fee}刻銭必要です。") if insufficient_after_lock
 
-    cost_text = blacksmith.player? ? "整備キット耐久を#{kit_cost}消費" : "#{fee}刻銭支払った"
-    Result.new(status: :ok, skill_exp_gained: gained, message: "#{weapon.display_name}を最大耐久まで整備した。#{cost_text}。")
+    Result.new(status: :ok, skill_exp_gained: gained, message: "#{weapon.display_name}を最大耐久まで整備した。#{fee}刻銭支払った。")
   end
 
-  def self.kit_cost_for(proficiency)
-    case proficiency.to_i
-    when 0...200 then 5
-    when 200...400 then 4
-    when 400...600 then 3
-    when 600...800 then 2
-    else 1
+  # 武器整備キットは携帯用の消耗品として、鍛冶屋を介さずどこでも使える。
+  # 鍛冶スキルの有無に関わらず使用可能で、これを累計100回使うと「鍛冶」
+  # スキルの習得条件を満たす(SkillUnlockService参照)。
+  def self.use_kit!(player:, weapon:)
+    return error("その武器は所持していません。") unless weapon&.player_id == player.id
+    return error("この武器は整備を必要としていません。") unless weapon.durability.to_i < weapon.effective_max_durability
+
+    kit = player.items.find_by(name: KIT_NAME)
+    return error("武器整備キットが必要です。") unless kit&.quantity.to_i&.positive?
+
+    heal_amount = [ (weapon.effective_max_durability * KIT_REPAIR_PERCENT).ceil, 1 ].max
+    insufficient_after_lock = false
+    ActiveRecord::Base.transaction do
+      player.lock!
+      weapon.lock!
+      kit.lock!
+      still_missing_kit = !player.items.find_by(name: KIT_NAME)&.quantity.to_i&.positive?
+      if still_missing_kit
+        insufficient_after_lock = true
+        raise ActiveRecord::Rollback
+      end
+
+      weapon.update!(durability: [ weapon.durability.to_i + heal_amount, weapon.effective_max_durability ].min)
+      consume_kit!(kit)
+      player.increment_skill_counter!(KIT_USE_COUNTER_KEY)
     end
+    return error("武器整備キットが必要です。") if insufficient_after_lock
+
+    Result.new(status: :ok, skill_exp_gained: 0, message: "#{weapon.display_name}の耐久を#{heal_amount}回復した。整備キットを1個消費。")
   end
 
   def self.error(message)
@@ -65,22 +83,9 @@ class WeaponMaintenanceService
   end
   private_class_method :error
 
-  def self.consume_kit!(kit, amount)
-    maximum = kit.max_durability.to_i.positive? ? kit.max_durability.to_i : KIT_MAX_DURABILITY
-    remaining = kit.durability.to_i.positive? ? kit.durability.to_i : maximum
-    remaining -= amount
-    if remaining <= 0
-      kit.quantity = kit.quantity.to_i - 1
-      if kit.quantity.positive?
-        kit.durability = maximum + remaining
-        kit.max_durability = maximum
-        kit.save!
-      else
-        kit.destroy!
-      end
-    else
-      kit.update!(durability: remaining, max_durability: maximum)
-    end
+  def self.consume_kit!(kit)
+    kit.quantity = kit.quantity.to_i - 1
+    kit.quantity.positive? ? kit.save! : kit.destroy!
   end
   private_class_method :consume_kit!
 end

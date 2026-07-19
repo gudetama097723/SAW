@@ -33,5 +33,23 @@ module Game
 
       redirect_to game_path(panel: "growth"), notice: "筋力に#{strength_points}、敏捷に#{agility_points}ポイント振り分けた。"
     end
+
+    def learn_skill_mod
+      skill = current_player.skills.find_by(name: params[:skill_set])
+      mod = SkillModCatalog.find(params[:mod_key])
+
+      unless skill && mod && mod.skill_name == skill.name
+        redirect_to game_path(panel: "skills", skill_set: params[:skill_set]), alert: "その補助式は習得できません。"
+        return
+      end
+
+      unless skill.can_learn_skill_mod?(mod.key)
+        redirect_to game_path(panel: "skills", skill_set: skill.name), alert: "補助式ポイントが足りないか、これ以上強化できません。"
+        return
+      end
+
+      rank = skill.learn_skill_mod!(mod.key)
+      redirect_to game_path(panel: "skills", skill_set: skill.name), notice: "#{mod.name}を#{rank}段階に強化した。"
+    end
   end
 end

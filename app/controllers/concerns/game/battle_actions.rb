@@ -235,7 +235,7 @@ module Game
       enemy_agility = alive_enemies.map { |battle_enemy| BattleService.mob_effective_agility(battle_enemy) }.max.to_i
       agility_gap = player.effective_agility - enemy_agility
       enemy_count_penalty = [alive_enemies.size - 1, 0].max * 12
-      chance = [[50 + agility_gap * 10 - enemy_count_penalty, 5].max, 95].min
+      chance = [[50 + agility_gap * 10 - enemy_count_penalty + SkillModEffects.escape_bonus(player, BattleService.combat_weapon_for(player)), 5].max, 95].min
       if rand(100) < chance
         BuffEffectService.clear_battle_effects!(player)
         player.clear_sword_skill_cooldowns!

@@ -134,7 +134,10 @@
       <h5><%= selected_skill_definition.name %></h5>
       <p class="mb-1">種別: <%= selected_skill_definition.target_label %></p>
       <p class="mb-1">威力倍率: <%= selected_skill_definition.damage_multiplier %>%</p>
-      <p class="mb-1">消費耐久: <%= selected_skill_definition.durability_cost %></p>
+      <% effective_skill_ct = BattleService.effective_sword_skill_cooldown(@player, equipped_weapon, selected_skill_definition.cooldown) %>
+      <% effective_skill_durability = BattleService.effective_sword_skill_durability_cost(@player, equipped_weapon, selected_skill_definition.key, selected_skill_definition.durability_cost, selected_skill_definition.cooldown) %>
+      <p class="mb-1">消費耐久: <%= effective_skill_durability %></p>
+      <p class="mb-1">CT: <%= effective_skill_ct %></p>
       <% if sword_skill_locked_out %>
         <p class="text-warning mb-1">発動不能: あと<%= sword_skill_lockout_turns %>ターン</p>
       <% end %>

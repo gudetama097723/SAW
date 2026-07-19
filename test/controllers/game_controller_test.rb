@@ -71,6 +71,60 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_match(/11\.5\s*\/\s*50/, response.body)
   end
 
+  test "status info hides zero hp strength and agility bonuses" do
+    @player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
+
+    get game_path, params: { panel: "growth" }
+
+    assert_response :success
+    assert_includes response.body, "HP:"
+    assert_includes response.body, "筋力:"
+    assert_includes response.body, "敏捷:"
+    assert_not_includes response.body, "武器 +0"
+    assert_not_includes response.body, "防具 +0"
+    assert_not_includes response.body, "防具 +0（+0%）"
+    assert_not_includes response.body, "重量 +0"
+  end
+
+  test "status info keeps non zero hp strength and agility bonuses" do
+    @player.update!(hp: 100, max_hp: 100, strength: 10, agility: 10)
+    @player.weapons.create!(
+      name: "補正表示テスト剣",
+      weapon_type: "片手直剣",
+      rarity: "common",
+      attack_power: 1,
+      durability: 10,
+      max_durability: 10,
+      hp_bonus: 5,
+      strength_bonus: 2,
+      agility_bonus: -1,
+      equipped: true
+    )
+    @player.armors.create!(
+      name: "補正表示テスト鎧",
+      armor_type: "軽鎧",
+      rarity: "common",
+      slot: "body",
+      defense: 1,
+      durability: 10,
+      max_durability: 10,
+      hp_bonus: 10,
+      strength_bonus: -1,
+      agility_bonus: 3,
+      equipped: true
+    )
+
+    get game_path, params: { panel: "growth" }
+
+    assert_response :success
+    assert_includes response.body, "武器 +5"
+    assert_includes response.body, "防具 +11"
+    assert_includes response.body, "武器 +2"
+    assert_includes response.body, "防具 -1"
+    assert_includes response.body, "武器 -1"
+    assert_includes response.body, "防具 +3"
+  end
+
   test "equipment info shows equipped armor durability" do
     @player.armors.create!(
       name: "耐久表示テスト鎧",
@@ -88,6 +142,76 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "耐久表示テスト鎧"
     assert_match(/耐久\s*42\s*\/\s*100/, response.body)
+  end
+
+  test "equipment info details open by clicking equipped gear and armors can be removed all at once" do
+    weapon = @player.weapons.create!(
+      name: "情報詳細テスト剣",
+      weapon_type: "片手直剣",
+      rarity: "common",
+      attack_power: 8,
+      durability: 30,
+      max_durability: 40,
+      equipped: true
+    )
+    armor = @player.armors.create!(
+      name: "情報詳細テスト鎧",
+      armor_type: "軽鎧",
+      rarity: "common",
+      slot: "body",
+      defense: 4,
+      durability: 20,
+      max_durability: 50,
+      equipped: true
+    )
+    helmet = @player.armors.create!(
+      name: "一括解除テスト兜",
+      armor_type: "軽兜",
+      rarity: "common",
+      slot: "head",
+      defense: 2,
+      durability: 15,
+      max_durability: 30,
+      equipped: true
+    )
+
+    get game_path, params: { panel: "equipment", detail_weapon_id: weapon.id }
+    assert_response :success
+    assert_includes response.body, "武器詳細"
+    assert_includes response.body, "情報詳細テスト剣"
+    assert_includes response.body, "攻撃力:"
+
+    get game_path, params: { panel: "equipment", detail_armor_id: armor.id }
+    assert_response :success
+    assert_includes response.body, "防具詳細"
+    assert_includes response.body, "情報詳細テスト鎧"
+    assert_match(/耐久力:\s*20\s*\/\s*50/, response.body)
+    assert_includes response.body, "防具をすべて外す"
+
+    post unequip_all_armors_path
+    assert_redirected_to game_path(panel: "equipment", equipment_tab: "armors")
+    assert_not armor.reload.equipped?
+    assert_not helmet.reload.equipped?
+  end
+
+  test "armor equipment actions keep armor tab selected" do
+    armor = @player.armors.create!(
+      name: "タブ維持テスト鎧",
+      armor_type: "軽鎧",
+      rarity: "common",
+      slot: "body",
+      defense: 4,
+      durability: 20,
+      max_durability: 50
+    )
+
+    post equip_armor_path, params: { armor_id: armor.id }
+    assert_redirected_to game_path(panel: "equipment", equipment_tab: "armors")
+    assert armor.reload.equipped?
+
+    post unequip_armor_path, params: { armor_id: armor.id }
+    assert_redirected_to game_path(panel: "equipment", equipment_tab: "armors")
+    assert_not armor.reload.equipped?
   end
 
   test "battle enemy hp color changes by remaining rate" do
@@ -417,6 +541,28 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to game_path(panel: "inn", inn_menu: "base")
     base = @player.player_bases.find_by!(location: beginning_town, base_type: "home")
     assert_equal 100, base.storage_limit
+  end
+
+  test "setting a temporary base elsewhere deactivates the previous one" do
+    town_a = Location.create!(name: "仮拠点テスト町A", floor: 1, danger_level: 0, safe_area: true, temporary_base_allowed: true)
+    town_b = Location.create!(name: "仮拠点テスト町B", floor: 1, danger_level: 0, safe_area: true, temporary_base_allowed: true)
+    @player.update!(location: town_a)
+    @player.town_discovery_for.update!(found_inn: true)
+
+    post set_home_base_path, params: { confirm: "1" }
+    assert_redirected_to game_path(panel: "inn", inn_menu: "base")
+    base_a = @player.player_bases.find_by!(location: town_a, base_type: "temporary")
+    assert base_a.active?
+
+    @player.update!(location: town_b)
+    @player.town_discovery_for.update!(found_inn: true)
+    post set_home_base_path, params: { confirm: "1" }
+    assert_redirected_to game_path(panel: "inn", inn_menu: "base")
+    base_b = @player.player_bases.find_by!(location: town_b, base_type: "temporary")
+
+    assert base_b.active?
+    refute base_a.reload.active?
+    assert_equal 1, @player.player_bases.where(base_type: "temporary", active: true).count
   end
 
   test "home base col management can deposit and withdraw all col" do
