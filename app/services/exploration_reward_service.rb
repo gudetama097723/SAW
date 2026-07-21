@@ -310,6 +310,16 @@ class ExplorationRewardService
       messages << "#{item_reward["name"]}を#{item_reward["quantity"].presence || 1}個入手した。"
     end
 
+    if reward["weapon"].present?
+      weapon = player.weapons.create!(reward["weapon"].merge("equipped" => false, "origin" => "quest_reward"))
+      messages << "#{weapon.name}を入手した。"
+    end
+
+    if reward["armor"].present?
+      armor = player.armors.create!(reward["armor"].merge("equipped" => false))
+      messages << "#{armor.name}を入手した。"
+    end
+
     player.save!
     messages.join
   end

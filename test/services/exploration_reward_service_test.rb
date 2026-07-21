@@ -182,6 +182,43 @@ class ExplorationRewardServiceTest < ActiveSupport::TestCase
     assert player.player_boss_kills.find_by(mob: fenrir).found?
   end
 
+  test "treasure reward can grant a weapon with quest_reward origin" do
+    player = create_player!
+    route = create_route!
+    area = create_area!(route)
+    treasure = TreasureChest.create!(
+      route: route,
+      field_area: area,
+      name: "踏破の証",
+      position: 100,
+      discovery_type: "mapping",
+      required_mapping: 100,
+      reward_data: {
+        col: 50,
+        weapon: {
+          name: "テスト用の牙短剣",
+          weapon_type: "短剣",
+          rarity: "rare",
+          attack_power: 14,
+          durability: 260,
+          max_durability: 260,
+          critical_rate: 16,
+          attack_attributes: "斬撃|刺突"
+        }
+      }.to_json
+    )
+    player.player_treasure_chests.create!(treasure_chest: treasure, found: true)
+
+    result = ExplorationRewardService.open_treasure!(player, treasure)
+
+    assert_equal :ok, result.status
+    assert_includes result.message, "テスト用の牙短剣を入手した。"
+    weapon = player.weapons.find_by!(name: "テスト用の牙短剣")
+    assert_equal "quest_reward", weapon.origin
+    assert weapon.evolvable_origin?
+    assert_not weapon.equipped?
+  end
+
   test "boss victories count repeated defeats after the first clear" do
     player = create_player!
     route = create_route!

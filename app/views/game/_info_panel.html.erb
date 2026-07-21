@@ -22,7 +22,6 @@
       <h6>武器詳細</h6>
       <p class="mb-1">武器: <%= selected_detail_weapon.display_name %></p>
       <p class="mb-1">種別: <%= selected_detail_weapon.weapon_type %></p>
-      <p class="mb-1">攻撃力: <%= formatted_attack_power(selected_detail_weapon.effective_attack_power) %></p>
       <p class="mb-1">基礎: <%= selected_detail_weapon.attack_power %> / 強化補正: +<%= formatted_attack_bonus_percent(selected_detail_weapon) %>%</p>
       <p class="mb-1">クリティカル率: <%= selected_detail_weapon.critical_rate %>%</p>
       <p class="mb-1">耐久力: <%= selected_detail_weapon.durability %> / <%= selected_detail_weapon.effective_max_durability %>（<%= selected_detail_weapon.durability_condition_label %>）</p>

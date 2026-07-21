@@ -40,9 +40,11 @@
     </div>
   </main>
 
-  <div class="message-dock">
-    <div class="container">
-      <%= render "messages" %>
+  <% if message_text.present? %>
+    <div class="message-dock">
+      <div class="container">
+        <%= render "messages" %>
+      </div>
     </div>
-  </div>
+  <% end %>
 </div>

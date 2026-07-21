@@ -125,6 +125,78 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "防具 +3"
   end
 
+  test "skill mods render as two column name list and expand details on selection" do
+    @player.skills.create!(
+      name: "片手直剣",
+      proficiency: 250,
+      skill_exp: 0,
+      skill_category: "weapon",
+      weapon_skill: true
+    )
+
+    get game_path, params: { panel: "skills", skill_set: "片手直剣" }
+
+    assert_response :success
+    assert_includes response.body, "row-cols-2"
+    assert_includes response.body, "刃筋補正"
+    assert_includes response.body, 'id="skill-mods"'
+    assert_includes response.body, "#skill-mods"
+    assert_not_includes response.body, "片手直剣の命中 +3ずつ"
+
+    get game_path, params: { panel: "skills", skill_set: "片手直剣", selected_mod_key: "blade_line" }
+
+    assert_response :success
+    assert_includes response.body, "片手直剣の命中 +3ずつ"
+    assert_includes response.body, "習得確認へ"
+
+    get game_path, params: { panel: "skills", skill_set: "片手直剣", confirm_mod_key: "blade_line" }
+
+    assert_response :success
+    assert_includes response.body, "本当に習得しますか？"
+    assert_includes response.body, "補助式ptは振り直しできません。"
+    assert_includes response.body, "はい"
+    assert_includes response.body, "いいえ"
+  end
+
+  test "learning skill mod requires confirmation before spending points" do
+    skill = @player.skills.create!(
+      name: "片手直剣",
+      proficiency: 50,
+      skill_exp: 0,
+      skill_category: "weapon",
+      weapon_skill: true
+    )
+
+    post learn_skill_mod_path, params: { skill_set: "片手直剣", mod_key: "blade_line" }
+
+    assert_redirected_to game_path(panel: "skills", skill_set: "片手直剣", selected_mod_key: "blade_line", confirm_mod_key: "blade_line", anchor: "skill-mods")
+    assert_equal "補助式の習得内容を確認してください。", flash[:alert]
+    assert_equal 0, skill.reload.skill_mod_rank("blade_line")
+    assert_equal 1, skill.skill_mod_points_remaining
+
+    post learn_skill_mod_path, params: { skill_set: "片手直剣", mod_key: "blade_line", confirm_skill_mod: "1" }
+
+    assert_redirected_to game_path(panel: "skills", skill_set: "片手直剣")
+    assert_equal 1, skill.reload.skill_mod_rank("blade_line")
+    assert_equal 0, skill.skill_mod_points_remaining
+  end
+
+  test "selected sword skill name link closes its detail panel" do
+    @player.skills.create!(
+      name: "片手直剣",
+      proficiency: 50,
+      skill_exp: 0,
+      skill_category: "weapon",
+      weapon_skill: true
+    )
+
+    get game_path, params: { panel: "skills", skill_set: "片手直剣", sword_skill: "vertical" }
+
+    assert_response :success
+    assert_includes response.body, "威力倍率:"
+    assert_select "a.btn-info[href=?]", game_path(panel: "skills", skill_set: "片手直剣")
+  end
+
   test "equipment info shows equipped armor durability" do
     @player.armors.create!(
       name: "耐久表示テスト鎧",
@@ -179,7 +251,7 @@ class GameControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "武器詳細"
     assert_includes response.body, "情報詳細テスト剣"
-    assert_includes response.body, "攻撃力:"
+    assert_includes response.body, "クリティカル率:"
 
     get game_path, params: { panel: "equipment", detail_armor_id: armor.id }
     assert_response :success
@@ -724,5 +796,19 @@ class GameControllerTest < ActionDispatch::IntegrationTest
 
     get game_path, params: { panel: "equipment" }
     assert_match(/盾:\s*装備不能/, response.body)
+  end
+
+  test "message dock is hidden when there is no flash message and shown when there is one" do
+    get game_path # consume the login flash message set during setup
+    assert_response :success
+    assert_includes response.body, "message-dock"
+
+    get game_path
+    assert_response :success
+    assert_not_includes response.body, "message-dock"
+
+    post stroll_path
+    follow_redirect!
+    assert_includes response.body, "message-dock"
   end
 end

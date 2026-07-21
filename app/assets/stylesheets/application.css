@@ -689,8 +689,20 @@
   line-height: 1.35;
 }
 
-.message-window .text-secondary {
-  color: rgba(248, 249, 250, 0.62) !important;
+#skill-mods {
+  scroll-margin-top: 11rem;
+}
+
+@media (max-width: 1199.98px) {
+  #skill-mods {
+    scroll-margin-top: 14rem;
+  }
+}
+
+@media (max-width: 767.98px) {
+  #skill-mods {
+    scroll-margin-top: 1rem;
+  }
 }
 
 .saw-visual {

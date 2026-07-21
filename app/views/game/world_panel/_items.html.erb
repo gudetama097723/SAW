@@ -57,7 +57,6 @@
                 <% end %>
                 <% if weapon.fully_enhanced? %><p class="text-warning mb-1">【完全強化】</p><% end %>
                 <p class="mb-1">強化: <%= weapon.enhancement_breakdown %>（+<%= weapon.enhancement_level %> / 試行 <%= weapon.enhance_attempts %>/<%= weapon.enhance_limit %>）</p>
-                <p class="mb-1">強化難度: <%= weapon.enhancement_difficulty %></p>
                 <p class="mb-1">耐久力: <%= weapon.durability %>/<%= weapon.effective_max_durability %>（<%= weapon.durability_condition_label %> / 攻撃力 <%= (weapon.durability_attack_multiplier * 100).to_i %>%）</p>
                 <p class="mb-1">攻撃属性: <%= weapon.attack_attribute_list.join(" / ") %></p>
                 <p class="mb-1">クリティカル率: <%= weapon.critical_rate %>%</p>
@@ -65,7 +64,6 @@
                 <p class="mb-1">重量: <%= weapon.weight %></p>
                 <p class="mb-1">能力反映: 筋力 <%= weapon.strength_ratio %>% / 敏捷 <%= weapon.agility_ratio %>%</p>
                 <p class="mb-1">補正: HP <%= signed_bonus(weapon.hp_bonus) %> / 筋力 <%= signed_bonus(weapon.strength_bonus) %> / 敏捷 <%= signed_bonus(weapon.agility_bonus) %></p>
-                <p class="mb-1">売却価格: <%= weapon.sell_price %>刻銭</p>
                 <% if weapon.description.present? %>
                   <p class="mb-2"><%= weapon.description %></p>
                 <% end %>
@@ -205,7 +203,6 @@
               <div class="collapse p-2"
                   id="item-right-<%= item.id %>">
 
-                <%= render "game/visual_asset", kind: :item, record: item, label: item.name, class_name: "saw-visual-detail mb-2" %>
                 <p class="mb-1">分類: <%= item.category_name %></p>
                 <p class="mb-1">数量: <%= item.quantity.to_i %></p>
                 <p class="mb-1">単体重量: <%= item.weight %></p>

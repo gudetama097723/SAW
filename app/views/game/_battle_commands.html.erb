@@ -125,19 +125,24 @@
       <h5><%= skill_set %>スキル</h5>
       <div class="d-grid gap-2">
         <% sword_skill_definitions.each do |skill_definition| %>
-          <%= link_to sword_skill_locked_out ? "#{skill_definition.name} 発動不能:#{sword_skill_lockout_turns}" : skill_definition.name,
+          <% skill_label = sword_skill_display_name(skill_definition, sword_skill) %>
+          <%= link_to sword_skill_locked_out ? "#{skill_label} 発動不能:#{sword_skill_lockout_turns}" : skill_label,
               game_path(battle_command: "sword_skill", skill_group: "sword_skill", selected_skill: skill_definition.key),
               class: sword_skill_locked_out ? "btn btn-outline-secondary w-100" : "btn btn-outline-danger w-100" %>
         <% end %>
       </div>
     <% else %>
-      <h5><%= selected_skill_definition.name %></h5>
+      <% selected_skill_level_bonus_lines = sword_skill_level_bonus_lines(selected_skill_definition, sword_skill) %>
+      <h5><%= sword_skill_display_name(selected_skill_definition, sword_skill) %></h5>
       <p class="mb-1">種別: <%= selected_skill_definition.target_label %></p>
       <p class="mb-1">威力倍率: <%= selected_skill_definition.damage_multiplier %>%</p>
       <% effective_skill_ct = BattleService.effective_sword_skill_cooldown(@player, equipped_weapon, selected_skill_definition.cooldown) %>
       <% effective_skill_durability = BattleService.effective_sword_skill_durability_cost(@player, equipped_weapon, selected_skill_definition.key, selected_skill_definition.durability_cost, selected_skill_definition.cooldown) %>
-      <p class="mb-1">消費耐久: <%= effective_skill_durability %></p>
+      <p class="mb-1">消費耐久力: <%= effective_skill_durability %></p>
       <p class="mb-1">CT: <%= effective_skill_ct %></p>
+      <% if selected_skill_level_bonus_lines.any? %>
+        <p class="mb-1">レベル補正: <%= selected_skill_level_bonus_lines.join(" / ") %></p>
+      <% end %>
       <% if sword_skill_locked_out %>
         <p class="text-warning mb-1">発動不能: あと<%= sword_skill_lockout_turns %>ターン</p>
       <% end %>

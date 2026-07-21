@@ -23,6 +23,20 @@ module GameHelper
     "#{sign}#{formatted_enhancement_preview_value(preview, change)}#{preview.unit}"
   end
 
+  def sword_skill_display_name(skill_definition, skill)
+    level = skill ? skill.sword_skill_level(skill_definition.key).to_i.clamp(1, 100) : 1
+    "#{skill_definition.name} Lv.#{level}"
+  end
+
+  def sword_skill_level_bonus_lines(skill_definition, skill)
+    level = skill ? skill.sword_skill_level(skill_definition.key).to_i.clamp(1, 100) : 1
+    [
+      ("威力 +#{level / 5}%" if (level / 5).positive?),
+      ("命中 +#{level / 20 * 2}" if (level / 20 * 2).positive?),
+      ("耐久 -#{level / 30}" if (level / 30).positive?)
+    ].compact
+  end
+
   def game_environment_classes(player, environment_location)
     [
       "game-shell",

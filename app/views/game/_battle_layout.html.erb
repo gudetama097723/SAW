@@ -136,9 +136,15 @@
           <% elsif sword_skill.blank? %>
             <p class="small mb-0"><%= skill_set %>スキルを習得していません。</p>
           <% elsif selected_skill_definition %>
-            <h6><%= selected_skill_definition.name %></h6>
+            <% selected_skill_level_bonus_lines = sword_skill_level_bonus_lines(selected_skill_definition, sword_skill) %>
+            <% effective_skill_ct = BattleService.effective_sword_skill_cooldown(@player, combat_weapon, selected_skill_definition.cooldown) %>
+            <% effective_skill_durability = BattleService.effective_sword_skill_durability_cost(@player, combat_weapon, selected_skill_definition.key, selected_skill_definition.durability_cost, selected_skill_definition.cooldown) %>
+            <h6><%= sword_skill_display_name(selected_skill_definition, sword_skill) %></h6>
             <p class="small mb-1">種別: <%= selected_skill_definition.target_label %></p>
-            <p class="small mb-1">威力: <%= selected_skill_definition.damage_multiplier %>% / 耐久消費: <%= selected_skill_definition.durability_cost %> / CT: <%= selected_skill_definition.cooldown %></p>
+            <p class="small mb-1">威力: <%= selected_skill_definition.damage_multiplier %>% / 消費耐久力: <%= effective_skill_durability %> / CT: <%= effective_skill_ct %></p>
+            <% if selected_skill_level_bonus_lines.any? %>
+              <p class="small mb-1">レベル補正: <%= selected_skill_level_bonus_lines.join(" / ") %></p>
+            <% end %>
             <% if sword_skill_locked_out %>
               <p class="small text-warning mb-1">発動不能: あと<%= sword_skill_lockout_turns %>ターン</p>
             <% end %>
@@ -174,12 +180,13 @@
             <div class="d-grid gap-2">
               <% sword_skill_definitions.each do |skill_definition| %>
                 <% cooldown = @player.sword_skill_cooldown(skill_definition.key) %>
+                <% skill_label = sword_skill_display_name(skill_definition, sword_skill) %>
                 <% label = if sword_skill_locked_out
-                     "#{skill_definition.name} 発動不能:#{sword_skill_lockout_turns}"
+                     "#{skill_label} 発動不能:#{sword_skill_lockout_turns}"
                    elsif cooldown.positive?
-                     "#{skill_definition.name} CT:#{cooldown}"
+                     "#{skill_label} CT:#{cooldown}"
                    else
-                     skill_definition.name
+                     skill_label
                    end %>
                 <%= link_to label,
                     game_path(battle_command: "sword_skill", skill_group: "sword_skill", selected_skill: skill_definition.key, target_enemy_id: selected_enemy&.id),

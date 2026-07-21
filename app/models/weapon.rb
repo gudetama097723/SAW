@@ -173,7 +173,10 @@ end
 
 def sell_price
     base = effective_attack_power.to_i * 4
-    [(base * rarity_cost_multiplier / 2.0).floor, 1].max
+    # 強化段階が高いほど、また強化試行を使い切っていない(伸びしろが残っている)ほど高値になる。
+    # 同じ+6でも試行を余して到達した個体の方が、試行を使い切った個体より高く売れる。
+    enhancement_multiplier = 1.0 + enhancement_level.to_i * 0.05 + remaining_enhance_attempts * 0.03
+    [(base * enhancement_multiplier * rarity_cost_multiplier / 2.0).floor, 1].max
   end
 
   def attack_attribute_list

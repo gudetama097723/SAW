@@ -48,6 +48,11 @@ module Game
         return
       end
 
+      unless params[:confirm_skill_mod] == "1"
+        redirect_to game_path(panel: "skills", skill_set: skill.name, selected_mod_key: mod.key, confirm_mod_key: mod.key, anchor: "skill-mods"), alert: "補助式の習得内容を確認してください。"
+        return
+      end
+
       rank = skill.learn_skill_mod!(mod.key)
       redirect_to game_path(panel: "skills", skill_set: skill.name), notice: "#{mod.name}を#{rank}段階に強化した。"
     end
